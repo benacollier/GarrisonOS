@@ -54,8 +54,11 @@ garrison.yourdomain.com {
     php_fastcgi unix//run/php/php8.2-fpm.sock
     file_server
 
-    # Block direct access to hidden files or internal PHP includes
+    # Block direct access to hidden files, env files, SQLite databases, and internal PHP includes
     @restricted {
+        path /.*
+        path *.env*
+        path *.sqlite*
         path /lib/*
         path /templates/*
     }
@@ -80,7 +83,12 @@ server {
         fastcgi_pass unix:/run/php/php8.2-fpm.sock;
     }
 
+    # Deny direct access to internal templates, includes, hidden files, env files, and SQLite databases
     location ~ ^/(lib|templates) {
+        deny all;
+    }
+
+    location ~ /(\.|\.env|\.sqlite) {
         deny all;
     }
 }

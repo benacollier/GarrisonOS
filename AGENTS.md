@@ -47,6 +47,8 @@ This document establishes the mandatory engineering standards, architectural con
 * Authentication tokens are signed HMAC-SHA256 tokens.
 * All state-modifying requests from the presentation layer must validate cryptographic CSRF tokens stored in the PHP session.
 * Public authentication endpoints must enforce sliding-window in-memory rate limiting.
+* **Network & Loopback Binding**: The Node.js core engine must strictly bind to `127.0.0.1` (loopback) to prevent direct untrusted network exposure.
+* **File Uploads & Media Storage**: Uploaded attachments must be stored outside the web root (`STORAGE_PATH`), validate explicit allowed MIME/extension whitelists, enforce byte size bounds, and validate paths against directory traversal attacks.
 
 ---
 

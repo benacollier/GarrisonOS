@@ -42,6 +42,16 @@ Hooks::registerDashboardMetric(function($api) {
 
 ## 3. Session & CSRF Security
 
+### Session Cookie Hygiene & Hardening
+Production PHP configurations (`php.ini` or front controller) must enforce strict cookie hygiene:
+```ini
+session.cookie_httponly = 1
+session.cookie_secure = 1
+session.cookie_samesite = "Strict"
+session.use_strict_mode = 1
+```
+
+### CSRF Protection
 Every state-modifying form in PHP must include the CSRF token:
 
 ```html
