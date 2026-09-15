@@ -65,7 +65,7 @@ describe('Backup Module - Snapshots, Exports, and Integrity Verification', () =>
 
   it('creates a tenant data export archive and verifies its content and checksum', async () => {
     await runInTenantContext(testTenant, async () => {
-      // Seed a sample record in a tenant table (e.g. audit_logs or contacts)
+      // Seed a sample record in a tenant table
       const db = getDatabase();
       db.prepare(`
         INSERT INTO audit_logs (id, tenant_id, user_id, entity_type, entity_id, action, changes_json, ip_address, created_at)
@@ -99,6 +99,68 @@ describe('Backup Module - Snapshots, Exports, and Integrity Verification', () =>
     });
   });
 
+  it('restores tenant data with clean_slate and merge options', async () => {
+    await runInTenantContext(testTenant, async () => {
+      const db = getDatabase();
+
+      // 1. Establish initial state
+      db.prepare(`
+        INSERT INTO audit_logs (id, tenant_id, user_id, entity_type, entity_id, action, changes_json, ip_address, created_at)
+        VALUES ('log-snap-1', ?, 'user-1', 'test', 'item-snap', 'create', '{"version":1}', '127.0.0.1', ?)
+      `).run(testTenant, Date.now());
+
+      // Create backup
+      const backup = await BackupService.createTenantExport();
+
+      // 2. Mutate state: add new log and modify initial record
+      db.prepare(`
+        INSERT INTO audit_logs (id, tenant_id, user_id, entity_type, entity_id, action, changes_json, ip_address, created_at)
+        VALUES ('log-new-2', ?, 'user-1', 'test', 'item-new', 'create', '{"version":2}', '127.0.0.1', ?)
+      `).run(testTenant, Date.now());
+
+      // 3. Test MERGE mode: restores snapshot records but keeps new record
+      const mergeResult = await BackupService.restoreTenantData(
+        { backupId: backup.id },
+        { mode: 'merge' }
+      );
+      assert.equal(mergeResult.success, true);
+      assert.equal(mergeResult.mode, 'merge');
+
+      const logsAfterMerge = db.prepare('SELECT id FROM audit_logs WHERE tenant_id = ?').all(testTenant) as { id: string }[];
+      const logIdsAfterMerge = logsAfterMerge.map((l) => l.id);
+      assert.ok(logIdsAfterMerge.includes('log-snap-1'));
+      assert.ok(logIdsAfterMerge.includes('log-new-2')); // preserved
+
+      // 4. Test CLEAN_SLATE mode: replaces tenant records, clearing post-snapshot records
+      const cleanResult = await BackupService.restoreTenantData(
+        { backupId: backup.id },
+        { mode: 'clean_slate' }
+      );
+      assert.equal(cleanResult.success, true);
+      assert.equal(cleanResult.mode, 'clean_slate');
+
+      const logsAfterClean = db.prepare('SELECT id FROM audit_logs WHERE tenant_id = ?').all(testTenant) as { id: string }[];
+      const logIdsAfterClean = logsAfterClean.map((l) => l.id);
+      assert.ok(logIdsAfterClean.includes('log-snap-1'));
+      assert.equal(logIdsAfterClean.includes('log-new-2'), false); // wiped clean
+    });
+  });
+
+  it('rejects cross-tenant data restoration attempts', async () => {
+    let backupId = '';
+    await runInTenantContext(testTenant, async () => {
+      const backup = await BackupService.createTenantExport();
+      backupId = backup.id;
+    });
+
+    // Attempt to restore testTenant's archive while operating under otherTenant context
+    await runInTenantContext(otherTenant, async () => {
+      await assert.rejects(async () => {
+        await BackupService.restoreTenantData({ backupId });
+      }, /not found|prohibited/);
+    });
+  });
+
   it('prevents path traversal during file resolution', () => {
     assert.throws(() => {
       BackupService.resolveSafeBackupPath('../../../etc/passwd');
@@ -122,4 +184,3 @@ describe('Backup Module - Snapshots, Exports, and Integrity Verification', () =>
     });
   });
 });
-

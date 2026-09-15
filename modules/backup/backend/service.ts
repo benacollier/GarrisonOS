@@ -3,9 +3,20 @@ import * as path from 'node:path';
 import * as zlib from 'node:zlib';
 import * as crypto from 'node:crypto';
 import { pipeline } from 'node:stream/promises';
-import { getDatabase } from '../../../database/client.js';
+import { getDatabase, closeDatabase, withTransaction } from '../../../database/client.js';
+import { runMigrations } from '../../../database/migrator.js';
 import { RequestContext } from '../../../core/context.js';
 import { BackupRecord, BackupRepository } from './repository.js';
+
+export interface RestoreTenantOptions {
+  mode: 'clean_slate' | 'merge';
+}
+
+export interface RestoreTenantResult {
+  success: boolean;
+  restoredTables: { [tableName: string]: number };
+  mode: 'clean_slate' | 'merge';
+}
 
 export class BackupService {
   public static getBackupDir(): string {
@@ -57,7 +68,6 @@ export class BackupService {
       db.exec('PRAGMA wal_checkpoint(TRUNCATE);');
 
       // SQLite safe online vacuum backup
-      // Parameterized VACUUM INTO is supported in SQLite
       const vacuumStmt = db.prepare('VACUUM INTO ?');
       vacuumStmt.run(tempSnapshotPath);
 
@@ -223,5 +233,179 @@ export class BackupService {
       }
     }
     return pruned;
+  }
+
+  /**
+   * Restore tenant data from a backup archive buffer or on-disk backup ID.
+   * Options:
+   *  - clean_slate: Replaces all tenant records in the backed up tables before inserting.
+   *  - merge: Inserts or replaces records without deleting unmentioned tenant records.
+   */
+  public static async restoreTenantData(
+    source: { backupId?: string; compressedBuffer?: Buffer },
+    options: RestoreTenantOptions = { mode: 'clean_slate' }
+  ): Promise<RestoreTenantResult> {
+    const tenantId = RequestContext.getTenantId();
+
+    let rawBuffer: Buffer;
+    if (source.backupId) {
+      const record = BackupRepository.getById(source.backupId);
+      if (!record) {
+        throw new Error(`Backup record not found: ${source.backupId}`);
+      }
+      if (record.backup_type !== 'tenant_data') {
+        throw new Error(`Only tenant_data backups can be restored into an active tenant session`);
+      }
+      const fullPath = this.resolveSafeBackupPath(record.relative_path);
+      if (!fs.existsSync(fullPath)) {
+        throw new Error(`Backup file missing from storage`);
+      }
+      rawBuffer = fs.readFileSync(fullPath);
+    } else if (source.compressedBuffer) {
+      rawBuffer = source.compressedBuffer;
+    } else {
+      throw new Error('Either backupId or compressedBuffer must be provided');
+    }
+
+    // Decompress and parse JSON
+    let exportData: Record<string, any[]>;
+    try {
+      const jsonText = zlib.gunzipSync(rawBuffer).toString('utf8');
+      exportData = JSON.parse(jsonText);
+    } catch (err: any) {
+      throw new Error(`Failed to decompress and parse backup archive: ${err.message}`);
+    }
+
+    // Verify tenant isolation metadata
+    const metadata = exportData['_export_metadata'];
+    if (!Array.isArray(metadata) || metadata.length === 0 || metadata[0]?.tenant_id !== tenantId) {
+      throw new Error(
+        `Cross-tenant restore prohibited: archive tenant_id '${metadata?.[0]?.tenant_id}' does not match active tenant_id '${tenantId}'`
+      );
+    }
+
+    const restoredTables: { [tableName: string]: number } = {};
+
+    // Execute atomic transaction for safe rollback
+    withTransaction((tx) => {
+      // Find all operational tenant-scoped tables that are safe to restore
+      const dbTables = tx.prepare(`
+        SELECT DISTINCT m.name as table_name
+        FROM sqlite_master m
+        JOIN pragma_table_info(m.name) p
+        WHERE m.type = 'table' AND p.name = 'tenant_id' AND m.name != 'backups'
+      `).all() as { table_name: string }[];
+
+      const validTableNames = new Set(dbTables.map((t) => t.table_name));
+
+      // 1. If clean_slate mode, delete existing tenant records from tables in reverse order
+      if (options.mode === 'clean_slate') {
+        for (const tableName of Object.keys(exportData)) {
+          if (tableName === '_export_metadata' || !validTableNames.has(tableName)) continue;
+          tx.prepare(`DELETE FROM "${tableName}" WHERE tenant_id = ?`).run(tenantId);
+        }
+      }
+
+      // 2. Insert records table by table
+      for (const [tableName, rows] of Object.entries(exportData)) {
+        if (tableName === '_export_metadata' || !validTableNames.has(tableName) || !Array.isArray(rows)) {
+          continue;
+        }
+
+        let insertedCount = 0;
+        for (const row of rows) {
+          if (typeof row !== 'object' || row === null) continue;
+
+          // Enforce tenant_id matches active context
+          const sanitizedRow = { ...row, tenant_id: tenantId };
+          const cols = Object.keys(sanitizedRow);
+          if (cols.length === 0) continue;
+
+          const placeholders = cols.map(() => '?').join(', ');
+          const colNames = cols.map((c) => `"${c}"`).join(', ');
+          const values = cols.map((c) => sanitizedRow[c]);
+
+          // Use INSERT OR REPLACE to support both merge and clean_slate cleanly
+          const insertSql = `INSERT OR REPLACE INTO "${tableName}" (${colNames}) VALUES (${placeholders})`;
+          tx.prepare(insertSql).run(...values);
+          insertedCount++;
+        }
+
+        restoredTables[tableName] = insertedCount;
+      }
+    });
+
+    return {
+      success: true,
+      restoredTables,
+      mode: options.mode
+    };
+  }
+
+  /**
+   * Disaster Recovery: Restores the full SQLite database from a .sqlite.gz snapshot.
+   * Safely removes active WAL/SHM handles, swaps files, and re-applies any pending migrations.
+   */
+  public static async restoreFullDatabase(sourcePath: string): Promise<void> {
+    if (!fs.existsSync(sourcePath)) {
+      throw new Error(`Snapshot file not found: ${sourcePath}`);
+    }
+
+    const dbPath = process.env['SQLITE_PATH'] || './garrison.sqlite';
+    const resolvedDbPath = path.resolve(dbPath);
+    const walPath = `${resolvedDbPath}-wal`;
+    const shmPath = `${resolvedDbPath}-shm`;
+
+    // 1. Decompress snapshot to a temporary verification file
+    const tempDbPath = path.resolve(path.dirname(resolvedDbPath), `restore-tmp-${Date.now()}.sqlite`);
+    try {
+      const sourceStream = fs.createReadStream(sourcePath);
+      const isGzip = sourcePath.endsWith('.gz');
+
+      if (isGzip) {
+        const gunzipStream = zlib.createGunzip();
+        const destStream = fs.createWriteStream(tempDbPath);
+        await pipeline(sourceStream, gunzipStream, destStream);
+      } else {
+        const destStream = fs.createWriteStream(tempDbPath);
+        await pipeline(sourceStream, destStream);
+      }
+
+      // Verify SQLite header magic bytes (first 16 bytes: "SQLite format 3\0")
+      const fd = fs.openSync(tempDbPath, 'r');
+      const headerBuf = Buffer.alloc(16);
+      fs.readSync(fd, headerBuf, 0, 16, 0);
+      fs.closeSync(fd);
+
+      if (headerBuf.toString('utf8', 0, 15) !== 'SQLite format 3') {
+        throw new Error('Invalid SQLite database header in restored snapshot');
+      }
+
+      // 2. Close active database connections
+      closeDatabase();
+
+      // 3. Remove stale WAL and SHM files
+      if (fs.existsSync(walPath)) {
+        try { fs.unlinkSync(walPath); } catch {}
+      }
+      if (fs.existsSync(shmPath)) {
+        try { fs.unlinkSync(shmPath); } catch {}
+      }
+
+      // 4. Overwrite main database file
+      fs.copyFileSync(tempDbPath, resolvedDbPath);
+
+      // Clean up temp file
+      try { fs.unlinkSync(tempDbPath); } catch {}
+
+      // 5. Re-open database and run migrations to catch up any newer schema changes
+      const db = getDatabase();
+      runMigrations(db);
+    } catch (err: any) {
+      if (fs.existsSync(tempDbPath)) {
+        try { fs.unlinkSync(tempDbPath); } catch {}
+      }
+      throw err;
+    }
   }
 }

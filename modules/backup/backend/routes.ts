@@ -2,7 +2,7 @@ import * as fs from 'node:fs';
 import { Router } from '../../../api/router.js';
 import { successResponse, errorResponse } from '../../../api/response.js';
 import { BackupRepository } from './repository.js';
-import { BackupService } from './service.js';
+import { BackupService, RestoreTenantOptions } from './service.js';
 import { eventBus } from '../../../core/events.js';
 
 export function registerRoutes(router: Router): void {
@@ -111,6 +111,33 @@ export function registerRoutes(router: Router): void {
     }
   });
 
+  // Restore tenant data from an existing backup ID
+  router.post('/api/v1/backups/:id/restore', async (req, res) => {
+    try {
+      const { id } = (req as any).params;
+      const body = (req as any).body || {};
+      const mode = body.mode === 'merge' ? 'merge' : 'clean_slate';
+
+      const result = await BackupService.restoreTenantData(
+        { backupId: id },
+        { mode }
+      );
+
+      eventBus.publish('backup.restored', {
+        backupId: id,
+        mode,
+        restoredTables: result.restoredTables
+      });
+
+      successResponse(res, {
+        message: `Tenant data restored successfully in ${mode} mode`,
+        ...result
+      });
+    } catch (err: any) {
+      errorResponse(res, 'RESTORE_FAILED', err.message, 400);
+    }
+  });
+
   // Delete backup
   router.delete('/api/v1/backups/:id', (req, res) => {
     try {
@@ -127,4 +154,3 @@ export function registerRoutes(router: Router): void {
     }
   });
 }
-

@@ -6,7 +6,7 @@
 $flashMessage = '';
 $flashError = '';
 
-// Handle POST actions: trigger backup, verify, delete
+// Handle POST actions: trigger backup, verify, delete, restore
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
     
@@ -31,6 +31,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
             } catch (Exception $e) {
                 $flashError = 'Verification error: ' . $e->getMessage();
+            }
+        }
+    } elseif ($action === 'restore') {
+        $backupId = $_POST['backup_id'] ?? '';
+        $mode = $_POST['restore_mode'] ?? 'clean_slate';
+        if ($backupId) {
+            try {
+                $res = $api->post("/api/v1/backups/{$backupId}/restore", ['mode' => $mode]);
+                $flashMessage = $res['data']['message'] ?? "Tenant data restored successfully ({$mode}).";
+            } catch (Exception $e) {
+                $flashError = 'Failed to restore backup: ' . $e->getMessage();
             }
         }
     } elseif ($action === 'delete') {
@@ -62,7 +73,7 @@ try {
     <div>
         <h1 style="margin: 0; font-size: 1.75rem;">Backup & Disaster Recovery</h1>
         <p style="margin: 0.25rem 0 0; color: var(--color-text-muted, #666);">
-            Create point-in-time snapshots, verify checksums, and export tenant archives.
+            Create point-in-time snapshots, verify checksums, and restore tenant archives.
         </p>
     </div>
 </div>
@@ -148,7 +159,7 @@ try {
                             <td style="padding: 0.75rem 0.5rem; font-family: monospace; font-size: 0.8rem;" title="<?= htmlspecialchars($b['checksum_sha256'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?>">
                                 <?= htmlspecialchars(substr($b['checksum_sha256'], 0, 12) . '...', ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?>
                             </td>
-                            <td style="padding: 0.75rem 0.5rem; text-align: right; display: flex; gap: 0.5rem; justify-content: flex-end;">
+                            <td style="padding: 0.75rem 0.5rem; text-align: right; display: flex; gap: 0.5rem; justify-content: flex-end; align-items: center;">
                                 <?php if ($b['status'] === 'completed'): ?>
                                     <a href="/api/v1/backups/<?= urlencode($b['id']) ?>/download" 
                                        style="padding: 0.25rem 0.5rem; background: #f1f3f4; border: 1px solid #dadce0; border-radius: 4px; text-decoration: none; color: #202124; font-size: 0.85rem;"
@@ -164,6 +175,15 @@ try {
                                             Verify
                                         </button>
                                     </form>
+
+                                    <?php if ($b['backup_type'] === 'tenant_data'): ?>
+                                        <!-- Restore Trigger with Modal / Prompt Selection -->
+                                        <button type="button" 
+                                                onclick="openRestoreModal('<?= htmlspecialchars($b['id'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?>', '<?= htmlspecialchars($b['filename'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?>')"
+                                                style="padding: 0.25rem 0.5rem; background: #e8f0fe; color: #1a73e8; border: 1px solid #d2e3fc; border-radius: 4px; cursor: pointer; font-size: 0.85rem; font-weight: 500;">
+                                            Restore...
+                                        </button>
+                                    <?php endif; ?>
                                 <?php endif; ?>
 
                                 <form method="POST" action="/backup" style="display: inline;" onsubmit="return confirm('Permanently remove this backup archive?');">
@@ -183,3 +203,63 @@ try {
     <?php endif; ?>
 </div>
 
+<!-- Restore Modal Dialog -->
+<div id="restoreModal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;">
+    <div style="background: #fff; width: 100%; max-width: 480px; padding: 1.5rem; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
+        <h3 style="margin-top: 0; margin-bottom: 0.5rem;">Restore Tenant Data</h3>
+        <p style="font-size: 0.9rem; color: #555; margin-bottom: 1.25rem;">
+            Restoring from <strong id="modalBackupFilename">archive</strong>. Choose how you want existing tenant data handled:
+        </p>
+
+        <form method="POST" action="/backup" id="restoreForm">
+            <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(CSRF::getToken(), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?>">
+            <input type="hidden" name="action" value="restore">
+            <input type="hidden" name="backup_id" id="modalBackupId" value="">
+
+            <div style="display: flex; flex-direction: column; gap: 0.75rem; margin-bottom: 1.5rem;">
+                <label style="display: flex; gap: 0.75rem; align-items: flex-start; cursor: pointer; padding: 0.5rem; border: 1px solid #eee; border-radius: 4px;">
+                    <input type="radio" name="restore_mode" value="clean_slate" checked style="margin-top: 0.25rem;">
+                    <div>
+                        <strong style="display: block; font-size: 0.95rem;">Clean-Slate (Replace)</strong>
+                        <span style="font-size: 0.85rem; color: #666;">
+                            Clears existing tenant records in the backed-up tables before inserting the snapshot. Recommended for rollback to a prior point in time.
+                        </span>
+                    </div>
+                </label>
+
+                <label style="display: flex; gap: 0.75rem; align-items: flex-start; cursor: pointer; padding: 0.5rem; border: 1px solid #eee; border-radius: 4px;">
+                    <input type="radio" name="restore_mode" value="merge" style="margin-top: 0.25rem;">
+                    <div>
+                        <strong style="display: block; font-size: 0.95rem;">Merge / Upsert</strong>
+                        <span style="font-size: 0.85rem; color: #666;">
+                            Inserts or updates records matching IDs from the backup, but preserves any new records created since the backup.
+                        </span>
+                    </div>
+                </label>
+            </div>
+
+            <div style="display: flex; justify-content: flex-end; gap: 0.75rem;">
+                <button type="button" onclick="closeRestoreModal()" style="padding: 0.5rem 1rem; border: 1px solid #ccc; background: #fff; border-radius: 4px; cursor: pointer;">
+                    Cancel
+                </button>
+                <button type="submit" style="padding: 0.5rem 1rem; background: #1a73e8; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-weight: 500;">
+                    Confirm & Restore
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function openRestoreModal(backupId, filename) {
+    document.getElementById('modalBackupId').value = backupId;
+    document.getElementById('modalBackupFilename').innerText = filename;
+    const modal = document.getElementById('restoreModal');
+    modal.style.display = 'flex';
+}
+
+function closeRestoreModal() {
+    const modal = document.getElementById('restoreModal');
+    modal.style.display = 'none';
+}
+</script>
