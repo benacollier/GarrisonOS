@@ -82,7 +82,11 @@ class ApiClient {
             $response = curl_exec($ch);
             $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
             $transportError = curl_error($ch);
-            curl_close($ch);
+            if (PHP_VERSION_ID < 80500) {
+                curl_close($ch);
+            } else {
+                unset($ch);
+            }
         } else {
             $opts = [
                 'http' => [
