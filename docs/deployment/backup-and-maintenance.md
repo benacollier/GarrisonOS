@@ -14,6 +14,7 @@ GarrisonOS packages a native, zero-dependency Backup Module exposing administrat
 * `POST /api/v1/backups/:id/restore`: Restores tenant data in **Clean-Slate** (replace) or **Merge** (upsert) mode.
 
 ### What Happens Internally
+
 1. Executes `PRAGMA wal_checkpoint(TRUNCATE)` to flush WAL log frames into the main database file.
 2. Uses SQLite's online `VACUUM INTO` command to generate an uncorrupted snapshot.
 3. Streams through native Node.js `node:zlib` Gzip compression.
@@ -31,6 +32,7 @@ node scripts/restore.js storage/backups/garrison-db-<timestamp>.sqlite.gz
 ```
 
 The script:
+
 1. Validates SQLite binary format header (`SQLite format 3`).
 2. Purges stale `-wal` and `-shm` cache files to prevent corruption.
 3. Overwrites the database and automatically applies pending migrations (`runMigrations()`).

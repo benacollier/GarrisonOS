@@ -158,6 +158,7 @@ GarrisonOS is intentionally architected with **zero external runtime package dep
 * **Vendor Assignment & Cost Conversion**: Vendor assignment, scheduled repair dates, estimated vs. actual costs, with automatic creation of accounting expenses upon completion via the Event Bus.
 
 ### 6. Backup & Disaster Recovery (`modules/backup`)
+
 * **Point-in-Time SQLite Snapshots**: Safe WAL checkpointing and online SQLite `VACUUM INTO` snapshots with gzip compression (`.sqlite.gz`).
 * **Tenant Data Portability**: Tenant-isolated data export and restore (`.json.gz`) with user-selectable **Clean-Slate** (replace) or **Merge** (upsert) modes.
 * **Integrity Hashing**: Cryptographic SHA-256 integrity verification upon creation and on-demand.

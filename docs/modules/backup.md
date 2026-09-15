@@ -63,6 +63,7 @@ All endpoints require standard `X-Tenant-ID` header and authentication tokens.
 ## 4. Restoration Modes
 
 ### Tenant-Level Restoration (`tenant_data`)
+
 1. **Clean-Slate (Replace)**:
    - Deletes existing tenant records in the backed-up tables before inserting snapshot records.
    - Ideal for rolling back unintentional data alterations or deletions.
@@ -73,6 +74,7 @@ All endpoints require standard `X-Tenant-ID` header and authentication tokens.
    - The backup metadata is strictly validated against `RequestContext.getTenantId()`. A tenant is strictly barred from restoring another tenant's archive.
 
 ### Full System Disaster Recovery (`full_system`)
+
 Executed via the standalone CLI tool:
 
 ```bash
