@@ -15,6 +15,7 @@ This document establishes the mandatory engineering standards, architectural con
 
 * Maintain clean, idiomatic, human-grade engineering standards.
 * No conversational explanations, boilerplate disclaimers, or generic placeholder comments (e.g. `// TODO: Implement your logic here`).
+* **Portable Path Hygiene**: Never hardcode host- or user-specific absolute filesystem paths (e.g., `C:\Users\...`, `/home/user/...`, `/Users/...`) in source code, automated tests, seed scripts, mock fixtures, comments, or documentation. All filesystem interactions must be strictly portable and relative, utilizing `node:path` primitives (`path.join()`, `path.resolve()`, `import.meta.url`) or standard environment configuration (`STORAGE_PATH`, `SQLITE_PATH`).
 * Commit messages must strictly follow the [Conventional Commits](https://www.conventionalcommits.org/) specification:
   * `feat(scope): add new capability`
   * `fix(scope): resolve issue`

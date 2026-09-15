@@ -40,3 +40,4 @@ body:
       placeholder: "Node.js 22.5.0, PHP 8.2, Ubuntu 24.04"
     validations:
       required: false
+

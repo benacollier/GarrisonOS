@@ -37,8 +37,9 @@ All contributions must strictly adhere to the project's non-negotiable architect
    - Currency values must be stored strictly as **INTEGER cents**.
    - Timestamps must be stored as **INTEGER milliseconds** (UTC epoch).
    - Use `deleted_at INTEGER` for soft deletes.
-4. **Code Quality & Commit Conventions**:
+4. **Code Quality & Path Hygiene**:
    - Write clean, idiomatic, human-grade code without generic boilerplate, placeholder comments, or conversational text.
+   - Never hardcode host- or user-specific absolute filesystem paths (`/home/...`, `C:\Users\...`). Use `node:path` relative lookups and environment variables.
    - Follow Conventional Commits format (e.g., `feat(properties): add unit status filter`, `fix(accounting): correct delinquency grace period calculation`).
 
 ---
