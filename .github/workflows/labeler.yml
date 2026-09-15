@@ -1,0 +1,57 @@
+name: Labeler
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  label-files-and-title:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Label File Paths
+        uses: actions/labeler@v5
+        with:
+          repo-token: "${{ secrets.GITHUB_TOKEN }}"
+          sync-labels: false
+
+      - name: Label Conventional Commit Title
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+            if (!pr) return;
+
+            const title = pr.title.trim();
+            const prefixMatch = title.match(/^([a-z]+)(\([a-z0-9_.-]+\))?!?:/i);
+            if (!prefixMatch) return;
+
+            const typeKey = prefixMatch[1].toLowerCase();
+            const typeMap = {
+              feat: 'type/feat',
+              fix: 'type/fix',
+              docs: 'type/docs',
+              test: 'type/test',
+              refactor: 'type/refactor',
+              perf: 'type/refactor',
+              ci: 'type/ci',
+              build: 'type/ci',
+              chore: 'type/chore',
+              security: 'type/security'
+            };
+
+            const targetLabel = typeMap[typeKey];
+            if (!targetLabel) return;
+
+            const existingLabels = (pr.labels || []).map(l => l.name);
+            if (!existingLabels.includes(targetLabel)) {
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: pr.number,
+                labels: [targetLabel]
+              });
+            }

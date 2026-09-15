@@ -1,12 +1,30 @@
 name: Bug Report
 description: Create a report to help us improve GarrisonOS
 title: "fix: "
-labels: ["bug"]
+labels: ["type/fix"]
 body:
   - type: markdown
     attributes:
       value: |
         Thanks for taking the time to report an issue! Please ensure that security vulnerabilities are NOT reported here (see [SECURITY.md](SECURITY.md)).
+  - type: dropdown
+    id: scope
+    attributes:
+      label: Affected Subsystem / Module
+      description: Select the area of GarrisonOS where the issue occurred.
+      options:
+        - "core (Runtime, DB, Primitives)"
+        - "api (HTTP Gateway & Middleware)"
+        - "web (PHP Frontend)"
+        - "accounting"
+        - "properties"
+        - "leases"
+        - "contacts"
+        - "maintenance"
+        - "backup"
+        - "other / general"
+    validations:
+      required: true
   - type: textarea
     id: description
     attributes:
@@ -40,4 +58,3 @@ body:
       placeholder: "Node.js 22.5.0, PHP 8.2, Ubuntu 24.04"
     validations:
       required: false
-

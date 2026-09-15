@@ -148,3 +148,35 @@ GarrisonOS leverages and attributes several key open-source tooling standards:
 - **[Contributor Covenant](https://www.contributor-covenant.org)**: Standard community Code of Conduct framework.
 - **[CLA Assistant](https://cla-assistant.io/)**: Automated Contributor License Agreement signature workflow.
 - **[Conventional Commits](https://www.conventionalcommits.org/)**: Commit specification standard for structured changelogs.
+
+---
+
+## 7. Issue & Pull Request Labels
+
+GarrisonOS uses a structured label taxonomy to organize, prioritize, and automate issue triage and pull request lifecycles.
+
+### Label Taxonomy
+
+| Category | Prefix | Examples | Description |
+| :--- | :--- | :--- | :--- |
+| **Change Type** | `type/*` | `type/feat`, `type/fix`, `type/docs`, `type/security` | Aligned directly with Conventional Commits specifications. |
+| **Subsystem Scope** | `scope/*` | `scope/core`, `scope/accounting`, `scope/api`, `scope/web` | Maps directly to modules and core architecture layers. |
+| **Lifecycle Status** | `status/*` | `status/needs-review`, `status/ready-to-merge`, `status/ci-failing` | Reflects current pull request review and CI state. |
+| **Issue Triage** | `triage/*` | `triage/accepted`, `triage/duplicate`, `triage/wontfix` | Indicates issue triaging decisions. |
+
+### Automated PR Labeling & Status Tracking
+
+GitHub Actions automatically manage labels to minimize manual overhead:
+
+1. **Path-based Scopes & Types**: When a PR is opened, `.github/workflows/labeler.yml` inspects changed files and applies corresponding `scope/*` (e.g., `scope/accounting`) and `type/*` labels based on paths and conventional commit titles.
+2. **Review Transitions**:
+   - When opened or marked ready for review: `status/needs-review` is attached.
+   - When opened as a draft: `status/draft` is attached.
+   - When a review requests changes: `status/changes-requested` is attached.
+   - When new commits are pushed after changes were requested: transitions back to `status/needs-review`.
+   - When approved by a maintainer: `status/ready-to-merge` is attached.
+3. **Automated CI / Check Feedback**:
+   - If CI tests or security scans fail: `status/ci-failing` is attached to prevent reviewers from reviewing broken branches.
+   - When checks turn green: `status/ci-failing` is automatically cleared.
+4. **Merge & Completion**:
+   - When merged: All operational `status/*` labels are removed and replaced with `status/merged`.
