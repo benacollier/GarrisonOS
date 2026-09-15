@@ -47,8 +47,10 @@ jobs:
         run: npm run check:hygiene
 
       - name: Install and Run Betterleaks
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          curl -sSL -o betterleaks.tar.gz https://github.com/betterleaks/betterleaks/releases/download/v1.8.1/betterleaks_1.8.1_linux_x64.tar.gz
+          gh release download --repo betterleaks/betterleaks --pattern "*_linux_x64.tar.gz" --output betterleaks.tar.gz
           tar -xzf betterleaks.tar.gz
           sudo mv betterleaks /usr/local/bin/
           betterleaks git . --exit-code 1
