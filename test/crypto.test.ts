@@ -86,3 +86,4 @@ describe('Cryptography & Identity Subsystem', () => {
     assert.equal(verifyToken(expiredToken, secret), null);
   });
 });
+

@@ -105,3 +105,4 @@ export async function loadModules(
 export function getLoadedModules(): LoadedModule[] {
   return [...loadedModulesRegistry];
 }
+

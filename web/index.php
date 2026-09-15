@@ -58,3 +58,4 @@ require $targetPageFile;
 $pageContent = ob_get_clean();
 
 require __DIR__ . '/templates/layout.php';
+

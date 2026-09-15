@@ -43,3 +43,4 @@ HookRegistry::registerDashboardCard(function ($api) {
         return null;
     }
 });
+

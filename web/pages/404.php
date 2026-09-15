@@ -7,3 +7,4 @@ $pageTitle = 'Page Not Found';
     <p class="text-muted" style="max-width: 480px; margin: 0 auto 2rem;">The requested URL could not be found or has been moved.</p>
     <a href="/dashboard" class="btn btn-primary">Return to Dashboard</a>
 </div>
+

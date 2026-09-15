@@ -53,3 +53,4 @@ CREATE TABLE IF NOT EXISTS units (
 );
 CREATE INDEX IF NOT EXISTS idx_units_tenant_property ON units(tenant_id, property_id);
 CREATE INDEX IF NOT EXISTS idx_units_tenant_status ON units(tenant_id, status);
+

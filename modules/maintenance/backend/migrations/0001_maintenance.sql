@@ -28,3 +28,4 @@ CREATE TABLE IF NOT EXISTS work_orders (
 );
 CREATE INDEX IF NOT EXISTS idx_work_orders_tenant_status ON work_orders(tenant_id, status);
 CREATE INDEX IF NOT EXISTS idx_work_orders_tenant_property ON work_orders(tenant_id, property_id, unit_id);
+

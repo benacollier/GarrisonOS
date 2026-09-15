@@ -63,3 +63,4 @@ CREATE TABLE IF NOT EXISTS attachments (
     FOREIGN KEY (tenant_id) REFERENCES tenants(id)
 );
 CREATE INDEX IF NOT EXISTS idx_attachments_entity ON attachments(tenant_id, entity_type, entity_id);
+

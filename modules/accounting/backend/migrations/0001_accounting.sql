@@ -42,3 +42,4 @@ CREATE TABLE IF NOT EXISTS transactions (
 CREATE INDEX IF NOT EXISTS idx_tx_tenant_lease_date ON transactions(tenant_id, lease_id, transaction_date);
 CREATE INDEX IF NOT EXISTS idx_tx_tenant_property_date ON transactions(tenant_id, property_id, transaction_date);
 CREATE INDEX IF NOT EXISTS idx_tx_tenant_type_category ON transactions(tenant_id, transaction_type, category);
+

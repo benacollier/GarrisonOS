@@ -87,3 +87,4 @@ $pageTitle = htmlspecialchars($contact['first_name'] . ' ' . $contact['last_name
         </div>
     </div>
 </div>
+

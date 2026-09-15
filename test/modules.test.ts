@@ -41,3 +41,4 @@ describe('Dynamic Module Loader & Migration Discovery Subsystem', () => {
     assert.equal(registered.length, 5);
   });
 });
+

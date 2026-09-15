@@ -55,3 +55,4 @@ This document establishes the mandatory engineering standards, architectural con
 * Domain features live inside self-contained modules under `modules/[module_name]/`.
 * Modules must supply a `module.json` manifest and follow standard contracts for backend migrations, routes, events, repositories, and frontend hooks/pages.
 * Cross-module communication must use the asynchronous in-process `EventBus` (`core/events.ts`).
+

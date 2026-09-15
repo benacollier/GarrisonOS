@@ -15,3 +15,4 @@ $tenantId = Auth::tenantId();
         <?php endif; ?>
     </div>
 </header>
+

@@ -33,3 +33,4 @@ $navItems = HookRegistry::getNavigation();
         <small>GarrisonOS v1.0.0 (Open Source)</small>
     </div>
 </aside>
+

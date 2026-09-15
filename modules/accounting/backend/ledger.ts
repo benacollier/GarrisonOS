@@ -226,3 +226,4 @@ export function calculateScheduleE(transactions: TransactionRecord[]): ScheduleE
     expenseByCategory
   };
 }
+

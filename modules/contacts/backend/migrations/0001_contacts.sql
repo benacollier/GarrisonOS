@@ -19,3 +19,4 @@ CREATE TABLE IF NOT EXISTS contacts (
 );
 CREATE INDEX IF NOT EXISTS idx_contacts_tenant_type ON contacts(tenant_id, contact_type);
 CREATE INDEX IF NOT EXISTS idx_contacts_tenant_name ON contacts(tenant_id, last_name, first_name);
+

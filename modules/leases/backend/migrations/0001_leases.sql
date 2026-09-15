@@ -36,3 +36,4 @@ CREATE TABLE IF NOT EXISTS lease_contacts (
     FOREIGN KEY (contact_id) REFERENCES contacts(id)
 );
 CREATE UNIQUE INDEX IF NOT EXISTS idx_lease_contacts_unique ON lease_contacts(tenant_id, lease_id, contact_id) WHERE deleted_at IS NULL;
+

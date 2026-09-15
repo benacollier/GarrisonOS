@@ -8,3 +8,4 @@ HookRegistry::registerNavigation([
     'order' => 30,
     'section' => 'portfolio'
 ]);
+

@@ -158,3 +158,4 @@ describe('Accounting & Ledger Mathematics Subsystem', () => {
     assert.equal(report.expenseByCategory['repairs'], 25000);
   });
 });
+
