@@ -1,0 +1,30 @@
+name: Feature Request
+description: Propose a new capability or architectural improvement for GarrisonOS
+title: "feat: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for proposing a new feature! Please remember GarrisonOS enforces strict zero external runtime dependencies.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Is your feature request related to a problem?
+      description: A clear and concise description of what the problem is (e.g. I'm always frustrated when [...] ).
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed Solution
+      description: A clear and concise description of what you want to happen.
+    validations:
+      required: true
+  - type: textarea
+    id: architectural-context
+    attributes:
+      label: Architectural & Zero-Dependency Impact
+      description: How this feature aligns with Node.js/PHP built-ins and multi-tenancy.
+    validations:
+      required: false

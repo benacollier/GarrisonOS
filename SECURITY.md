@@ -10,7 +10,7 @@ Security updates are actively applied to the following versions of GarrisonOS:
 
 | Version | Supported          |
 | ------- | ------------------ |
-| `main` / `master` | :white_check_mark: |
+| `main`            | :white_check_mark: |
 | Latest Release    | :white_check_mark: |
 | Older Versions    | :x:                |
 
@@ -22,7 +22,7 @@ Security updates are actively applied to the following versions of GarrisonOS:
 
 If you discover a security vulnerability in GarrisonOS, please report it via one of the following channels:
 
-* **GitHub Security Advisory**: Use the [Private Vulnerability Reporting](https://github.com/GarrisonOS/GarrisonOS/security/advisories/new) tab on GitHub.
+* **GitHub Security Advisory**: Use the [Private Vulnerability Reporting](https://github.com/benacollier/GarrisonOS/security/advisories/new) tab on GitHub.
 * **Email**: Send an encrypted or plain-text email to `security@garrisonos.org` (or the project maintainer).
 
 ### What to Include in Your Report

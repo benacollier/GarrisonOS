@@ -104,7 +104,8 @@ Tests must pass with zero failures and maintain 100% tenant isolation. All modul
 2. Implement your changes following all architectural guardrails.
 3. Verify type correctness: `npm run build`.
 4. Ensure all automated tests pass: `npm test`.
-5. Commit your changes using conventional commit messages.
+5. Commit your changes using conventional commit messages (`feat: ...`, `fix: ...`, `test: ...`).
 6. Push to your fork and submit a Pull Request to `main`.
-7. Sign the automated CLA when prompted by the CLA bot.
+7. Fill out the Pull Request template checklist.
+8. Sign the automated CLA when prompted by the CLA bot.
 
