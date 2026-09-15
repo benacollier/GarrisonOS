@@ -48,7 +48,7 @@ All contributions must strictly adhere to the project's non-negotiable architect
 
 ### Prerequisites
 * **Node.js**: v22.5.0 or newer (Node v24 LTS recommended)
-* **PHP**: 8.2 or newer (with `pdo_sqlite`, `curl`, and `session` enabled)
+* **PHP**: 8.2 or newer (with `pdo_sqlite`, `curl`, `filter`, and `session` enabled)
 
 ### Local Setup
 1. Clone the repository:
@@ -60,26 +60,17 @@ All contributions must strictly adhere to the project's non-negotiable architect
    ```bash
    npm install
    ```
-3. Copy environment configuration:
+3. Run the automated preflight and setup tool:
    ```bash
-   cp .env.example .env
+   npm run setup
+   # or with seed demo data:
+   npm run setup -- --seed
    ```
-4. Build TypeScript and run migrations:
+4. Start development server (Node.js engine + PHP web frontend on http://localhost:8080):
    ```bash
-   npm run build
-   npm run migrate
-   ```
-5. Seed demo data (optional):
-   ```bash
-   npm run seed
-   ```
-6. Start development servers:
-   ```bash
-   # Terminal 1: Node.js API engine
    npm run dev
-
-   # Terminal 2: PHP frontend
-   php -S localhost:80 -t web web/index.php
+   # or with custom port:
+   npm run dev -- --port=8080
    ```
 
 ---

@@ -22,8 +22,20 @@ class ApiException extends Exception {
 class ApiClient {
     private string $baseUrl;
 
-    public function __construct(string $baseUrl = 'http://127.0.0.1:3000') {
-        $this->baseUrl = rtrim($baseUrl, '/');
+    public function __construct(?string $baseUrl = null) {
+        if ($baseUrl !== null && $baseUrl !== '') {
+            $this->baseUrl = rtrim($baseUrl, '/');
+        } elseif (!empty($_SERVER['API_URL'])) {
+            $this->baseUrl = rtrim((string)$_SERVER['API_URL'], '/');
+        } elseif (($envApi = getenv('API_URL')) !== false && $envApi !== '') {
+            $this->baseUrl = rtrim($envApi, '/');
+        } elseif (($envPort = getenv('PORT')) !== false && $envPort !== '') {
+            $this->baseUrl = 'http://127.0.0.1:' . $envPort;
+        } elseif (!empty($_SERVER['PORT'])) {
+            $this->baseUrl = 'http://127.0.0.1:' . $_SERVER['PORT'];
+        } else {
+            $this->baseUrl = 'http://127.0.0.1:3000';
+        }
     }
 
     public function request(string $method, string $path, ?array $data = null): array {

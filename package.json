@@ -6,8 +6,11 @@
   "main": "dist/api/server.js",
   "scripts": {
     "build": "tsc",
-    "start": "node dist/api/server.js",
-    "dev": "node --watch dist/api/server.js",
+    "setup": "node scripts/setup.js",
+    "start": "node scripts/serve.js",
+    "start:engine": "node dist/api/server.js",
+    "dev": "node scripts/serve.js --dev",
+    "dev:engine": "node --watch dist/api/server.js",
     "migrate": "node dist/database/migrator.js",
     "seed": "node dist/database/seed.js",
     "test": "node scripts/test.js",

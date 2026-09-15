@@ -262,9 +262,29 @@ garrison-os/
 ### 1. Prerequisites
 Ensure you have the following installed on your system:
 * **Node.js**: `v22.5.0` or higher (`node -v`)
-* **PHP**: `8.2` or higher (`php -v`) with `curl`, `pdo_sqlite`, and `session` extensions enabled
+* **PHP**: `8.2` or higher (`php -v`) with `curl`, `session`, `filter`, and `pdo_sqlite` extensions enabled
 
-### 2. Installation & Setup
+---
+
+### 2. Automated One-Line Installation
+
+Install directly from GitHub Releases with a single terminal command:
+
+#### Windows (PowerShell)
+```powershell
+irm https://raw.githubusercontent.com/garrisonos/garrison-os/main/scripts/install.ps1 | iex
+```
+
+#### Linux & macOS (Bash)
+```bash
+curl -fsSL https://raw.githubusercontent.com/garrisonos/garrison-os/main/scripts/install.sh | bash
+```
+
+---
+
+### 3. Developer & Manual Setup
+
+For manual repository setup or development:
 
 1. **Clone the repository**:
    ```bash
@@ -272,46 +292,32 @@ Ensure you have the following installed on your system:
    cd garrison-os
    ```
 
-2. **Install development build dependencies**:
+2. **Run the automated preflight and setup tool**:
    ```bash
-   npm install
+   npm run setup
+   # or with realistic 20-unit demo portfolio seeded:
+   npm run setup -- --seed
    ```
+   *(This tool automatically validates prerequisites, generates `.env` with a secure random `APP_SECRET`, compiles TypeScript, and executes SQLite migrations).*
 
-3. **Configure environment variables**:
-   ```bash
-   cp .env.example .env
-   ```
+---
 
-4. **Compile TypeScript into JavaScript**:
-   ```bash
-   npm run build
-   ```
+### 4. Running the Application
 
-5. **Execute database migrations**:
-   ```bash
-   npm run migrate
-   ```
-
-6. **Seed the demo dataset** (creates a realistic 20-unit portfolio with 12 months of historical data):
-   ```bash
-   npm run seed
-   ```
-
-### 3. Running the Application
-
-GarrisonOS runs via two decoupled processes:
+Start both the backend API engine and frontend web presentation layer with a single command:
 
 ```bash
-# Terminal 1: Start the Node.js API Engine (Port 3000)
-npm run start
-# or for auto-reloading development mode:
-npm run dev
+# Start full application (Default Web UI: http://localhost:8080)
+npm start
 
-# Terminal 2: Start the Native PHP Web Frontend (Port 80)
-php -S localhost:80 -t web web/index.php
+# Or customize local ports on the fly:
+npm start -- --port=8080 --api-port=3000
+
+# For auto-reloading development mode:
+npm run dev
 ```
 
-Once running, navigate to `http://localhost` (or `http://localhost:80`) in your web browser.
+Once running, open your web browser at **`http://localhost:8080`**.
 
 #### Demo Credentials
 * **Email**: `operator@garrisonos.local`
