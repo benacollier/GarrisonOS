@@ -1,22 +1,35 @@
-# Accounting & Financials Module
+# Accounting & General Ledger Module
 
-The **Accounting** module (`modules/accounting/`) implements single-entry cash-basis bookkeeping, IRS Schedule E tax categorization, running tenant balance tracking, automated rent charge generation, and payment waterfall allocation.
+The **Accounting** module (`modules/accounting/`) implements a native, immutable double-entry General Ledger engine, standard Chart of Accounts mapping aligned with IRS Schedule E and QuickBooks, Trial Balance reporting, tenant lease ledger calculations, and automated monthly billing.
 
 ---
 
-## 1. Single-Entry Cash Ledger (`transactions`)
+## 1. Native Double-Entry General Ledger Architecture
 
-All transactions are recorded as positive integer cents accompanied by a `transaction_type`:
+GarrisonOS enforces first-class double-entry bookkeeping with strict zero-sum debit/credit balance proofs across all operational activity.
 
-| `transaction_type` | Impact | Description |
-| :--- | :--- | :--- |
-| `charge` | Increases Tenant Balance | Invoiced amount owed by tenant (rent, late fee, utility rebill) |
-| `payment` | Decreases Tenant Balance | Cash received from tenant applied against charges |
-| `expense` | Outflow (Schedule E) | Operating disbursement paid to vendors, utilities, or taxes |
-| `refund` | Increases Tenant Balance | Money returned to tenant |
-| `deposit_inflow` | Escrow / Trust Inflow | Tenant security deposit collected into trust |
-| `deposit_return` | Escrow / Trust Outflow | Security deposit refunded to tenant upon move-out |
-| `deposit_deduction` | Escrow Transfer | Deposit applied to unpaid rent or property repair damages |
+### 1.1. Core Tables & Invariants
+
+* **`journal_entries`**: Header table tracking sequentially numbered transactions (`entry_number` per tenant), accounting date (`date_ms`), descriptive memo, source tracking (`source_type`, `source_id`), posting timestamp, and optional link to reversing entries (`reversed_by_entry_id`).
+* **`journal_lines`**: Itemized lines enforcing non-negative integer cents:
+  $$\sum \text{debit\_cents} \equiv \sum \text{credit\_cents} > 0$$
+  Each line belongs to an account in `chart_of_accounts`, and must satisfy:
+  $$\text{CHECK }((\text{debit} > 0 \land \text{credit} = 0) \lor (\text{credit} > 0 \land \text{debit} = 0))$$
+  Lines optionally attach granular dimensions: `property_id`, `unit_id`, and `contact_id`.
+
+### 1.2. Operational Event Mappings
+
+Every operational event posts a balanced double-entry journal entry:
+
+| Operational Activity | Source Type | Debit Line | Credit Line |
+| :--- | :--- | :--- | :--- |
+| **Rent / Fee Invoicing** | `rent_billing` / `charge` | Accounts Receivable (`#1100`) | Rental Income (`#4010`) / Fee Income |
+| **Tenant Rent Payment** | `tenant_payment` / `payment` | Operating Checking (`#1010`) | Accounts Receivable (`#1100`) |
+| **Vendor Repair Expense** | `maintenance_expense` / `expense` | Repairs & Maintenance (`#5100`) | Operating Checking (`#1010`) / AP |
+| **Security Deposit Inflow** | `deposit_inflow` | Security Deposit Trust (`#1020`) | Tenant Security Deposits Held (`#2100`) |
+| **Security Deposit Refund** | `deposit_return` | Tenant Security Deposits Held (`#2100`) | Security Deposit Trust (`#1020`) |
+| **Deposit Applied to Rent** | `deposit_deduction` | Tenant Security Deposits Held (`#2100`) | Accounts Receivable (`#1100`) |
+| **Reversals / Voids** | `reversal` | Exact opposite lines of original entry | Exact opposite lines of original entry |
 
 ---
 
@@ -24,21 +37,21 @@ All transactions are recorded as positive integer cents accompanied by a `transa
 
 Operating expenses align with standard IRS Form 1040 Schedule E line items:
 
-* `advertising`
-* `auto_travel`
-* `cleaning_maintenance`
-* `commissions`
-* `insurance`
-* `legal_professional`
-* `management_fees`
-* `mortgage_interest`
-* `other_interest`
-* `repairs`
-* `supplies`
-* `property_taxes`
-* `utilities`
-* `hoa_fees`
-* `capital_improvement`
+* `advertising` (#5010)
+* `auto_travel` (#5020)
+* `cleaning_maintenance` (#5030)
+* `commissions` (#5040)
+* `insurance` (#5050)
+* `legal_professional` (#5060)
+* `management_fees` (#5070)
+* `mortgage_interest` (#5080)
+* `other_interest` (#5090)
+* `repairs` (#5100)
+* `supplies` (#5110)
+* `property_taxes` (#5120)
+* `utilities` (#5130)
+* `hoa_fees` (#5140)
+* `capital_improvement` (#1500)
 
 ---
 
@@ -47,6 +60,9 @@ Operating expenses align with standard IRS Form 1040 Schedule E line items:
 ### 3.1. Tenant Running Balance
 
 $$\text{Tenant Balance} = \sum (\text{charges} + \text{deposit\_returns} + \text{deposit\_deductions}) - \sum (\text{payments} + \text{refunds})$$
+
+From double-entry journal lines on Accounts Receivable:
+$$\text{Tenant Receivable Balance} = \sum \text{Debits} - \sum \text{Credits}$$
 
 ### 3.2. Payment Priority Waterfall
 
@@ -65,18 +81,30 @@ $$\text{NOI} = \text{Operating Income (Rent, Fees)} - \text{Operating Expenses (
 
 ## 4. API Endpoints
 
+### 4.1. General Ledger & Invariants
+* `GET /api/v1/accounting/trial-balance`: Live Trial Balance report verifying that total debits equal total credits
+* `GET /api/v1/accounting/journal-entries`: Paginated list of double-entry journal entries with itemized lines
+* `GET /api/v1/accounting/journal-entries/:id`: Fetch single journal entry by ID
+* `POST /api/v1/accounting/journal-entries`: Post manual balanced journal entry
+* `POST /api/v1/accounting/journal-entries/:id/reverse`: Post reversal entry and link `reversed_by_entry_id`
+* `POST /api/v1/accounting/backfill-ledger`: Idempotently backfill historical single-entry transactions
+
+### 4.2. Operational Transactions & Billing
 * `GET /api/v1/accounting/transactions`: List transactions with filters (`type`, `category`, `lease_id`, `date range`)
-* `POST /api/v1/accounting/transactions`: Post a financial transaction
-* `GET /api/v1/accounting/ledger/:leaseId`: Calculate running balance and itemized statement for a lease
+* `POST /api/v1/accounting/transactions`: Post a transaction (automatically creates balanced double-entry journal entry)
+* `DELETE /api/v1/accounting/transactions/:id`: Void a transaction (posts reversal journal entry)
+* `GET /api/v1/accounting/balance/:leaseId`: Calculate running balance and itemized statement for a lease
 * `POST /api/v1/accounting/generate-rent-charges`: Trigger automated recurring monthly billing run
 * `POST /api/v1/accounting/deposit-disposition`: Finalize deposit trust payout and damage deductions
+
+### 4.3. Exports & External Compatibility
 * `GET /api/v1/accounting/export/rent-roll.csv`: Stream Rent Roll CSV
 * `GET /api/v1/accounting/export/schedule-e.csv`: Stream IRS Schedule E P&L breakdown CSV
 * `GET /api/v1/accounting/export/ledger/:leaseId.csv`: Stream itemized tenant ledger statement CSV
 * `GET /api/v1/accounting/chart-of-accounts`: List Chart of Accounts
 * `POST /api/v1/accounting/chart-of-accounts`: Create general ledger account
 * `PUT /api/v1/accounting/chart-of-accounts/:id`: Update general ledger account
-* `GET /api/v1/accounting/quickbooks/preview`: Preview balanced double-entry journal entries
+* `GET /api/v1/accounting/quickbooks/preview`: Preview persistent double-entry journal entries for export
 * `GET /api/v1/accounting/export/quickbooks/qbo-journal.csv`: Export QuickBooks Online Journal Entry batch CSV
 * `GET /api/v1/accounting/export/quickbooks/desktop.iif`: Export QuickBooks Desktop IIF format
 * `GET /api/v1/accounting/export/quickbooks/bank-feed.qbo`: Export Web Connect (.QBO) bank feed
@@ -85,7 +113,7 @@ $$\text{NOI} = \text{Operating Income (Rent, Fees)} - \text{Operating Expenses (
 
 ## 5. QuickBooks Compatibility Architecture
 
-GarrisonOS translates property operations into general ledger double-entry debits and credits:
+GarrisonOS exports directly from persistent General Ledger entries into standard accounting formats:
 
 1. **Chart of Accounts (COA) Standard Mapping**:
    * **Bank (1010 Operating Checking, 1020 Security Deposit Trust Checking)**: Operating vs escrow cash segregation.
@@ -95,7 +123,7 @@ GarrisonOS translates property operations into general ledger double-entry debit
    * **Operating Expenses (5010–5140)**: Aligned with IRS Form 1040 Schedule E lines.
 
 2. **Class & Customer Tracking**:
-   * Each journal entry maps the GarrisonOS `property_id` to a QuickBooks **Class** for granular property-level P&L reporting.
+   * Each journal line maps the GarrisonOS `property_id` to a QuickBooks **Class** for granular property-level P&L reporting.
    * Payer/Payee contacts map to QuickBooks **Customer:Job** or **Vendor**.
 
 3. **Universal QuickBooks Formats**:

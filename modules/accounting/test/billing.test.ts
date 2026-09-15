@@ -66,6 +66,7 @@ describe('Accounting Module - Monthly Billing & Proration', () => {
       assert.equal(txs.length, 1);
       assert.equal(txs[0]?.amount_cents, 160000);
       assert.equal(txs[0]?.reference_number, `rent_charge:${lease.id}:2026-10`);
+      assert.ok(txs[0]?.journal_entry_id, 'Generated rent charge must have linked journal_entry_id');
 
       // 3. Run billing generator again for the SAME month (should skip and create 0 charges)
       const run2 = generateMonthlyRentCharges('2026-10');

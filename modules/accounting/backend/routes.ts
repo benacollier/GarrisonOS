@@ -4,6 +4,7 @@ import { AccountingRepository } from './repository.js';
 import { generateMonthlyRentCharges } from './billing.js';
 import { ChartOfAccountsRepository } from './chart_of_accounts.js';
 import { QuickBooksService } from './quickbooks.js';
+import { JournalService } from './journal.js';
 
 export function registerRoutes(router: Router): void {
   // --- Rent Roll ---
@@ -77,21 +78,25 @@ export function registerRoutes(router: Router): void {
     if (!transaction_type || !category || amount_cents === undefined || !description) {
       return errorResponse(res, 'VALIDATION_ERROR', 'transaction_type, category, amount_cents, and description are required', 400);
     }
-    const transaction = AccountingRepository.createTransaction({
-      transaction_type,
-      category,
-      amount_cents: parseInt(amount_cents, 10),
-      transaction_date: req.body.transaction_date ? parseInt(req.body.transaction_date, 10) : Date.now(),
-      description,
-      payment_method: req.body.payment_method || null,
-      reference_number: req.body.reference_number || null,
-      property_id: req.body.property_id || null,
-      unit_id: req.body.unit_id || null,
-      lease_id: req.body.lease_id || null,
-      payer_contact_id: req.body.payer_contact_id || null,
-      payee_contact_id: req.body.payee_contact_id || null
-    });
-    successResponse(res, { transaction }, 201);
+    try {
+      const transaction = AccountingRepository.createTransaction({
+        transaction_type,
+        category,
+        amount_cents: parseInt(amount_cents, 10),
+        transaction_date: req.body.transaction_date ? parseInt(req.body.transaction_date, 10) : Date.now(),
+        description,
+        payment_method: req.body.payment_method || null,
+        reference_number: req.body.reference_number || null,
+        property_id: req.body.property_id || null,
+        unit_id: req.body.unit_id || null,
+        lease_id: req.body.lease_id || null,
+        payer_contact_id: req.body.payer_contact_id || null,
+        payee_contact_id: req.body.payee_contact_id || null
+      });
+      successResponse(res, { transaction }, 201);
+    } catch (err: any) {
+      errorResponse(res, 'TRANSACTION_POST_FAILED', err.message, 400);
+    }
   });
 
   router.get('/api/v1/accounting/transactions/:id', (req, res) => {
@@ -108,6 +113,81 @@ export function registerRoutes(router: Router): void {
       return errorResponse(res, 'NOT_FOUND', 'Transaction not found', 404);
     }
     successResponse(res, { deleted: true });
+  });
+
+  // ==========================================
+  // --- Native Double-Entry General Ledger ---
+  // ==========================================
+
+  // Trial Balance Report
+  router.get('/api/v1/accounting/trial-balance', (req, res) => {
+    const asOfDate = req.query.as_of_date ? parseInt(req.query.as_of_date, 10) : undefined;
+    const propertyId = req.query.property_id || undefined;
+    const trialBalance = JournalService.getTrialBalance(asOfDate, propertyId);
+    successResponse(res, { trialBalance });
+  });
+
+  // List General Ledger Journal Entries
+  router.get('/api/v1/accounting/journal-entries', (req, res) => {
+    const { entries, total } = JournalService.listEntries({
+      source_type: req.query.source_type,
+      source_id: req.query.source_id,
+      start_date: req.query.start_date ? parseInt(req.query.start_date, 10) : undefined,
+      end_date: req.query.end_date ? parseInt(req.query.end_date, 10) : undefined,
+      limit: req.query.limit ? parseInt(req.query.limit, 10) : 50,
+      offset: req.query.offset ? parseInt(req.query.offset, 10) : 0
+    });
+    successResponse(res, { entries, total });
+  });
+
+  // Get Journal Entry by ID
+  router.get('/api/v1/accounting/journal-entries/:id', (req, res) => {
+    const entry = JournalService.getEntryById(req.params.id!);
+    if (!entry) {
+      return errorResponse(res, 'NOT_FOUND', 'Journal entry not found', 404);
+    }
+    successResponse(res, { entry });
+  });
+
+  // Post Manual Balanced Journal Entry
+  router.post('/api/v1/accounting/journal-entries', (req, res) => {
+    const { memo, source_type, lines, date_ms } = req.body || {};
+    if (!memo || !lines || !Array.isArray(lines)) {
+      return errorResponse(res, 'VALIDATION_ERROR', 'memo and lines array are required', 400);
+    }
+
+    try {
+      const entry = JournalService.postEntry({
+        memo,
+        source_type: source_type || 'manual_journal',
+        date_ms: date_ms ? parseInt(date_ms, 10) : Date.now(),
+        lines
+      });
+      successResponse(res, { entry }, 201);
+    } catch (err: any) {
+      errorResponse(res, 'JOURNAL_POST_FAILED', err.message, 400);
+    }
+  });
+
+  // Reverse a Journal Entry
+  router.post('/api/v1/accounting/journal-entries/:id/reverse', (req, res) => {
+    const reason = req.body?.reason || 'Reversal requested';
+    try {
+      const reversal = JournalService.reverseEntry(req.params.id!, reason);
+      successResponse(res, { reversal });
+    } catch (err: any) {
+      errorResponse(res, 'REVERSAL_FAILED', err.message, 400);
+    }
+  });
+
+  // Backfill Legacy Transactions into General Ledger
+  router.post('/api/v1/accounting/backfill-ledger', (_req, res) => {
+    try {
+      const result = JournalService.backfillLegacyTransactions();
+      successResponse(res, { result });
+    } catch (err: any) {
+      errorResponse(res, 'BACKFILL_FAILED', err.message, 500);
+    }
   });
 
   // --- CSV Exports ---

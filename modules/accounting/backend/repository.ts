@@ -7,6 +7,8 @@ import {
   calculateScheduleE,
   ScheduleEReport
 } from './ledger.js';
+import { JournalService, CreateJournalLineInput } from './journal.js';
+import { ChartOfAccountsRepository } from './chart_of_accounts.js';
 
 export interface CreateTransactionData {
   transaction_type: TransactionRecord['transaction_type'];
@@ -99,50 +101,268 @@ export class AccountingRepository {
     return row || null;
   }
 
+  /**
+   * Create a financial transaction and automatically post its corresponding
+   * balanced double-entry journal entry atomically.
+   */
   public static createTransaction(data: CreateTransactionData): TransactionRecord {
+    ChartOfAccountsRepository.ensureDefaultAccounts();
     const tenantId = RequestContext.getTenantId();
     const db = getDatabase();
     const id = generateUUIDv7();
     const now = Date.now();
+    const amount = Math.abs(data.amount_cents);
 
-    db.prepare(`
-      INSERT INTO transactions (
-        id, tenant_id, transaction_type, category, amount_cents,
-        transaction_date, description, payment_method, reference_number,
-        property_id, unit_id, lease_id, payer_contact_id, payee_contact_id,
-        created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
-      id,
-      tenantId,
-      data.transaction_type,
-      data.category,
-      Math.abs(data.amount_cents),
-      data.transaction_date,
-      data.description,
-      data.payment_method || null,
-      data.reference_number || null,
-      data.property_id || null,
-      data.unit_id || null,
-      data.lease_id || null,
-      data.payer_contact_id || null,
-      data.payee_contact_id || null,
-      now,
-      now
-    );
+    if (amount <= 0) {
+      throw new Error('Transaction amount must be greater than 0 cents.');
+    }
+
+    const operatingBank = ChartOfAccountsRepository.getAccountByMapping('operating_bank')!;
+    const trustBank = ChartOfAccountsRepository.getAccountByMapping('trust_bank')!;
+    const accountsReceivable = ChartOfAccountsRepository.getAccountByMapping('accounts_receivable')!;
+    const depositLiability = ChartOfAccountsRepository.getAccountByMapping('security_deposit')!;
+    const mappedAccount = ChartOfAccountsRepository.getAccountByMapping(data.category);
+
+    const lines: CreateJournalLineInput[] = [];
+
+    switch (data.transaction_type) {
+      case 'charge': {
+        const revAccount = mappedAccount || ChartOfAccountsRepository.getAccountByMapping('rent')!;
+        lines.push(
+          {
+            account_id: accountsReceivable.id,
+            debit_cents: amount,
+            credit_cents: 0,
+            property_id: data.property_id,
+            unit_id: data.unit_id,
+            contact_id: data.payer_contact_id,
+            description: data.description
+          },
+          {
+            account_id: revAccount.id,
+            debit_cents: 0,
+            credit_cents: amount,
+            property_id: data.property_id,
+            unit_id: data.unit_id,
+            contact_id: data.payer_contact_id,
+            description: data.description
+          }
+        );
+        break;
+      }
+      case 'payment': {
+        lines.push(
+          {
+            account_id: operatingBank.id,
+            debit_cents: amount,
+            credit_cents: 0,
+            property_id: data.property_id,
+            unit_id: data.unit_id,
+            contact_id: data.payer_contact_id,
+            description: data.description
+          },
+          {
+            account_id: accountsReceivable.id,
+            debit_cents: 0,
+            credit_cents: amount,
+            property_id: data.property_id,
+            unit_id: data.unit_id,
+            contact_id: data.payer_contact_id,
+            description: data.description
+          }
+        );
+        break;
+      }
+      case 'expense': {
+        const expAccount = mappedAccount || ChartOfAccountsRepository.getAccountByMapping('repairs')!;
+        lines.push(
+          {
+            account_id: expAccount.id,
+            debit_cents: amount,
+            credit_cents: 0,
+            property_id: data.property_id,
+            unit_id: data.unit_id,
+            contact_id: data.payee_contact_id,
+            description: data.description
+          },
+          {
+            account_id: operatingBank.id,
+            debit_cents: 0,
+            credit_cents: amount,
+            property_id: data.property_id,
+            unit_id: data.unit_id,
+            contact_id: data.payee_contact_id,
+            description: data.description
+          }
+        );
+        break;
+      }
+      case 'refund': {
+        lines.push(
+          {
+            account_id: accountsReceivable.id,
+            debit_cents: amount,
+            credit_cents: 0,
+            property_id: data.property_id,
+            unit_id: data.unit_id,
+            contact_id: data.payee_contact_id,
+            description: data.description
+          },
+          {
+            account_id: operatingBank.id,
+            debit_cents: 0,
+            credit_cents: amount,
+            property_id: data.property_id,
+            unit_id: data.unit_id,
+            contact_id: data.payee_contact_id,
+            description: data.description
+          }
+        );
+        break;
+      }
+      case 'deposit_inflow': {
+        lines.push(
+          {
+            account_id: trustBank.id,
+            debit_cents: amount,
+            credit_cents: 0,
+            property_id: data.property_id,
+            unit_id: data.unit_id,
+            contact_id: data.payer_contact_id,
+            description: data.description
+          },
+          {
+            account_id: depositLiability.id,
+            debit_cents: 0,
+            credit_cents: amount,
+            property_id: data.property_id,
+            unit_id: data.unit_id,
+            contact_id: data.payer_contact_id,
+            description: data.description
+          }
+        );
+        break;
+      }
+      case 'deposit_return': {
+        lines.push(
+          {
+            account_id: depositLiability.id,
+            debit_cents: amount,
+            credit_cents: 0,
+            property_id: data.property_id,
+            unit_id: data.unit_id,
+            contact_id: data.payee_contact_id,
+            description: data.description
+          },
+          {
+            account_id: trustBank.id,
+            debit_cents: 0,
+            credit_cents: amount,
+            property_id: data.property_id,
+            unit_id: data.unit_id,
+            contact_id: data.payee_contact_id,
+            description: data.description
+          }
+        );
+        break;
+      }
+      case 'deposit_deduction': {
+        lines.push(
+          {
+            account_id: depositLiability.id,
+            debit_cents: amount,
+            credit_cents: 0,
+            property_id: data.property_id,
+            unit_id: data.unit_id,
+            contact_id: data.payer_contact_id,
+            description: data.description
+          },
+          {
+            account_id: accountsReceivable.id,
+            debit_cents: 0,
+            credit_cents: amount,
+            property_id: data.property_id,
+            unit_id: data.unit_id,
+            contact_id: data.payer_contact_id,
+            description: data.description
+          }
+        );
+        break;
+      }
+      default:
+        throw new Error(`Unsupported transaction type: ${data.transaction_type}`);
+    }
+
+    let journalEntryId: string;
+
+    withTransaction((tx) => {
+      const journalEntry = JournalService.postEntry({
+        date_ms: data.transaction_date,
+        memo: data.description,
+        source_type: data.transaction_type,
+        source_id: id,
+        lines
+      }, tx);
+      journalEntryId = journalEntry.id;
+
+      tx.prepare(`
+        INSERT INTO transactions (
+          id, tenant_id, transaction_type, category, amount_cents,
+          transaction_date, description, payment_method, reference_number,
+          property_id, unit_id, lease_id, payer_contact_id, payee_contact_id,
+          journal_entry_id, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        id,
+        tenantId,
+        data.transaction_type,
+        data.category,
+        amount,
+        data.transaction_date,
+        data.description,
+        data.payment_method || null,
+        data.reference_number || null,
+        data.property_id || null,
+        data.unit_id || null,
+        data.lease_id || null,
+        data.payer_contact_id || null,
+        data.payee_contact_id || null,
+        journalEntryId,
+        now,
+        now
+      );
+    }, db);
 
     return AccountingRepository.getTransactionById(id)!;
   }
 
+  /**
+   * Reverse a transaction and its double-entry journal entry.
+   */
   public static deleteTransaction(id: string): boolean {
     const tenantId = RequestContext.getTenantId();
     const db = getDatabase();
     const now = Date.now();
-    const info = db.prepare(`
-      UPDATE transactions SET deleted_at = ?
-      WHERE id = ? AND tenant_id = ? AND deleted_at IS NULL
-    `).run(now, id, tenantId);
-    return info.changes > 0;
+
+    const txRecord = this.getTransactionById(id);
+    if (!txRecord) return false;
+
+    withTransaction((tx) => {
+      if (txRecord.journal_entry_id) {
+        try {
+          JournalService.reverseEntry(txRecord.journal_entry_id, `Transaction deleted/voided`, tx);
+        } catch {
+          // If already reversed or not present, proceed
+        }
+      }
+
+      tx.prepare(`
+        UPDATE transactions SET deleted_at = ?
+        WHERE id = ? AND tenant_id = ? AND deleted_at IS NULL
+      `).run(now, id, tenantId);
+    }, db);
+
+    return true;
   }
 
   public static getLeaseTransactions(leaseId: string): TransactionRecord[] {
@@ -263,50 +483,32 @@ export class AccountingRepository {
 
       // 1. Post damage deduction transactions if any
       for (const d of deductions) {
-        const txId = generateUUIDv7();
-        tx.prepare(`
-          INSERT INTO transactions (
-            id, tenant_id, transaction_type, category, amount_cents,
-            transaction_date, description, property_id, unit_id, lease_id,
-            created_at, updated_at
-          ) VALUES (?, ?, 'deposit_deduction', ?, ?, ?, ?, (SELECT property_id FROM units WHERE id = ?), ?, ?, ?, ?)
-        `).run(
-          txId,
-          tenantId,
-          d.category || 'repairs',
-          Math.abs(d.amount_cents),
-          now,
-          `Deposit Deduction: ${d.description}`,
-          lease.unit_id,
-          lease.unit_id,
-          leaseId,
-          now,
-          now
-        );
-        createdTxs.push(AccountingRepository.getTransactionById(txId)!);
+        const created = AccountingRepository.createTransaction({
+          transaction_type: 'deposit_deduction',
+          category: d.category || 'repairs',
+          amount_cents: Math.abs(d.amount_cents),
+          transaction_date: now,
+          description: `Deposit Deduction: ${d.description}`,
+          property_id: lease.property_id || null,
+          unit_id: lease.unit_id || null,
+          lease_id: leaseId
+        });
+        createdTxs.push(created);
       }
 
       // 2. Post deposit return transaction if refund remains
       if (finalRefundCents > 0) {
-        const txId = generateUUIDv7();
-        tx.prepare(`
-          INSERT INTO transactions (
-            id, tenant_id, transaction_type, category, amount_cents,
-            transaction_date, description, property_id, unit_id, lease_id,
-            created_at, updated_at
-          ) VALUES (?, ?, 'deposit_return', 'security_deposit', ?, ?, 'Security Deposit Refund Return', (SELECT property_id FROM units WHERE id = ?), ?, ?, ?, ?)
-        `).run(
-          txId,
-          tenantId,
-          finalRefundCents,
-          now,
-          lease.unit_id,
-          lease.unit_id,
-          leaseId,
-          now,
-          now
-        );
-        createdTxs.push(AccountingRepository.getTransactionById(txId)!);
+        const created = AccountingRepository.createTransaction({
+          transaction_type: 'deposit_return',
+          category: 'security_deposit',
+          amount_cents: finalRefundCents,
+          transaction_date: now,
+          description: 'Security Deposit Refund Return',
+          property_id: lease.property_id || null,
+          unit_id: lease.unit_id || null,
+          lease_id: leaseId
+        });
+        createdTxs.push(created);
       }
 
       // 3. Update lease deposit held to 0 and terminate lease if active

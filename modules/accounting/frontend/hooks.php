@@ -10,10 +10,26 @@ HookRegistry::registerNavigation([
 ]);
 
 HookRegistry::registerNavigation([
+    'label' => 'General Ledger',
+    'route' => '/accounting/general-ledger',
+    'icon' => 'book',
+    'order' => 41,
+    'section' => 'financial'
+]);
+
+HookRegistry::registerNavigation([
+    'label' => 'Trial Balance',
+    'route' => '/accounting/trial-balance',
+    'icon' => 'activity',
+    'order' => 42,
+    'section' => 'financial'
+]);
+
+HookRegistry::registerNavigation([
     'label' => 'Rent Roll',
     'route' => '/accounting/rent-roll',
     'icon' => 'list',
-    'order' => 41,
+    'order' => 43,
     'section' => 'financial'
 ]);
 
@@ -21,7 +37,7 @@ HookRegistry::registerNavigation([
     'label' => 'Schedule E Tax',
     'route' => '/accounting/schedule-e',
     'icon' => 'file-bar-chart',
-    'order' => 42,
+    'order' => 44,
     'section' => 'financial'
 ]);
 
@@ -29,7 +45,7 @@ HookRegistry::registerNavigation([
     'label' => 'QuickBooks Sync',
     'route' => '/accounting/quickbooks',
     'icon' => 'refresh-cw',
-    'order' => 43,
+    'order' => 45,
     'section' => 'financial'
 ]);
 
@@ -37,7 +53,7 @@ HookRegistry::registerNavigation([
     'label' => 'Chart of Accounts',
     'route' => '/accounting/chart-of-accounts',
     'icon' => 'book-open',
-    'order' => 44,
+    'order' => 46,
     'section' => 'financial'
 ]);
 
@@ -59,4 +75,3 @@ HookRegistry::registerDashboardCard(function ($api) {
         return null;
     }
 });
-
