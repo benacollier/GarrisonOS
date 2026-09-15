@@ -78,7 +78,7 @@ All contributions must strictly adhere to the project's non-negotiable architect
    npm run dev
 
    # Terminal 2: PHP frontend
-   php -S localhost:8080 -t web web/index.php
+   php -S localhost:80 -t web web/index.php
    ```
 
 ---

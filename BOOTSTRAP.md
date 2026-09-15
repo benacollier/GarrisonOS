@@ -760,5 +760,5 @@ All REST endpoints return standardized JSON structures:
 2. **Database Initialization**: Execute `npm run migrate` to apply core and module migrations.
 3. **Data Seeding**: Execute `npm run seed` to load the 20-unit realistic demo dataset.
 4. **Backend Engine**: Launch via `npm run start` (listening on port 3000).
-5. **Frontend Web**: Launch native PHP server: `php -S localhost:8080 -t web web/index.php`.
+5. **Frontend Web**: Launch native PHP server: `php -S localhost:80 -t web web/index.php`.
 6. **Automated Testing**: Run `npm test` (`node --test dist/test/**/*.test.js`) and ensure 100% test pass rate.
