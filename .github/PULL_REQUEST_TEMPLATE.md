@@ -19,6 +19,17 @@
 - [ ] `security`: Security enhancements or vulnerability fixes (`type/security`)
 - [ ] `chore`: Tooling, maintenance, or configuration changes (`type/chore`)
 
+## Walkthrough & Changes Summary
+
+<!-- Provide a brief, bulleted walkthrough of changes made, grouped by component or file. Avoid excessive detail. -->
+- **Component / File**: Summary of change.
+
+## Verification & Testing Evidence
+
+<!-- Briefly record test commands run and verification results. -->
+- **Automated Tests**: e.g., `npm.cmd test` or `node scripts/test.js <module>` passed.
+- **Manual Verification**: Brief note on validation.
+
 ## Contributor Checklist
 
 Please verify each of the following before submitting:
