@@ -78,3 +78,12 @@ The following scenarios are considered out of scope:
 * Attacks requiring physical access, root compromise, or local shell control of the host machine.
 * Vulnerabilities in third-party reverse proxies (Nginx, Caddy) or PHP runtime versions themselves.
 * Social engineering or physical attacks against host operators.
+
+---
+
+## 6. Automated Secret Scanning & Security Tooling
+
+To ensure sensitive credentials, host-specific paths, and API keys are never introduced to the codebase, GarrisonOS maintains automated CI security checks powered by:
+
+* **[Betterleaks](https://github.com/betterleaks/betterleaks)**: Runs in our security workflow (`.github/workflows/security.yml`) to scan commits against credential patterns and rule baselines (`.betterleaksignore`).
+* **Repository Hygiene Linter**: Custom zero-dependency pre-commit and CI scanner (`scripts/check-hygiene.js`) ensuring strict path hygiene and preventing accidental leaks.

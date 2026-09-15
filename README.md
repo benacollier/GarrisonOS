@@ -221,7 +221,9 @@ garrison-os/
 ├── .github/
 │   └── workflows/
 │       ├── ci.yml                 # Automated build and test pipeline
-│       └── cla.yml                # Automated Contributor License Agreement check
+│       ├── cla.yml                # Automated Contributor License Agreement check
+│       └── security.yml           # Automated hygiene and Betterleaks secret scanning
+├── .betterleaksignore             # Secret scanning baseline exception rules
 ├── .env.example                   # Environment configuration template
 ├── .gitignore
 ├── AGENTS.md                      # Contributor rules & engineering guardrails
@@ -433,6 +435,17 @@ Full architectural specifications, module details, API contracts, development gu
 We welcome contributions from the community! Please review our [Contributing Guide](CONTRIBUTING.md), [Code of Conduct](CODE_OF_CONDUCT.md), and [Contributor License Agreement (CLA)](docs/legal/CLA.md) before submitting Pull Requests.
 
 All contributions must adhere to the engineering standards specified in [AGENTS.md](AGENTS.md).
+
+---
+
+## Acknowledgements & Attributions
+
+GarrisonOS is built on and inspired by foundational open-source standards, tools, and community specifications:
+
+* **[Betterleaks](https://github.com/betterleaks/betterleaks)**: High-speed repository secret and sensitive credential scanning used across our continuous integration and security pipelines.
+* **[Contributor Covenant](https://www.contributor-covenant.org)**: The open-source community code of conduct standard powering [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
+* **[Mozilla Diversity & Inclusion](https://github.com/mozilla/diversity)**: Community impact guidelines and enforcement ladder informing our moderation process.
+* **[RFC 9562](https://www.rfc-editor.org/rfc/rfc9562.html)**: Universally Unique IDentifiers (UUIDv7) specification establishing our time-ordered primary key standard.
 
 ---
 
