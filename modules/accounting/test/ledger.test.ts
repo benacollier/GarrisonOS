@@ -6,9 +6,9 @@ import {
   calculateDepositDisposition,
   calculateScheduleE,
   TransactionRecord
-} from '../modules/accounting/backend/ledger.js';
+} from '../backend/ledger.js';
 
-describe('Accounting & Ledger Mathematics Subsystem', () => {
+describe('Accounting Module - Ledger Mathematics', () => {
   it('calculates running tenant balance correctly', () => {
     const transactions: TransactionRecord[] = [
       {
@@ -158,4 +158,3 @@ describe('Accounting & Ledger Mathematics Subsystem', () => {
     assert.equal(report.expenseByCategory['repairs'], 25000);
   });
 });
-

@@ -245,6 +245,9 @@ Every functional module under `modules/[module_name]/` must adhere strictly to t
 * **`hooks.php`**: Registers navigation links, dashboard summary cards, and detail view tabs with the central hook registry.
 * **`pages/`**: PHP view scripts dispatched dynamically by `web/index.php` when navigating to `/[module_name]/[view]`.
 
+### 3.4. Test Contracts (`test/`)
+* **`[module_name].test.ts`**: Co-located unit and integration test suite executing under native `node:test` and `node:assert`. Covers module repositories, route endpoints, lifecycle states, and tenant context isolation. Automatically discovered and executed on `npm test`.
+
 ---
 
 ## 4. MVP Domain Entities & Schemas
@@ -744,13 +747,19 @@ All REST endpoints return standardized JSON structures:
 
 ### Phase 7: Demo Seeder & Automated Verification Suite
 1. Implement `database/seed.ts`: Deterministic date-relative seeder populating a realistic 20-unit sample portfolio (10 Single-Family Homes, 3 Duplexes, 1 4-Plex) with 12 months of historical transactions, active leases, 1 delinquent tenant, 1 expiring lease, and 2 open work orders.
-2. Build test suite in `test/` using `node:test` and `node:assert`:
-   - `crypto.test.ts`: Monotonic time-sorting and scrypt verification.
-   - `context.test.ts`: `AsyncLocalStorage` concurrency and leak prevention.
-   - `isolation.test.ts`: Multi-tenant isolation (confirm Tenant A cannot access Tenant B records).
-   - `ledger.test.ts`: Financial ledger balance, payment allocation hierarchy, and Schedule E categorization.
-   - `billing.test.ts`: Idempotent recurring rent generation and proration math.
-   - `router.test.ts`: HTTP request parsing, param matching, and response status codes.
+2. Build automated test suite using `node:test` and `node:assert`:
+   - **Core Engine Suites** (`test/`):
+     - `crypto.test.ts`: Monotonic time-sorting, UUIDv7 structure, scrypt hashing, and HMAC session tokens.
+     - `context.test.ts`: `AsyncLocalStorage` concurrency and leak prevention.
+     - `isolation.test.ts`: Multi-tenant isolation (confirm Tenant A cannot access Tenant B records).
+     - `router.test.ts`: HTTP request parsing, param matching, and response status codes.
+     - `modules.test.ts`: Dynamic module discovery and automated test package verification.
+   - **Module-Packaged Domain Suites** (`modules/[module_name]/test/`):
+     - `modules/properties/test/properties.test.ts`: Portfolios, properties, units, vacancies, and occupancy metrics.
+     - `modules/contacts/test/contacts.test.ts`: Directory filtering, vendor specialties, and contact CRUD.
+     - `modules/leases/test/leases.test.ts`: Contract lifecycle transitions, multi-party signatories, and terms.
+     - `modules/accounting/test/`: Billing proration, idempotent rent generator, ledger mathematics, 4-tier waterfall, Schedule E NOI, and financial transactions.
+     - `modules/maintenance/test/maintenance.test.ts`: Work order triage, vendor dispatch, and cross-module expense event hooks.
 
 ---
 
@@ -761,4 +770,4 @@ All REST endpoints return standardized JSON structures:
 3. **Data Seeding**: Execute `npm run seed` to load the 20-unit realistic demo dataset.
 4. **Backend Engine**: Launch via `npm run start` (listening on port 3000).
 5. **Frontend Web**: Launch native PHP server: `php -S localhost:80 -t web web/index.php`.
-6. **Automated Testing**: Run `npm test` (`node --test dist/test/**/*.test.js`) and ensure 100% test pass rate.
+6. **Automated Testing**: Run `npm test` (`node --test dist/**/*.test.js`) and ensure 100% test pass rate across core and all modules.

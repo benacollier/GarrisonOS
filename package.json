@@ -11,7 +11,7 @@
     "migrate": "node dist/database/migrator.js",
     "seed": "node dist/database/seed.js",
     "frontend": "php -S localhost:80 -t web web/index.php",
-    "test": "node --test dist/test/**/*.test.js"
+    "test": "node --test dist/**/*.test.js"
   },
   "keywords": [
     "property-management",

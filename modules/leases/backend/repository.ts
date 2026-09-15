@@ -238,7 +238,7 @@ export class LeasesRepository {
         id, tenant_id, lease_id, contact_id, role,
         is_financially_responsible, created_at
       ) VALUES (?, ?, ?, ?, ?, ?, ?)
-      ON CONFLICT(tenant_id, lease_id, contact_id) DO UPDATE SET
+      ON CONFLICT(tenant_id, lease_id, contact_id) WHERE deleted_at IS NULL DO UPDATE SET
         role = excluded.role,
         is_financially_responsible = excluded.is_financially_responsible,
         deleted_at = NULL

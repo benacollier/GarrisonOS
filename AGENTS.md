@@ -53,6 +53,7 @@ This document establishes the mandatory engineering standards, architectural con
 ## 6. Modular Architecture
 
 * Domain features live inside self-contained modules under `modules/[module_name]/`.
-* Modules must supply a `module.json` manifest and follow standard contracts for backend migrations, routes, events, repositories, and frontend hooks/pages.
+* Modules must supply a `module.json` manifest and follow standard contracts for backend migrations, routes, events, repositories, frontend hooks/pages, and packaged automated tests under `modules/[module_name]/test/`.
+* Whenever a new module is introduced, its associated unit and integration test suite must be co-located within the module's `test/` directory.
 * Cross-module communication must use the asynchronous in-process `EventBus` (`core/events.ts`).
 

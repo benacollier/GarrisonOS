@@ -40,5 +40,25 @@ describe('Dynamic Module Loader & Migration Discovery Subsystem', () => {
     const registered = getLoadedModules();
     assert.equal(registered.length, 5);
   });
+
+  it('ensures all registered modules package their own test suites', async () => {
+    const fs = await import('node:fs');
+    const path = await import('node:path');
+    const loaded = getLoadedModules();
+
+    for (const mod of loaded) {
+      const testDir = path.join(mod.moduleDir, 'test');
+      assert.ok(
+        fs.existsSync(testDir) && fs.statSync(testDir).isDirectory(),
+        `Module ${mod.manifest.id} must include a test/ directory`
+      );
+
+      const testFiles = fs.readdirSync(testDir).filter((f) => f.endsWith('.test.ts') || f.endsWith('.test.js'));
+      assert.ok(
+        testFiles.length > 0,
+        `Module ${mod.manifest.id} must contain at least one packaged test file (*.test.ts) in ${testDir}`
+      );
+    }
+  });
 });
 

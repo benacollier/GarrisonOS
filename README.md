@@ -226,11 +226,11 @@ garrison-os/
 │       └── 0001_core_schema.sql
 │
 ├── modules/                       # Self-Contained Domain Modules
-│   ├── properties/                # Portfolios, Properties, and Units
-│   ├── contacts/                  # Human & Organization Directory
-│   ├── leases/                    # Lease Contracts & Signatories
-│   ├── accounting/                # Cash-Basis Ledger, Billing, Schedule E & Proration
-│   └── maintenance/               # Work Orders, Vendor Dispatch & Expense Hooks
+│   ├── properties/                # Portfolios, Properties, Units & test/
+│   ├── contacts/                  # Human & Organization Directory & test/
+│   ├── leases/                    # Lease Contracts, Signatories & test/
+│   ├── accounting/                # Ledger, Billing, Schedule E & test/
+│   └── maintenance/               # Work Orders, Dispatch & test/
 │
 ├── web/                           # Native PHP Presentation Layer
 │   ├── index.php                  # Front controller, CSRF validator & dynamic router
@@ -239,15 +239,13 @@ garrison-os/
 │   ├── pages/                     # Dashboard and login view controllers
 │   └── public/                    # Design tokens, CSS styles, and minimal JavaScript
 │
-└── test/                          # Native node:test & node:assert Suite
+└── test/                          # Core System node:test & node:assert Suite
     ├── helpers.ts                 # In-memory SQLite fixtures & mock harnesses
     ├── crypto.test.ts             # UUIDv7 format, timestamp ordering & scrypt tests
     ├── context.test.ts            # AsyncLocalStorage concurrency & isolation tests
     ├── isolation.test.ts          # Cross-tenant data isolation & leak tests
     ├── router.test.ts             # Route matching, params & body parsing tests
-    ├── ledger.test.ts             # Running balance, waterfall allocation & Schedule E tests
-    ├── billing.test.ts            # Recurring rent generator & proration tests
-    └── modules.test.ts            # Dynamic module discovery & migration runner tests
+    └── modules.test.ts            # Dynamic module & test packaging discovery tests
 ```
 
 ---
@@ -317,21 +315,26 @@ Once running, navigate to `http://localhost` (or `http://localhost:80`) in your 
 
 ## Automated Test Suite
 
-GarrisonOS includes automated unit, integration, and security isolation tests powered by Node.js built-in test runner (`node:test` and `node:assert`):
+GarrisonOS includes comprehensive automated unit, integration, and security isolation tests powered by Node.js built-in test runner (`node:test` and `node:assert`):
 
 ```bash
-# Run full automated test suite
+# Run full automated test suite (executes core and all module-packaged tests)
 npm test
 ```
 
 The test suite validates:
-* **Cryptography & Identity**: RFC 9562 UUIDv7 structure, monotonic timestamp sorting, `scrypt` password hashing, and HMAC session token verification.
-* **Multi-Tenant Context**: `AsyncLocalStorage` propagation across concurrent asynchronous operations and strict rejection outside context.
-* **Row-Level Tenant Isolation**: Verification that Tenant A cannot query or mutate records belonging to Tenant B across all domain entities.
-* **Accounting & Financial Math**: Running tenant balances, payment allocation waterfalls, deposit trust dispositions, and Schedule E NOI calculations.
-* **Billing & Proration**: Monthly rent generation idempotency and mid-month proration formulas.
-* **HTTP Router**: Route parameter extraction, query string parsing, body streaming, and structured error responses.
-* **Module Loader**: Auto-discovery of manifests, migrations, routes, and subscribers.
+* **Core Subsystems** (`test/`):
+  * **Cryptography & Identity**: RFC 9562 UUIDv7 structure, monotonic timestamp sorting, `scrypt` password hashing, and HMAC session token verification.
+  * **Multi-Tenant Context**: `AsyncLocalStorage` propagation across concurrent asynchronous operations and strict rejection outside context.
+  * **Row-Level Tenant Isolation**: Verification that Tenant A cannot query or mutate records belonging to Tenant B across all domain entities.
+  * **HTTP Router**: Route parameter extraction, query string parsing, body streaming, and structured error responses.
+  * **Module Loader & Test Enforcement**: Dynamic discovery of manifests, migrations, routes, subscribers, and verification that all modules package their own test suites.
+* **Module-Packaged Domain Logic** (`modules/[module_name]/test/`):
+  * **Accounting**: Running tenant balances, 4-tier waterfall payment allocation, deposit trust dispositions, Schedule E NOI calculations, monthly rent generation idempotency, and mid-month proration.
+  * **Properties**: Portfolios, properties, units, vacancy state transitions, and occupancy metrics.
+  * **Contacts**: Human directory filtering, vendor specializations, and soft-delete lifecycle.
+  * **Leases**: Contract lifecycle transitions, multi-party signatories, and financial terms.
+  * **Maintenance**: Work order priority triage, vendor assignments, and cross-module expense event triggers.
 
 ---
 

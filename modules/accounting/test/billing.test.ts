@@ -1,13 +1,13 @@
 import { test, describe, it, before, after } from 'node:test';
 import * as assert from 'node:assert/strict';
-import { calculateProratedRent, generateMonthlyRentCharges } from '../modules/accounting/backend/billing.js';
-import { createTestDb, runInTenantContext } from './helpers.js';
-import { PropertiesRepository } from '../modules/properties/backend/repository.js';
-import { LeasesRepository } from '../modules/leases/backend/repository.js';
-import { AccountingRepository } from '../modules/accounting/backend/repository.js';
-import { closeDatabase, getDatabase } from '../database/client.js';
+import { calculateProratedRent, generateMonthlyRentCharges } from '../backend/billing.js';
+import { createTestDb, runInTenantContext } from '../../../test/helpers.js';
+import { PropertiesRepository } from '../../properties/backend/repository.js';
+import { LeasesRepository } from '../../leases/backend/repository.js';
+import { AccountingRepository } from '../backend/repository.js';
+import { closeDatabase, getDatabase } from '../../../database/client.js';
 
-describe('Automated Monthly Billing & Proration Subsystem', () => {
+describe('Accounting Module - Monthly Billing & Proration', () => {
   before(() => {
     getDatabase({ inMemory: true });
     createTestDb();
@@ -78,4 +78,3 @@ describe('Automated Monthly Billing & Proration Subsystem', () => {
     });
   });
 });
-

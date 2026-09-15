@@ -85,14 +85,16 @@ All contributions must strictly adhere to the project's non-negotiable architect
 
 ## 4. Testing Requirements
 
-All PRs introducing new features or bug fixes must include corresponding tests using the native Node.js test runner (`node:test` and `node:assert`):
+All PRs introducing new modules, features, or bug fixes must include corresponding tests using the native Node.js test runner (`node:test` and `node:assert`):
+* **Core Subsystem Tests**: Co-located in `test/` for core primitives, routers, crypto, and multi-tenant context.
+* **Module-Packaged Tests**: Co-located within the module's `modules/[module_name]/test/` directory for repositories, routes, events, and business workflows.
 
 ```bash
-# Run the full automated test suite
+# Run the full automated test suite (executes core and all module tests)
 npm test
 ```
 
-Tests must pass with zero failures and maintain 100% tenant isolation.
+Tests must pass with zero failures and maintain 100% tenant isolation. All modules must package at least one automated test suite.
 
 ---
 
