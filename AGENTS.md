@@ -61,9 +61,10 @@ This document establishes the mandatory engineering standards, architectural con
 
 ## 7. Efficient Test Execution & Verification
 
-* **Documentation / Asset Changes**: Do not execute the test suite when making documentation-only or asset-only changes.
+* **Proactive Execution Prohibition**: Never proactively run builds (`npm run build`) or test suites (`npm test`) unless runtime code was actually modified or explicitly requested by the user.
+* **Documentation, Tooling & IDE Settings**: Do NOT execute builds or tests when creating/modifying documentation (`*.md`), IDE settings (`.vscode/`), CI workflows (`.github/`), static assets, or non-runtime files.
 * **Modular Changes**: When modifying a single module, execute only that module's test suite: `npm run test:module <module_name>` or `node scripts/test.js <module_name>`.
 * **Core Subsystems**: When modifying core primitives (`core/`, `api/`, `database/`), execute core tests via `npm run test:core`.
-* **Full Regression**: Execute `npm test` before submitting pull requests or after touching global configuration / dependencies.
+* **Full Regression**: Execute `npm test` only before submitting pull requests or when modifying runtime engine dependencies / core compilation configurations (`tsconfig.json`, `package.json` runtime scripts).
 
 
