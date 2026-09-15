@@ -122,6 +122,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <th>Category</th>
                     <th>Description</th>
                     <th>Payment Method</th>
+                    <th>GL Entry</th>
                     <th>Charge</th>
                     <th>Payment</th>
                     <th>Running Balance</th>
@@ -130,7 +131,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <tbody>
                 <?php if (empty($transactions)): ?>
                 <tr>
-                    <td colspan="8" class="text-center text-muted">No transactions on ledger.</td>
+                    <td colspan="9" class="text-center text-muted">No transactions on ledger.</td>
                 </tr>
                 <?php else: ?>
                 <?php
@@ -147,6 +148,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <td><?= htmlspecialchars(ucwords(str_replace('_', ' ', $t['category']))) ?></td>
                     <td><?= htmlspecialchars($t['description']) ?></td>
                     <td><?= $t['payment_method'] ? htmlspecialchars(strtoupper($t['payment_method'])) : '—' ?></td>
+                    <td>
+                        <?php if (!empty($t['journal_entry_id'])): ?>
+                            <a href="/accounting/general-ledger" title="View in General Ledger"><code>GL Linked</code></a>
+                        <?php else: ?>
+                            <span class="text-muted">—</span>
+                        <?php endif; ?>
+                    </td>
                     <td><?= $isCharge ? '$' . number_format($t['amount_cents'] / 100, 2) : '—' ?></td>
                     <td><?= $isPayment ? '<span class="text-success font-bold">$' . number_format($t['amount_cents'] / 100, 2) . '</span>' : '—' ?></td>
                     <td><strong>$<?= number_format($running / 100, 2) ?></strong></td>

@@ -56,6 +56,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     </div>
     <div class="btn-group">
         <button class="btn btn-primary" onclick="document.getElementById('addTxModal').showModal()">+ Record Transaction</button>
+        <a href="/accounting/general-ledger" class="btn btn-secondary">General Ledger</a>
+        <a href="/accounting/trial-balance" class="btn btn-secondary">Trial Balance</a>
         <a href="/accounting/rent-roll" class="btn btn-secondary">Rent Roll</a>
         <a href="/accounting/schedule-e" class="btn btn-secondary">Schedule E</a>
         <a href="/accounting/quickbooks" class="btn btn-secondary">QuickBooks Sync</a>
