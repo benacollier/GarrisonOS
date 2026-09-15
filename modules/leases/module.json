@@ -1,0 +1,20 @@
+{
+  "id": "leases",
+  "name": "Leases & Tenants",
+  "version": "1.0.0",
+  "description": "Lease agreements, terms, rent rules, and signatory management.",
+  "navigation": [
+    {
+      "label": "Leases",
+      "route": "/leases",
+      "icon": "file-text",
+      "order": 30,
+      "section": "core"
+    }
+  ],
+  "slots": [
+    "dashboard.metrics",
+    "unit.details.tabs"
+  ],
+  "dependencies": ["properties", "contacts"]
+}

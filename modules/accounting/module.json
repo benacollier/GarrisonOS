@@ -1,0 +1,34 @@
+{
+  "id": "accounting",
+  "name": "Accounting & Ledger",
+  "version": "1.0.0",
+  "description": "Cash-basis ledger, billing cycles, IRS Schedule E reporting, and rent collection.",
+  "navigation": [
+    {
+      "label": "Accounting",
+      "route": "/accounting",
+      "icon": "dollar-sign",
+      "order": 40,
+      "section": "financial"
+    },
+    {
+      "label": "Rent Roll",
+      "route": "/accounting/rent-roll",
+      "icon": "list",
+      "order": 41,
+      "section": "financial"
+    },
+    {
+      "label": "Schedule E Tax",
+      "route": "/accounting/schedule-e",
+      "icon": "file-bar-chart",
+      "order": 42,
+      "section": "financial"
+    }
+  ],
+  "slots": [
+    "dashboard.metrics",
+    "lease.details.tabs"
+  ],
+  "dependencies": ["properties", "contacts", "leases"]
+}

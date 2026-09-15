@@ -1,0 +1,20 @@
+{
+  "id": "properties",
+  "name": "Properties & Portfolios",
+  "version": "1.0.0",
+  "description": "Management of portfolios, physical properties, and rentable units.",
+  "navigation": [
+    {
+      "label": "Properties",
+      "route": "/properties",
+      "icon": "building",
+      "order": 10,
+      "section": "core"
+    }
+  ],
+  "slots": [
+    "dashboard.metrics",
+    "property.details.tabs"
+  ],
+  "dependencies": []
+}

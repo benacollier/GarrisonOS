@@ -1,0 +1,19 @@
+{
+  "id": "contacts",
+  "name": "Contacts & Directory",
+  "version": "1.0.0",
+  "description": "Directory for tenants, property owners, contractors, vendors, and emergency contacts.",
+  "navigation": [
+    {
+      "label": "Contacts",
+      "route": "/contacts",
+      "icon": "users",
+      "order": 20,
+      "section": "core"
+    }
+  ],
+  "slots": [
+    "contact.details.tabs"
+  ],
+  "dependencies": []
+}

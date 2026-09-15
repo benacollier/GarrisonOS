@@ -1,0 +1,142 @@
+import { getDatabase } from '../../../database/client.js';
+import { RequestContext } from '../../../core/context.js';
+import { generateUUIDv7 } from '../../../core/crypto.js';
+
+export interface Contact {
+  id: string;
+  tenant_id: string;
+  contact_type: 'tenant' | 'owner' | 'vendor' | 'guarantor' | 'prospect' | 'emergency';
+  first_name: string;
+  last_name: string;
+  company_name?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  secondary_phone?: string | null;
+  tax_id_last4?: string | null;
+  vendor_specialty?: string | null;
+  notes?: string | null;
+  created_at: number;
+  updated_at: number;
+  deleted_at?: number | null;
+}
+
+export class ContactsRepository {
+  public static listContacts(filter?: { contact_type?: string; query?: string }): Contact[] {
+    const tenantId = RequestContext.getTenantId();
+    const db = getDatabase();
+    let sql = 'SELECT * FROM contacts WHERE tenant_id = ? AND deleted_at IS NULL';
+    const params: any[] = [tenantId];
+
+    if (filter?.contact_type) {
+      sql += ' AND contact_type = ?';
+      params.push(filter.contact_type);
+    }
+
+    if (filter?.query) {
+      sql += ' AND (first_name LIKE ? OR last_name LIKE ? OR company_name LIKE ? OR email LIKE ? OR phone LIKE ?)';
+      const term = `%${filter.query}%`;
+      params.push(term, term, term, term, term);
+    }
+
+    sql += ' ORDER BY last_name ASC, first_name ASC';
+    return db.prepare(sql).all(...params) as unknown as Contact[];
+  }
+
+  public static getContactById(id: string): Contact | null {
+    const tenantId = RequestContext.getTenantId();
+    const db = getDatabase();
+    const row = db.prepare(`
+      SELECT * FROM contacts
+      WHERE id = ? AND tenant_id = ? AND deleted_at IS NULL
+    `).get(id, tenantId) as Contact | undefined;
+    return row || null;
+  }
+
+  public static createContact(data: {
+    contact_type: Contact['contact_type'];
+    first_name: string;
+    last_name: string;
+    company_name?: string;
+    email?: string;
+    phone?: string;
+    secondary_phone?: string;
+    tax_id_last4?: string;
+    vendor_specialty?: string;
+    notes?: string;
+  }): Contact {
+    const tenantId = RequestContext.getTenantId();
+    const db = getDatabase();
+    const id = generateUUIDv7();
+    const now = Date.now();
+
+    db.prepare(`
+      INSERT INTO contacts (
+        id, tenant_id, contact_type, first_name, last_name,
+        company_name, email, phone, secondary_phone,
+        tax_id_last4, vendor_specialty, notes, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      id,
+      tenantId,
+      data.contact_type,
+      data.first_name,
+      data.last_name,
+      data.company_name || null,
+      data.email || null,
+      data.phone || null,
+      data.secondary_phone || null,
+      data.tax_id_last4 || null,
+      data.vendor_specialty || null,
+      data.notes || null,
+      now,
+      now
+    );
+
+    return ContactsRepository.getContactById(id)!;
+  }
+
+  public static updateContact(id: string, data: Partial<Omit<Contact, 'id' | 'tenant_id' | 'created_at' | 'updated_at' | 'deleted_at'>>): Contact | null {
+    const existing = ContactsRepository.getContactById(id);
+    if (!existing) return null;
+
+    const tenantId = RequestContext.getTenantId();
+    const db = getDatabase();
+    const now = Date.now();
+    const updated = { ...existing, ...data, updated_at: now };
+
+    db.prepare(`
+      UPDATE contacts SET
+        contact_type = ?, first_name = ?, last_name = ?,
+        company_name = ?, email = ?, phone = ?, secondary_phone = ?,
+        tax_id_last4 = ?, vendor_specialty = ?, notes = ?, updated_at = ?
+      WHERE id = ? AND tenant_id = ? AND deleted_at IS NULL
+    `).run(
+      updated.contact_type,
+      updated.first_name,
+      updated.last_name,
+      updated.company_name || null,
+      updated.email || null,
+      updated.phone || null,
+      updated.secondary_phone || null,
+      updated.tax_id_last4 || null,
+      updated.vendor_specialty || null,
+      updated.notes || null,
+      now,
+      id,
+      tenantId
+    );
+
+    return ContactsRepository.getContactById(id);
+  }
+
+  public static deleteContact(id: string): boolean {
+    const tenantId = RequestContext.getTenantId();
+    const db = getDatabase();
+    const now = Date.now();
+    const info = db.prepare(`
+      UPDATE contacts SET deleted_at = ?
+      WHERE id = ? AND tenant_id = ? AND deleted_at IS NULL
+    `).run(now, id, tenantId);
+    return info.changes > 0;
+  }
+}
