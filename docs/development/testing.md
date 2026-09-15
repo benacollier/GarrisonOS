@@ -55,3 +55,17 @@ describe('Properties Module - Lifecycle & Inventory Management', () => {
 1. **Context Isolation**: Every test must execute within an explicit `RequestContext.run()` wrapper to simulate isolated request execution.
 2. **Deterministic Time**: Tests must use fixed or relative timestamp offsets to avoid flaky assertions.
 3. **Zero Test Framework Dependencies**: Do not introduce Jest, Mocha, Chai, Vitest, or Sinon. Use standard Node.js built-ins.
+
+---
+
+## 4. Secret Scanning & Repository Hygiene
+
+To safeguard against accidental credential exposure and host-specific path leaks, all contributions must pass hygiene and secret scanning:
+
+```bash
+# Run repository hygiene and path leak checks
+npm run check:hygiene
+```
+
+* **Betterleaks Secret Scanning**: Executed on CI (`.github/workflows/security.yml`) across all commits and pull requests.
+* **Baseline Exceptions**: Synthetic test credentials or cryptographic test vectors in `test/` that trigger false positives must be baselined in [`.betterleaksignore`](../../.betterleaksignore).
