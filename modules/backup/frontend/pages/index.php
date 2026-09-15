@@ -93,7 +93,7 @@ try {
 <div class="card" style="background: var(--color-surface, #fff); padding: 1.5rem; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 2rem;">
     <h2 style="margin-top: 0; font-size: 1.25rem;">Create New Backup</h2>
     <form method="POST" action="/backup" style="display: flex; gap: 1rem; align-items: flex-end; flex-wrap: wrap;">
-        <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(CSRF::getToken(), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?>">
+        <?= CSRF::field() ?>
         <input type="hidden" name="action" value="create">
 
         <div style="display: flex; flex-direction: column; gap: 0.25rem;">
@@ -168,7 +168,7 @@ try {
                                     </a>
 
                                     <form method="POST" action="/backup" style="display: inline;">
-                                        <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(CSRF::getToken(), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?>">
+                                        <?= CSRF::field() ?>
                                         <input type="hidden" name="action" value="verify">
                                         <input type="hidden" name="backup_id" value="<?= htmlspecialchars($b['id'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?>">
                                         <button type="submit" style="padding: 0.25rem 0.5rem; background: #f1f3f4; border: 1px solid #dadce0; border-radius: 4px; cursor: pointer; font-size: 0.85rem;">
@@ -187,7 +187,7 @@ try {
                                 <?php endif; ?>
 
                                 <form method="POST" action="/backup" style="display: inline;" onsubmit="return confirm('Permanently remove this backup archive?');">
-                                    <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(CSRF::getToken(), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?>">
+                                    <?= CSRF::field() ?>
                                     <input type="hidden" name="action" value="delete">
                                     <input type="hidden" name="backup_id" value="<?= htmlspecialchars($b['id'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?>">
                                     <button type="submit" style="padding: 0.25rem 0.5rem; background: #fce8e6; color: #c5221f; border: 1px solid #fad2cf; border-radius: 4px; cursor: pointer; font-size: 0.85rem;">
@@ -212,7 +212,7 @@ try {
         </p>
 
         <form method="POST" action="/backup" id="restoreForm">
-            <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(CSRF::getToken(), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?>">
+            <?= CSRF::field() ?>
             <input type="hidden" name="action" value="restore">
             <input type="hidden" name="backup_id" id="modalBackupId" value="">
 

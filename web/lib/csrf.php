@@ -8,6 +8,10 @@ class CSRF {
         return $_SESSION['csrf_token'];
     }
 
+    public static function getToken(): string {
+        return self::token();
+    }
+
     public static function field(): string {
         $token = self::token();
         return '<input type="hidden" name="csrf_token" value="' . htmlspecialchars($token) . '">';

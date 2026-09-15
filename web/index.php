@@ -73,6 +73,10 @@ if ($path === '' || $path === 'dashboard') {
     $module = $parts[0] ?? '';
     $action = $parts[1] ?? 'index';
 
+    if ($module === 'backups') {
+        $module = 'backup';
+    }
+
     $modulePage = __DIR__ . "/../modules/{$module}/frontend/pages/{$action}.php";
     if (file_exists($modulePage)) {
         $targetPageFile = $modulePage;
