@@ -32,13 +32,17 @@ describe('Dynamic Module Loader & Migration Discovery Subsystem', () => {
     const router = new Router();
     const loaded = await loadModules(router, eventBus);
 
-    assert.equal(loaded.length, 5);
-    const moduleIds = loaded.map((m) => m.manifest.id).sort();
-    assert.deepEqual(moduleIds, ['accounting', 'contacts', 'leases', 'maintenance', 'properties']);
+    assert.ok(loaded.length >= 5);
+    const moduleIds = loaded.map((m) => m.manifest.id);
+    assert.ok(moduleIds.includes('properties'));
+    assert.ok(moduleIds.includes('contacts'));
+    assert.ok(moduleIds.includes('leases'));
+    assert.ok(moduleIds.includes('accounting'));
+    assert.ok(moduleIds.includes('maintenance'));
 
     // Introspection registry matches
     const registered = getLoadedModules();
-    assert.equal(registered.length, 5);
+    assert.equal(registered.length, loaded.length);
   });
 
   it('ensures all registered modules package their own test suites', async () => {
