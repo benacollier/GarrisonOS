@@ -102,4 +102,3 @@ GarrisonOS translates property operations into general ledger double-entry debit
    * **QuickBooks Online (QBO) Journal CSV**: Conforms to Intuit's batch journal import structure.
    * **QuickBooks Desktop (IIF)**: Tab-delimited transaction blocks (`!TRNS`/`!SPL`/`!ENDTRNS`).
    * **Web Connect (QBO/OFX)**: OFX 2.1 SGML/XML banking import for bank feed reconciliation.
-

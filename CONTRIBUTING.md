@@ -44,6 +44,7 @@ All contributions must strictly adhere to the project's non-negotiable architect
    - Write clean, idiomatic, human-grade code without generic boilerplate, placeholder comments, or conversational text.
    - Never hardcode host- or user-specific absolute filesystem paths (`/home/...`, `C:\Users\...`). Use `node:path` relative lookups and environment variables.
    - Follow Conventional Commits format (e.g., `feat(properties): add unit status filter`, `fix(accounting): correct delinquency grace period calculation`).
+   - Keep commits atomic and granular: do not bundle unrelated features, fixes, or refactors into a single commit. Keep commit messages concise and to the point.
 
 ---
 
@@ -109,7 +110,7 @@ Tests must pass with zero failures and maintain 100% tenant isolation. All modul
 2. Implement your changes following all architectural guardrails.
 3. Verify type correctness: `npm run build`.
 4. Ensure all automated tests pass: `npm test`.
-5. Commit your changes using conventional commit messages (`feat: ...`, `fix: ...`, `test: ...`).
+5. Commit your changes using conventional commit messages (`feat: ...`, `fix: ...`, `test: ...`), separating unrelated changes into atomic commits.
 6. Push to your fork and submit a Pull Request to `main`.
-7. Fill out the Pull Request template checklist.
+7. Fill out the Pull Request template completely, keeping the **Walkthrough & Changes Summary** and **Verification & Testing Evidence** concise and high-signal.
 8. Sign the automated CLA when prompted by the CLA bot.
