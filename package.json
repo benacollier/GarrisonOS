@@ -1,0 +1,29 @@
+{
+  "name": "garrison-os",
+  "version": "1.0.0",
+  "description": "Zero-dependency, open-source property management platform",
+  "type": "module",
+  "main": "dist/api/server.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/api/server.js",
+    "dev": "node --watch dist/api/server.js",
+    "migrate": "node dist/database/migrator.js",
+    "seed": "node dist/database/seed.js",
+    "test": "node --test dist/test/**/*.test.js"
+  },
+  "keywords": [
+    "property-management",
+    "real-estate",
+    "landlord",
+    "accounting",
+    "zero-dependency",
+    "multi-tenant"
+  ],
+  "author": "GarrisonOS Contributors",
+  "license": "AGPL-3.0-or-later",
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "^5.8.0"
+  }
+}
