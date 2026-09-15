@@ -167,3 +167,4 @@ echo "Access URLs:"
 echo "  Web Application: http://localhost:$PORT"
 echo "  API Backend:     http://127.0.0.1:$API_PORT"
 echo ""
+
