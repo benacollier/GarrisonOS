@@ -94,3 +94,26 @@ server {
 }
 ```
 
+---
+
+## 4. Production Security Hardening
+
+1. **File Permissions**:
+   - Ensure SQLite database files (`garrison.db`, `garrison.db-wal`, `garrison.db-shm`) and `.env` have restrictive permissions:
+     ```bash
+     chmod 600 garrison.db* .env
+     chown www-data:www-data garrison.db* .env
+     ```
+2. **Loopback Isolation**:
+   - The Node.js engine must bind strictly to `127.0.0.1:3000` (`HOST=127.0.0.1` in `.env`). Never bind to `0.0.0.0` or expose the Node.js port directly to the public Internet.
+3. **PHP Session Hardening (`php.ini`)**:
+   - Enforce secure session cookies:
+     ```ini
+     session.cookie_httponly = 1
+     session.cookie_secure = 1
+     session.cookie_samesite = "Strict"
+     session.use_strict_mode = 1
+     ```
+4. **Storage Directory Outside Web Root**:
+   - Ensure `STORAGE_PATH` (where attachments, receipts, and documents are saved) is placed entirely outside the web root (e.g. `/var/www/garrison-storage`).
+

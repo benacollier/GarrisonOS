@@ -44,10 +44,33 @@ To help us triage and resolve the issue quickly, please include:
 ---
 
 ## 4. Core Security Principles in GarrisonOS
+ 
+ GarrisonOS enforces strict architectural controls across the engine and presentation tiers:
+ 
+ * **Zero External Runtime Dependencies**: Eliminates supply chain attacks and transitive dependency vulnerabilities.
+ * **Strict Tenant Isolation**: Implicit tenant scoping via `AsyncLocalStorage` and compound database indexes.
+ * **Zero Outbound Telemetry**: Offline-first design with no unsolicited outbound external network requests or tracking.
+ * **Cryptographic Standards**: Native `scrypt` password hashing, signed HMAC-SHA256 session tokens, and constant-time equality comparisons (`node:crypto.timingSafeEqual`).
+ * **Presentation Layer Hygiene**: Mandatory CSRF protection on state mutations, contextual output escaping (`htmlspecialchars`), and strict Content Security Policy (CSP).
+ * **Path Traversal & Storage Security**: Attachments stored outside the web root (`STORAGE_PATH`), validated against MIME/extension whitelists and path traversal vectors.
 
-GarrisonOS enforces strict architectural controls across the engine and presentation tiers:
+---
 
-* **Zero External Runtime Dependencies**: Eliminates supply chain attacks and transitive dependency vulnerabilities.
-* **Strict Tenant Isolation**: Implicit tenant scoping via `AsyncLocalStorage` and compound database indexes.
-* **Cryptographic Standards**: Native `scrypt` password hashing, signed HMAC-SHA256 session tokens, and constant-time equality comparisons (`node:crypto.timingSafeEqual`).
-* **Presentation Layer Hygiene**: Mandatory CSRF protection on state mutations, contextual output escaping (`htmlspecialchars`), and strict Content Security Policy (CSP).
+## 5. Scope & Vulnerability Classifications
+
+### In-Scope Vulnerabilities
+We actively investigate reports regarding:
+* Cross-tenant data leakage or unauthorized multi-tenant access.
+* Authentication and authorization bypass.
+* Remote code execution (RCE) or SQL injection.
+* Cross-Site Request Forgery (CSRF) or Cross-Site Scripting (XSS).
+* Path traversal in file upload and storage handlers.
+* Cryptographic flaws or timing side-channel leaks.
+
+### Out-of-Scope
+The following scenarios are considered out of scope:
+* Denial-of-service (DoS) against local loopback ports (`127.0.0.1:3000`).
+* Attacks requiring physical access, root compromise, or local shell control of the host machine.
+* Vulnerabilities in third-party reverse proxies (Nginx, Caddy) or PHP runtime versions themselves.
+* Social engineering or physical attacks against host operators.
+

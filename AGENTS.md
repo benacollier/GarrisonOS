@@ -27,7 +27,7 @@ This document establishes the mandatory engineering standards, architectural con
 
 * Every operational database table must contain a `tenant_id TEXT NOT NULL` column, referencing `tenants(id)`.
 * Tenant context must be resolved from the `X-Tenant-ID` header and propagated via `AsyncLocalStorage` in `core/context.ts`.
-* Business logic, repositories, and domain services must NEVER accept `tenant_id` from request bodies or URL route parameters. It must always be extracted implicitly from `RequestContext.get()`.
+* Business logic, repositories, and domain services must NEVER accept `tenant_id` from request bodies or URL route parameters. It must always be extracted implicitly from `RequestContext.getTenantId()` or `RequestContext.get()`.
 * Every SQL query must filter on `tenant_id` and be supported by compound indexes `(tenant_id, ...)`.
 
 ---
@@ -35,9 +35,9 @@ This document establishes the mandatory engineering standards, architectural con
 ## 4. Data Representation & Entity Standards
 
 * **Primary Keys**: RFC 9562 UUIDv7 (time-ordered 128-bit UUID generated natively via `node:crypto.randomBytes`).
-* **Financials & Currency**: Stored strictly as **INTEGER cents** (e.g., $1,250.00 is stored as `125000`). Floating-point currency math is prohibited.
+* **Financials & Currency**: Stored strictly as **INTEGER cents** (e.g., $1,250.00 is stored as `125000`). Floating-point currency math is prohibited. Ledger transactions are append-only and immutable; corrections must be recorded as explicit reversal/adjustment transactions.
 * **Timestamps**: Stored strictly as **INTEGER milliseconds** (UTC epoch ms via `Date.now()`).
-* **Soft Deletes**: Standardized `deleted_at INTEGER` column on all operational tables (`NULL` when active, epoch ms when deleted).
+* **Soft Deletes**: Standardized `deleted_at INTEGER` column on all operational tables (`NULL` when active, epoch ms when deleted). All operational queries must filter `WHERE deleted_at IS NULL` by default.
 
 ---
 
@@ -48,7 +48,8 @@ This document establishes the mandatory engineering standards, architectural con
 * All state-modifying requests from the presentation layer must validate cryptographic CSRF tokens stored in the PHP session.
 * Public authentication endpoints must enforce sliding-window in-memory rate limiting.
 * **Network & Loopback Binding**: The Node.js core engine must strictly bind to `127.0.0.1` (loopback) to prevent direct untrusted network exposure.
-* **File Uploads & Media Storage**: Uploaded attachments must be stored outside the web root (`STORAGE_PATH`), validate explicit allowed MIME/extension whitelists, enforce byte size bounds, and validate paths against directory traversal attacks.
+* **Zero Outbound Telemetry**: The engine operates offline-first; no unsolicited external network calls, tracking, or telemetry are permitted.
+* **File Uploads & Media Storage**: Uploaded attachments must be stored outside the web root (`STORAGE_PATH`), validate explicit allowed MIME/extension whitelists, enforce byte size bounds, and validate resolved paths against directory traversal attacks (`path.resolve`).
 
 ---
 
@@ -74,7 +75,8 @@ This document establishes the mandatory engineering standards, architectural con
 ## 8. Database & Transaction Safety
 
 * **Parameterized Queries**: Raw SQL string concatenation and template literal interpolation for variable data are strictly prohibited. All queries must use parameterized placeholders (`?` or named parameters).
-* **Atomic Transactions**: Multi-step state mutations must execute within explicit transaction boundaries (`db.transaction(...)` / `BEGIN IMMEDIATE`) to prevent concurrency anomalies and SQLite locking contention.
+* **Operational PRAGMAs**: Database connections must enforce Foreign Keys (`PRAGMA foreign_keys = ON`), Write-Ahead Logging (`PRAGMA journal_mode = WAL`), and Busy Timeout (`PRAGMA busy_timeout = 5000`).
+* **Atomic Transactions & Lock Minimization**: Multi-step state mutations must execute within explicit transaction boundaries (`db.transaction(...)` / `BEGIN IMMEDIATE`) to prevent concurrency anomalies and SQLite locking contention. Keep transaction execution windows minimal.
 * **Schema Evolution**: Schema modifications must be performed exclusively through standard versioned migrations; direct runtime DDL executions outside migration lifecycles are forbidden.
 
 ---
