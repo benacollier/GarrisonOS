@@ -44,7 +44,10 @@ All contributions must strictly adhere to the project's non-negotiable architect
    - Write clean, idiomatic, human-grade code without generic boilerplate, placeholder comments, or conversational text.
    - Never hardcode host- or user-specific absolute filesystem paths (`/home/...`, `C:\Users\...`). Use `node:path` relative lookups and environment variables.
    - Follow Conventional Commits format (e.g., `feat(properties): add unit status filter`, `fix(accounting): correct delinquency grace period calculation`).
-   - Keep commits atomic and granular: do not bundle unrelated features, fixes, or refactors into a single commit. Keep commit messages concise and to the point.
+5. **Secret Scanning & Security**:
+   - Never commit secrets, authentication tokens, private keys, or passwords to git history.
+   - All commits and Pull Requests are scanned for exposed credentials using **[Betterleaks](https://github.com/betterleaks/betterleaks)** and our zero-dependency repository hygiene checker (`scripts/check-hygiene.js`).
+   - If test fixtures or cryptographic mock data in test suites trigger false positives, record baseline exceptions in [`.betterleaksignore`](.betterleaksignore).
 
 ---
 
@@ -88,7 +91,7 @@ All contributions must strictly adhere to the project's non-negotiable architect
 
 ---
 
-## 4. Testing Requirements
+## 4. Testing & Hygiene Requirements
 
 All PRs introducing new modules, features, or bug fixes must include corresponding tests using the native Node.js test runner (`node:test` and `node:assert`):
 
@@ -102,6 +105,24 @@ npm test
 
 Tests must pass with zero failures and maintain 100% tenant isolation. All modules must package at least one automated test suite.
 
+### Secret Scanning & Hygiene Verification
+
+Before submitting changes, verify that no machine-specific host paths or sensitive credentials are introduced:
+
+```bash
+# Run repository hygiene and path check
+npm run check:hygiene
+```
+
+On every pull request, the CI security workflow (`.github/workflows/security.yml`) executes both the hygiene checker and **Betterleaks**:
+
+```bash
+# Optional: Run Betterleaks locally if installed
+betterleaks git . --gitleaks-ignore-path .betterleaksignore --exit-code 1
+```
+
+If synthetic test credentials or crypto fixtures trigger false positives, add the specific commit/file/rule signature to [`.betterleaksignore`](.betterleaksignore).
+
 ---
 
 ## 5. Submitting a Pull Request
@@ -110,10 +131,12 @@ Tests must pass with zero failures and maintain 100% tenant isolation. All modul
 2. Implement your changes following all architectural guardrails.
 3. Verify type correctness: `npm run build`.
 4. Ensure all automated tests pass: `npm test`.
-5. Commit your changes using conventional commit messages (`feat: ...`, `fix: ...`, `test: ...`), separating unrelated changes into atomic commits.
-6. Push to your fork and submit a Pull Request to `main`.
-7. Fill out the Pull Request template completely, keeping the **Walkthrough & Changes Summary** and **Verification & Testing Evidence** concise and high-signal.
-8. Sign the automated CLA when prompted by the CLA bot.
+5. Verify path hygiene and secret scanning: `npm run check:hygiene`.
+6. Commit your changes using conventional commit messages (`feat: ...`, `fix: ...`, `test: ...`).
+7. Push to your fork and submit a Pull Request to `main`.
+8. Ensure CI checks pass (including automated tests and the **Betterleaks Secret Scan**).
+9. Fill out the Pull Request template checklist.
+10. Sign the automated CLA when prompted by the CLA bot.
 
 ---
 

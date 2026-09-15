@@ -2,7 +2,7 @@
 
 ## Description
 
-<!-- Provide a concise, 1-2 sentence description of the changes introduced by this PR. -->
+<!-- Provide a brief description of the changes introduced by this PR. -->
 
 ## Related Issues
 
@@ -31,11 +31,11 @@
 
 Please verify each of the following before submitting:
 
-- [ ] **Walkthrough Provided**: Walkthrough summary and verification details are provided above.
 - [ ] **Zero External Runtime Dependencies**: Relies solely on Node.js built-ins and native PHP standard extensions. No runtime packages added.
 - [ ] **Strict Multi-Tenancy**: All operational queries filter by `tenant_id` resolved implicitly via `RequestContext`.
 - [ ] **Financial & Entity Standards**: Monetary amounts in integer cents; primary keys in RFC 9562 UUIDv7; timestamps in epoch ms.
 - [ ] **Path Hygiene**: No machine-specific or absolute paths hardcoded; all paths use `node:path` relative lookups or standard env vars.
+- [ ] **Secret Scanning & Hygiene**: Repository hygiene checks pass (`npm run check:hygiene`) and zero secrets or credentials committed (verified by Betterleaks).
 - [ ] **Automated Tests**: Unit/integration tests added in `test/` or `modules/<module_name>/test/` and pass with `npm test`.
 - [ ] **Conventional Commits**: Commit messages follow the specification (e.g. `feat(scope): ...`).
 - [ ] **CLA**: I have read and agree to the [Contributor License Agreement (CLA)](docs/legal/CLA.md).
