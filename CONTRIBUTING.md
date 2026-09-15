@@ -2,7 +2,7 @@
 
 Thank you for your interest in contributing to **GarrisonOS**! We welcome community contributions to build the premier zero-dependency, open-source property management platform.
 
-Please review this guide before submitting issues or Pull Requests.
+Please review this guide before submitting issues or Pull Requests. All participants are expected to uphold our [Code of Conduct](CODE_OF_CONDUCT.md).
 
 ---
 

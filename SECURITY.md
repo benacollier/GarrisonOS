@@ -22,8 +22,7 @@ Security updates are actively applied to the following versions of GarrisonOS:
 
 If you discover a security vulnerability in GarrisonOS, please report it via one of the following channels:
 
-* **GitHub Security Advisory**: Use the [Private Vulnerability Reporting](https://github.com/garrisonos/GarrisonOS/security/advisories/new) tab on GitHub.
-* **Email**: Send an encrypted or plain-text email to `security@garrisonos.org` (or the project maintainer).
+* **GitHub Security Advisory**: Use the [Private Vulnerability Reporting](https://github.com/garrisonos/GarrisonOS/security/advisories/new) tab on GitHub to submit confidential reports directly to maintainers.
 
 ### What to Include in Your Report
 To help us triage and resolve the issue quickly, please include:

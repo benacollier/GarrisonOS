@@ -394,7 +394,7 @@ Full architectural specifications, module details, API contracts, development gu
 
 ## Contributing
 
-We welcome contributions from the community! Please review our [Contributing Guide](CONTRIBUTING.md) and [Contributor License Agreement (CLA)](docs/legal/CLA.md) before submitting Pull Requests.
+We welcome contributions from the community! Please review our [Contributing Guide](CONTRIBUTING.md), [Code of Conduct](CODE_OF_CONDUCT.md), and [Contributor License Agreement (CLA)](docs/legal/CLA.md) before submitting Pull Requests.
 
 All contributions must adhere to the engineering standards specified in [AGENTS.md](AGENTS.md).
 
