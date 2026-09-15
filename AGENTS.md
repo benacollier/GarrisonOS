@@ -65,11 +65,12 @@ This document establishes the mandatory engineering standards, architectural con
 
 ## 7. Efficient Test Execution & Verification
 
-* **Proactive Execution Prohibition**: Never proactively run builds (`npm run build`) or test suites (`npm test`) unless runtime code was actually modified or explicitly requested by the user.
+* **Windows Terminal Execution Guardrail**: When running terminal commands on Windows host environments, NEVER invoke bare `npm` or `npx`. ALWAYS execute `npm.cmd`, `npx.cmd`, or invoke `node <script>` directly (e.g. `node scripts/test.js`, `npm.cmd test`, `npm.cmd run build`) to prevent PowerShell script execution policy errors (`PSSecurityException` on `npm.ps1`).
+* **Proactive Execution Prohibition**: Never proactively run builds (`npm.cmd run build`) or test suites (`node scripts/test.js`) unless runtime code was actually modified or explicitly requested by the user.
 * **Documentation, Tooling & IDE Settings**: Do NOT execute builds or tests when creating/modifying documentation (`*.md`), IDE settings (`.vscode/`), CI workflows (`.github/`), static assets, or non-runtime files.
-* **Modular Changes**: When modifying a single module, execute only that module's test suite: `npm run test:module <module_name>` or `node scripts/test.js <module_name>`.
-* **Core Subsystems**: When modifying core primitives (`core/`, `api/`, `database/`), execute core tests via `npm run test:core`.
-* **Full Regression**: Execute `npm test` only before submitting pull requests or when modifying runtime engine dependencies / core compilation configurations (`tsconfig.json`, `package.json` runtime scripts).
+* **Modular Changes**: When modifying a single module, execute only that module's test suite: `node scripts/test.js <module_name>` or `npm.cmd run test:module <module_name>`.
+* **Core Subsystems**: When modifying core primitives (`core/`, `api/`, `database/`), execute core tests via `node scripts/test.js core`.
+* **Full Regression**: Execute `node scripts/test.js` (or `npm.cmd test`) only before submitting pull requests or when modifying runtime engine dependencies / core compilation configurations (`tsconfig.json`, `package.json` runtime scripts).
 
 ---
 
