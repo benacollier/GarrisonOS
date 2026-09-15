@@ -1,5 +1,6 @@
 import { test, describe, it } from 'node:test';
 import * as assert from 'node:assert/strict';
+import { randomBytes } from 'node:crypto';
 import {
   generateUUIDv7,
   getUUIDv7Timestamp,
@@ -44,7 +45,7 @@ describe('Cryptography & Identity Subsystem', () => {
   });
 
   it('hashes and verifies passwords using scrypt with timing-safe comparison', async () => {
-    const password = 'SuperSecretSecurePassword!99';
+    const password = `test-pass-${randomBytes(12).toString('hex')}`;
     const hash = await hashPassword(password);
 
     assert.ok(hash.startsWith('$scrypt$N=16384,r=8,p=1$'));
