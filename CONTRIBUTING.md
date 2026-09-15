@@ -8,7 +8,7 @@ Please review this guide before submitting issues or Pull Requests.
 
 ## 1. Contributor License Agreement (CLA) & Dual Licensing
 
-To ensure that GarrisonOS remains legally protected and sustainable, all contributors must sign our [Contributor License Agreement (CLA)](CLA.md) before their contributions can be merged.
+To ensure that GarrisonOS remains legally protected and sustainable, all contributors must sign our [Contributor License Agreement (CLA)](docs/legal/CLA.md) before their contributions can be merged.
 
 ### Why do we require a CLA?
 GarrisonOS operates under an open-source model licensed under the **GNU Affero General Public License v3 (AGPLv3)** with a Section 7 UI attribution requirement. To sustainably support and fund ongoing open-source engineering, the project utilizes a **dual-licensing / commercial licensing model**. 

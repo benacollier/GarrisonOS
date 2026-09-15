@@ -24,13 +24,13 @@ jobs:
           PERSONAL_ACCESS_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
         with:
           path-to-signatures: 'signatures/version1/cla.json'
-          path-to-document: 'https://github.com/${{ github.repository }}/blob/main/CLA.md'
+          path-to-document: 'https://github.com/${{ github.repository }}/blob/main/docs/legal/CLA.md'
           branch: 'main'
           allowlist: 'bot*|*bot,garrison-bot'
           custom-notsigned-prcomment: |
             Thank you for your contribution to GarrisonOS! 🏰
 
-            Before we can review and merge your pull request, you must sign our [Contributor License Agreement (CLA)](https://github.com/${{ github.repository }}/blob/main/CLA.md).
+            Before we can review and merge your pull request, you must sign our [Contributor License Agreement (CLA)](https://github.com/${{ github.repository }}/blob/main/docs/legal/CLA.md).
 
             You can agree to the CLA by simply posting a comment on this pull request with the exact text:
             > **I have read the CLA Document and I hereby sign the CLA**

@@ -158,3 +158,4 @@ describe('Accounting Module - Ledger Mathematics', () => {
     assert.equal(report.expenseByCategory['repairs'], 25000);
   });
 });
+

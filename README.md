@@ -196,12 +196,19 @@ garrison-os/
 ├── .env.example                   # Environment configuration template
 ├── .gitignore
 ├── AGENTS.md                      # Contributor rules & engineering guardrails
-├── BOOTSTRAP.md                   # Canonical architecture specification
-├── CLA.md                         # Contributor License Agreement
 ├── CONTRIBUTING.md                # Contribution guide & development workflow
 ├── LICENSE                        # AGPLv3 with Section 7(b) UI attribution addendum
 ├── package.json                   # Zero runtime dependencies (typescript, @types/node)
 ├── tsconfig.json                  # Strict TypeScript compiler options
+│
+├── docs/                          # Comprehensive Documentation Hierarchy
+│   ├── README.md                  # Documentation navigation index
+│   ├── architecture/              # Core engine, multi-tenancy, data model & blueprints
+│   ├── modules/                   # Properties, contacts, leases, accounting, maintenance
+│   ├── api/                       # REST API endpoints & EventBus catalog
+│   ├── development/               # Getting started, frontend guide & testing standards
+│   ├── deployment/                # Self-hosting, configuration & SQLite WAL maintenance
+│   └── legal/                     # Contributor License Agreement (CLA)
 │
 ├── core/                          # Foundation Engine
 │   ├── context.ts                 # AsyncLocalStorage tenant & user context
@@ -338,9 +345,40 @@ The test suite validates:
 
 ---
 
+## Documentation
+
+Full architectural specifications, module details, API contracts, development guides, and deployment instructions are available in the [`docs/`](docs/README.md) directory:
+
+* **Architecture**:
+  * [System Architecture Overview](docs/architecture/overview.md)
+  * [Strict Multi-Tenancy & Isolation](docs/architecture/multi-tenancy.md)
+  * [Data Representation & Identity Standards](docs/architecture/data-model.md)
+  * [Architecture Specification & Blueprint](docs/architecture/bootstrap-spec.md)
+  * [Technical Debt Assessment & Critique](docs/architecture/technical-debt.md)
+* **Domain Modules**:
+  * [Module System Architecture](docs/modules/overview.md)
+  * [Properties & Portfolios](docs/modules/properties.md)
+  * [Contacts Directory](docs/modules/contacts.md)
+  * [Lease Management](docs/modules/leases.md)
+  * [Accounting & IRS Schedule E](docs/modules/accounting.md)
+  * [Maintenance Work Orders](docs/modules/maintenance.md)
+* **API & Events**:
+  * [REST API Reference](docs/api/rest-api.md)
+  * [In-Process EventBus Reference](docs/api/events.md)
+* **Development & QA**:
+  * [Developer Getting Started](docs/development/getting-started.md)
+  * [Frontend Presentation Layer Guide](docs/development/frontend-guide.md)
+  * [Testing & QA Guide](docs/development/testing.md)
+* **Deployment & Operations**:
+  * [Production Self-Hosting Guide](docs/deployment/self-hosting.md)
+  * [Configuration Reference](docs/deployment/configuration.md)
+  * [SQLite WAL Backup & Maintenance](docs/deployment/backup-and-maintenance.md)
+
+---
+
 ## Contributing
 
-We welcome contributions from the community! Please review our [Contributing Guide](CONTRIBUTING.md) and [Contributor License Agreement (CLA)](CLA.md) before submitting Pull Requests.
+We welcome contributions from the community! Please review our [Contributing Guide](CONTRIBUTING.md) and [Contributor License Agreement (CLA)](docs/legal/CLA.md) before submitting Pull Requests.
 
 All contributions must adhere to the engineering standards specified in [AGENTS.md](AGENTS.md).
 

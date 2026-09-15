@@ -1,4 +1,4 @@
-# GarrisonOS: Repository Bootstrap & Architecture Execution Plan
+# GarrisonOS: Architecture Specification & Bootstrap Blueprint
 
 GarrisonOS is a zero-dependency, open-source property management platform engineered for independent property managers, self-managing landlords, and small real estate operators managing portfolios of up to 50 units (single-family residences, small multifamily properties, and scattered sites).
 
@@ -12,11 +12,10 @@ This document serves as the canonical architectural blueprint, engineering stand
    - **Backend Engine:** Relies exclusively on the Node.js standard library (`node:http`, `node:sqlite`, `node:crypto`, `node:async_hooks`, `node:events`, `node:fs`, `node:path`, `node:test`, `node:assert`). No npm runtime packages (no Express, Fastify, Drizzle, Prisma, TypeORM, Zod, or external UUID libraries). Only compile-time `@types/node` and `typescript` are permitted as development dependencies.
    - **Frontend Presentation:** Relies exclusively on native PHP (standard extensions: `pdo_sqlite`, `curl`, `session`, `filter`) and semantic HTML5 with vanilla CSS Custom Properties. No Composer packages, Tailwind build steps, Webpack/Vite bundles, or client-side JavaScript frameworks.
 
-2. **Zero Traces of AI/LLM Assistance:**
-   - There must be **ZERO** traces, markers, signatures, or metadata indicating AI/LLM assistance anywhere in the codebase, documentation, configuration, or git history.
-   - Forbid AI attribution comments, co-author tags (e.g., `Co-authored-by: ...`), conversational explanations, or generic placeholder comments (e.g., `// TODO: Implement your logic here`).
+2. **Code Attribution & Quality:**
    - Write clean, concise, idiomatic, professional human-grade code.
-   - Commit messages must follow standard conventional commit syntax (e.g., `feat(core): add request context store`) with zero AI flavoring.
+   - Forbid generic placeholder comments (e.g., `// TODO: Implement your logic here`).
+   - Commit messages must follow standard conventional commit syntax (e.g., `feat(core): add request context store`).
 
 3. **Strict Multi-Tenancy & Row-Level Isolation:**
    - Every operational database table MUST include a `tenant_id TEXT NOT NULL` column.
@@ -65,12 +64,19 @@ garrison-os/
 ├── .env.example
 ├── .gitignore
 ├── AGENTS.md                  # Contributor & engineering guardrails
-├── BOOTSTRAP.md               # Canonical bootstrap & execution plan
-├── CLA.md                     # Contributor License Agreement
 ├── CONTRIBUTING.md            # Contribution guide & dual-licensing policy
 ├── LICENSE                    # AGPLv3 with Section 7(b) UI attribution addendum
 ├── package.json               # Zero runtime dependencies (typescript, @types/node)
 ├── tsconfig.json              # Strict TypeScript compiler configuration
+│
+├── docs/                      # Comprehensive Documentation Hierarchy
+│   ├── README.md
+│   ├── architecture/
+│   ├── modules/
+│   ├── api/
+│   ├── development/
+│   ├── deployment/
+│   └── legal/
 │
 ├── core/                      # Engine Foundation & Runtime
 │   ├── context.ts             # AsyncLocalStorage tenant & user context
@@ -96,102 +102,17 @@ garrison-os/
 │
 ├── modules/                   # Drop-in Functional Modules
 │   ├── properties/            # Portfolios, Properties, and Units
-│   │   ├── module.json
-│   │   ├── backend/
-│   │   │   ├── migrations/
-│   │   │   │   └── 0001_properties.sql
-│   │   │   ├── routes.ts
-│   │   │   ├── events.ts
-│   │   │   └── repository.ts
-│   │   └── frontend/
-│   │       ├── hooks.php
-│   │       └── pages/
-│   │           ├── index.php
-│   │           ├── show.php
-│   │           └── edit.php
-│   │
 │   ├── contacts/              # Humans directory (tenants, owners, vendors, emergency)
-│   │   ├── module.json
-│   │   ├── backend/
-│   │   │   ├── migrations/
-│   │   │   │   └── 0001_contacts.sql
-│   │   │   ├── routes.ts
-│   │   │   ├── events.ts
-│   │   │   └── repository.ts
-│   │   └── frontend/
-│   │       ├── hooks.php
-│   │       └── pages/
-│   │           ├── index.php
-│   │           └── show.php
-│   │
 │   ├── leases/                # Lease agreements, terms & lease_contacts junction
-│   │   ├── module.json
-│   │   ├── backend/
-│   │   │   ├── migrations/
-│   │   │   │   └── 0001_leases.sql
-│   │   │   ├── routes.ts
-│   │   │   ├── events.ts
-│   │   │   └── repository.ts
-│   │   └── frontend/
-│   │       ├── hooks.php
-│   │       └── pages/
-│   │           ├── index.php
-│   │           └── show.php
-│   │
 │   ├── accounting/            # Cash-basis ledger, billing cycles, Schedule E & balances
-│   │   ├── module.json
-│   │   ├── backend/
-│   │   │   ├── migrations/
-│   │   │   │   └── 0001_accounting.sql
-│   │   │   ├── routes.ts
-│   │   │   ├── events.ts
-│   │   │   ├── repository.ts
-│   │   │   ├── ledger.ts      # Running balances, payment allocation & Schedule E tax math
-│   │   │   └── billing.ts     # Monthly recurring rent generator & mid-month proration
-│   │   └── frontend/
-│   │       ├── hooks.php
-│   │       └── pages/
-│   │           ├── index.php
-│   │           ├── rent-roll.php
-│   │           ├── ledger-detail.php
-│   │           └── schedule-e.php
-│   │
 │   └── maintenance/           # Work order tracking, vendor dispatch, cost conversion
-│       ├── module.json
-│       ├── backend/
-│       │   ├── migrations/
-│       │   │   └── 0001_maintenance.sql
-│       │   ├── routes.ts
-│       │   ├── events.ts
-│       │   └── repository.ts
-│       └── frontend/
-│           ├── hooks.php
-│           └── pages/
-│               ├── index.php
-│               └── show.php
 │
 ├── web/                       # Presentation Layer (Native PHP / Semantic HTML5)
 │   ├── index.php              # Front controller, CSRF validator & dynamic page dispatcher
-│   ├── lib/
-│   │   ├── api.php            # Native cURL client wrapper with session forwarding
-│   │   ├── auth.php           # Session management & credential verification
-│   │   ├── csrf.php           # CSRF token generation and validation
-│   │   └── hooks.php          # UI slot registry & module nav aggregator
-│   ├── templates/
-│   │   ├── layout.php         # HTML5 base layout, responsive shell, slot anchors
-│   │   ├── header.php         # Topbar, tenant switcher, user profile
-│   │   ├── sidebar.php        # Navigation menu populated dynamically from modules
-│   │   └── flash.php          # Flash alert rendering
-│   ├── pages/
-│   │   ├── dashboard.php      # Main KPI dashboard (occupancy, delinquency, repairs)
-│   │   ├── login.php          # Operator sign-in
-│   │   └── 404.php
-│   └── public/
-│       ├── css/
-│       │   ├── variables.css  # Design tokens (colors, typography, spacing, elevations)
-│       │   └── style.css      # Semantic HTML5 reset, layout grid, UI components
-│       └── js/
-│           └── app.js         # Minimal progressive enhancements (modals, dropdowns)
+│   ├── lib/                   # Native cURL client, auth, CSRF, and slot hooks
+│   ├── templates/             # Layouts, navigation, headers, and flash alerts
+│   ├── pages/                 # Dashboard, login, and error pages
+│   └── public/                # Design tokens (CSS Custom Properties), styles, minimal JS
 │
 └── test/                      # Native node:test & node:assert Suite
     ├── helpers.ts             # In-memory SQLite fixtures & mock HTTP harnesses
@@ -199,8 +120,6 @@ garrison-os/
     ├── context.test.ts        # AsyncLocalStorage propagation & concurrency tests
     ├── isolation.test.ts      # Cross-tenant data isolation & leak prevention tests
     ├── router.test.ts         # Route matching, parameter extraction, body parsing tests
-    ├── ledger.test.ts         # Running balance, payment allocation & Schedule E tests
-    ├── billing.test.ts        # Recurring rent generator & proration tests
     └── modules.test.ts        # Module auto-discovery & migration runner tests
 ```
 
@@ -681,93 +600,3 @@ All REST endpoints return standardized JSON structures:
 * Uses CSS Custom Properties for typography, colors, borders, shadows, and light/dark theme variables.
 * Fully responsive layout using CSS Grid and Flexbox without utility frameworks.
 * Native HTML `<dialog>` for modal interactions and accessible semantic tables for ledger data.
-
----
-
-## 8. Phased Execution Roadmap
-
-### Phase 1: Repository Scaffolding & Configuration
-1. Initialize `package.json` with zero runtime dependencies (only `typescript` and `@types/node` in `devDependencies`).
-2. Configure `tsconfig.json` with strict type checking, ES2022 target, and NodeNext module resolution.
-3. Configure `.gitignore` (ignoring `*.sqlite`, `*.sqlite-wal`, `storage/uploads/*`, `.env`, `dist/`).
-4. Create `.env.example` with clear defaults (`PORT=3000`, `SQLITE_PATH=./garrison.sqlite`, `STORAGE_PATH=./storage/uploads`, `APP_SECRET=change-me-to-a-secure-random-secret`).
-5. Create `LICENSE` with AGPLv3 and Section 7(b) UI attribution addendum.
-6. Create `CLA.md` (Individual Contributor License Agreement) and `CONTRIBUTING.md` (dual-licensing transparency & contributor guide).
-7. Configure `.github/workflows/cla.yml` and `.github/workflows/ci.yml` for automated GitHub Actions checks.
-8. Create `AGENTS.md` specifying contributor constraints and anti-AI trace policies.
-
-### Phase 2: Core Foundation & Multi-Tenancy Runtime
-1. Implement `core/crypto.ts`: RFC 9562 UUIDv7 generator, scrypt password hashing, and HMAC token signing.
-2. Implement `core/context.ts`: Multi-tenant context store via `AsyncLocalStorage`.
-3. Implement `core/events.ts`: EventBus backed by `node:events.EventEmitter`.
-4. Implement `core/storage.ts`: Abstract `StorageDriver` and `LocalDiskStorageDriver` with path sanitization using `node:fs/promises`.
-
-### Phase 3: Database Engine & Core Migrations
-1. Implement `database/client.ts`: SQLite connection factory using `node:sqlite.DatabaseSync` with `WAL` mode, `busy_timeout = 5000`, `foreign_keys = ON`, `synchronous = NORMAL`, and `db.transaction()` wrapper.
-2. Implement `database/migrator.ts`: Sequential `.sql` migration runner with `_migrations` tracking table.
-3. Create `database/migrations/0001_core_schema.sql` (`tenants`, `users`, `audit_logs`, `attachments`, `_migrations`).
-
-### Phase 4: Zero-Dependency HTTP Router & Module Loader
-1. Implement `api/router.ts`: Fast zero-dependency HTTP router supporting route params, query strings, and JSON body parsing.
-2. Implement `api/response.ts`: Standard success, pagination, and structured error envelopes.
-3. Implement `api/middleware.ts`: Tenant context resolution, rate limiting, and request correlation tracking.
-4. Implement `core/module-loader.ts`: Dynamic module scanner, migration executor, route registrar, and event hook binder.
-5. Implement `api/server.ts`: HTTP server harness with `/health` and `/ready` endpoints.
-
-### Phase 5: MVP Domain Modules
-1. **Properties Module (`modules/properties/`)**:
-   - Migration for `portfolios`, `properties`, `units`.
-   - REST endpoints for CRUD operations and occupancy calculations.
-   - Frontend views for Portfolio list, Property details, and Unit grid.
-2. **Contacts Module (`modules/contacts/`)**:
-   - Migration for `contacts`.
-   - REST endpoints for Directory search, role filtering, and profile management.
-   - Frontend views for Contact Directory and Contact profile.
-3. **Leases Module (`modules/leases/`)**:
-   - Migration for `leases` and `lease_contacts`.
-   - REST endpoints for Lease lifecycle (Draft $\rightarrow$ Active $\rightarrow$ Terminated) and signatory assignment.
-   - Frontend views for Active Leases list and Lease detail view.
-4. **Accounting Module (`modules/accounting/`)**:
-   - Migration for `transactions` with IRS Schedule E category mappings.
-   - REST endpoints for Posting charges, recording payments, logging expenses, move-out deposit dispositions, and running balances.
-   - Automated recurring rent charge generator (`POST /api/v1/accounting/generate-rent-charges`) with mid-month proration.
-   - CSV export endpoints for Rent Roll, Schedule E P&L, and itemized tenant ledgers.
-   - Frontend views for Rent Roll, Income & Expense reports, and Tenant Ledger detail view.
-5. **Maintenance Module (`modules/maintenance/`)**:
-   - Migration for `work_orders` with entry instructions and priority matrix.
-   - REST endpoints for Work order submission, status transitions, vendor assignment, and expense conversion.
-   - Frontend views for Maintenance list and Work order modal.
-
-### Phase 6: Presentation Layer & UI Extension System
-1. Build `web/templates/layout.php`, `header.php`, `sidebar.php`, and `flash.php`.
-2. Build `web/lib/csrf.php`, `web/lib/auth.php`, `web/lib/hooks.php`, and `web/lib/api.php`.
-3. Implement `web/pages/dashboard.php` aggregating real-time portfolio metrics (Occupancy %, Total Rent Roll, Delinquency Total, Open Work Orders).
-4. Implement `web/pages/login.php` with session authentication and CSRF protection.
-5. Implement `web/public/css/variables.css` and `web/public/css/style.css`.
-
-### Phase 7: Demo Seeder & Automated Verification Suite
-1. Implement `database/seed.ts`: Deterministic date-relative seeder populating a realistic 20-unit sample portfolio (10 Single-Family Homes, 3 Duplexes, 1 4-Plex) with 12 months of historical transactions, active leases, 1 delinquent tenant, 1 expiring lease, and 2 open work orders.
-2. Build automated test suite using `node:test` and `node:assert`:
-   - **Core Engine Suites** (`test/`):
-     - `crypto.test.ts`: Monotonic time-sorting, UUIDv7 structure, scrypt hashing, and HMAC session tokens.
-     - `context.test.ts`: `AsyncLocalStorage` concurrency and leak prevention.
-     - `isolation.test.ts`: Multi-tenant isolation (confirm Tenant A cannot access Tenant B records).
-     - `router.test.ts`: HTTP request parsing, param matching, and response status codes.
-     - `modules.test.ts`: Dynamic module discovery and automated test package verification.
-   - **Module-Packaged Domain Suites** (`modules/[module_name]/test/`):
-     - `modules/properties/test/properties.test.ts`: Portfolios, properties, units, vacancies, and occupancy metrics.
-     - `modules/contacts/test/contacts.test.ts`: Directory filtering, vendor specialties, and contact CRUD.
-     - `modules/leases/test/leases.test.ts`: Contract lifecycle transitions, multi-party signatories, and terms.
-     - `modules/accounting/test/`: Billing proration, idempotent rent generator, ledger mathematics, 4-tier waterfall, Schedule E NOI, and financial transactions.
-     - `modules/maintenance/test/maintenance.test.ts`: Work order triage, vendor dispatch, and cross-module expense event hooks.
-
----
-
-## 9. Verification & Execution Instructions
-
-1. **Compilation**: Execute `npm run build` (invoking `tsc`) to compile TypeScript into `dist/`.
-2. **Database Initialization**: Execute `npm run migrate` to apply core and module migrations.
-3. **Data Seeding**: Execute `npm run seed` to load the 20-unit realistic demo dataset.
-4. **Backend Engine**: Launch via `npm run start` (listening on port 3000).
-5. **Frontend Web**: Launch native PHP server: `php -S localhost:80 -t web web/index.php`.
-6. **Automated Testing**: Run `npm test` (`node --test dist/**/*.test.js`) and ensure 100% test pass rate across core and all modules.

@@ -66,3 +66,4 @@ describe('Contacts Module - Directory & Vendor Registry', () => {
     });
   });
 });
+
