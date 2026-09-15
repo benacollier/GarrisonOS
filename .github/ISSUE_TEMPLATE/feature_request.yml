@@ -1,12 +1,30 @@
 name: Feature Request
 description: Propose a new capability or architectural improvement for GarrisonOS
 title: "feat: "
-labels: ["enhancement"]
+labels: ["type/feat"]
 body:
   - type: markdown
     attributes:
       value: |
         Thanks for proposing a new feature! Please remember GarrisonOS enforces strict zero external runtime dependencies.
+  - type: dropdown
+    id: scope
+    attributes:
+      label: Target Subsystem / Module
+      description: Select the primary module or subsystem for this feature.
+      options:
+        - "core (Runtime, DB, Primitives)"
+        - "api (HTTP Gateway & Middleware)"
+        - "web (PHP Frontend)"
+        - "accounting"
+        - "properties"
+        - "leases"
+        - "contacts"
+        - "maintenance"
+        - "backup"
+        - "cross-cutting / architecture"
+    validations:
+      required: true
   - type: textarea
     id: problem
     attributes:
@@ -28,4 +46,3 @@ body:
       description: How this feature aligns with Node.js/PHP built-ins and multi-tenancy.
     validations:
       required: false
-

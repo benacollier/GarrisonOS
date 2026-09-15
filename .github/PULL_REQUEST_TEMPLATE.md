@@ -10,11 +10,14 @@
 
 ## Type of Change
 
-- [ ] `feat`: New feature or capability
-- [ ] `fix`: Bug fix
-- [ ] `test`: New or updated tests
-- [ ] `refactor`: Code refactoring with no behavior change
-- [ ] `docs`: Documentation updates
+- [ ] `feat`: New feature or capability (`type/feat`)
+- [ ] `fix`: Bug fix (`type/fix`)
+- [ ] `docs`: Documentation updates (`type/docs`)
+- [ ] `test`: New or updated tests (`type/test`)
+- [ ] `refactor`: Code refactoring with no behavior change (`type/refactor`)
+- [ ] `ci`: CI/CD workflow and automation improvements (`type/ci`)
+- [ ] `security`: Security enhancements or vulnerability fixes (`type/security`)
+- [ ] `chore`: Tooling, maintenance, or configuration changes (`type/chore`)
 
 ## Walkthrough & Changes Summary
 
