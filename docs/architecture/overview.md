@@ -63,7 +63,7 @@ The core backend relies exclusively on Node.js standard libraries:
 * `node:fs` & `node:path`: File storage driver and dynamic module discovery.
 * `node:test` & `node:assert`: Integrated testing framework.
 
-The presentation layer relies exclusively on standard PHP 8.2+ extensions (`pdo_sqlite`, `curl`, `session`, `filter`) and semantic HTML5 with vanilla CSS Custom Properties.
+The presentation layer relies exclusively on standard PHP 8.2+ extensions (`session`, `filter`, `pdo_sqlite`, and optionally `curl` with native HTTP stream fallback) and semantic HTML5 with vanilla CSS Custom Properties.
 
 ---
 

@@ -148,6 +148,7 @@ GarrisonOS is intentionally architected with **zero external runtime package dep
 * **Move-Out Deposit Disposition**: Automatic computation of deposit refunds minus unpaid rent and itemized damage deductions.
 * **Automated Monthly Rent Generation**: Scheduled batch generation with idempotency keys (`rent_charge:{lease_id}:{YYYY_MM}`) and mid-month proration calculations.
 * **Financial Data Exports**: Streamed CSV generation for Rent Roll, Schedule E income/expense statements, and tenant ledgers.
+* **Chart of Accounts & QuickBooks Compatibility**: Customizable standard Chart of Accounts (Bank, AR, Liabilities, Income, Schedule E Expenses), balanced double-entry journal preview, and universal exports for QuickBooks Online (`.csv`), QuickBooks Desktop (`.iif`), and Web Connect bank feeds (`.qbo`).
 
 ### 5. Maintenance & Work Orders (`modules/maintenance`)
 
@@ -187,9 +188,8 @@ To maintain focus, agility, and uncompromising simplicity, commercial-grade and 
   * Retail percentage rent based on tenant sales reporting.
   * CPI-indexed and fixed annual lease escalation schedules.
 * **Enterprise Accounting & Finance**:
-  * Double-entry General Ledger (GL) with customizable Chart of Accounts.
-  * Formal trust/escrow bank account reconciliation and compliance reporting.
-  * Integrated payment processing gateways (direct ACH debit, credit card rails) and automated bank feed integrations (Plaid/OFX).
+  * Formal trust/escrow bank account compliance reporting and statutory audits.
+  * Integrated payment processing gateways (direct ACH debit, credit card rails) and automated live bank feeds (Plaid API sync).
   * Automated 1099-MISC / 1099-NEC vendor tax form generation and e-filing.
 * **Portals & External Interfaces**:
   * Dedicated self-service Tenant Portal (online payments, maintenance ticket submission, lease document downloads).

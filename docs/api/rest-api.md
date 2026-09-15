@@ -113,6 +113,13 @@ All JSON responses conform to standardized envelopes:
 * `GET /api/v1/accounting/export/rent-roll.csv`: Stream Rent Roll CSV
 * `GET /api/v1/accounting/export/schedule-e.csv`: Stream Schedule E CSV
 * `GET /api/v1/accounting/export/ledger/:leaseId.csv`: Stream Ledger Statement CSV
+* `GET /api/v1/accounting/chart-of-accounts`: List Chart of Accounts
+* `POST /api/v1/accounting/chart-of-accounts`: Create general ledger account
+* `PUT /api/v1/accounting/chart-of-accounts/:id`: Update general ledger account
+* `GET /api/v1/accounting/quickbooks/preview`: Preview balanced double-entry journal entries
+* `GET /api/v1/accounting/export/quickbooks/qbo-journal.csv`: Export QuickBooks Online Journal Entry batch CSV
+* `GET /api/v1/accounting/export/quickbooks/desktop.iif`: Export QuickBooks Desktop IIF format
+* `GET /api/v1/accounting/export/quickbooks/bank-feed.qbo`: Export Web Connect (.QBO) bank feed
 
 ### Maintenance
 

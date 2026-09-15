@@ -23,7 +23,7 @@ docs/
 │   ├── properties.md      # Portfolios, properties, and rentable unit inventory
 │   ├── contacts.md        # Directory of tenants, owners, vendors, and emergency contacts
 │   ├── leases.md          # Lease agreements, terms, signatories, and lifecycle transitions
-│   ├── accounting.md      # Single-entry cash ledger, IRS Schedule E, proration, waterfall payments
+│   ├── accounting.md      # Cash ledger, Schedule E, Chart of Accounts, and QuickBooks compatibility
 │   └── maintenance.md     # Work order triage, vendor dispatch, and expense conversion
 │
 ├── api/                   # REST API and EventBus contracts

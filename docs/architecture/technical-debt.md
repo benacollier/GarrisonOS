@@ -91,15 +91,16 @@ This document provides a technical critique of the GarrisonOS architecture, runt
 * Single-entry cash-basis ledger stored in `transactions` with integer cents precision.
 * Tax categorization directly aligned with IRS Schedule E expense lines.
 * Automated recurring rent generation with mid-month proration and idempotency keys (`rent_charge:{lease_id}:{YYYY_MM}`).
+* Double-entry General Ledger translation through customizable Chart of Accounts (`chart_of_accounts`), supporting export to QuickBooks Online (CSV), QuickBooks Desktop (IIF), and Web Connect (.QBO).
 
 ### Identified Risks & Limitations
 
-* **Security Deposit Trust Liability vs. Operating Funds**: Single-entry ledger tracking combines operating revenue and tenant security deposit trust liabilities within the same transaction table. In many jurisdictions, statutory regulations require strict separation and reconciliation of escrow/trust balances from operating cash.
+* **Security Deposit Trust Liability vs. Operating Funds**: Single-entry ledger tracking combines operating revenue and tenant security deposit trust liabilities within the same transaction table. The QuickBooks integration maps these to dedicated accounts (1010 Operating Checking vs 1020 Trust Checking, and 2100 Tenant Security Deposits Held), but statutory trust banking reconciliation reports remain an ongoing enhancement.
 * **Running Balance Performance**: Tenant running balances are calculated on-the-fly by aggregating all historical transactions for a given lease. While performant for small unit portfolios (<50 units), large transaction histories will require periodic snapshotting or indexed materialization.
 
 ### Recommendations
 
-1. Add explicit bank/trust account allocation metadata to `transactions` to support strict reconciliation between operating cash and tenant deposit liabilities.
+1. Provide automated trust bank account reconciliation reports comparing ledger deposit balances with bank balances.
 2. Introduce balance caching or periodic ledger checkpointing for long-running tenancies.
 
 ---
@@ -136,4 +137,4 @@ This document provides a technical critique of the GarrisonOS architecture, runt
 | **Medium** | **HTTP Router** | Linear regex matching order sensitivity | Introduce static-first segment precedence in route dispatcher |
 | **Medium** | **Security** | Inability to revoke stateless HMAC tokens | Add `token_version` claim check against `users` table |
 | **Medium** | **Frontend API** | Sequential cURL overhead on composite pages | Provide composite/batch API endpoint for dashboard hydration |
-| **Low** | **Accounting** | Single-entry trust liability co-mingling | Add dedicated escrow/trust account tagging and reconciliation |
+| **Low** | **Accounting** | Statutory trust reconciliation reporting | Add dedicated escrow/trust statutory compliance reports |

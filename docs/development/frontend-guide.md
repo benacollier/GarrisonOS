@@ -8,7 +8,8 @@ GarrisonOS presentation layer is engineered in native PHP 8.2+ with semantic HTM
 
 * **No CSS Preprocessors**: Standard CSS Custom Properties (`web/public/css/variables.css`, `web/public/css/style.css`) provide theming, spacing tokens, and typography.
 * **No Client JS Frameworks**: Dynamic components (such as modals and drawers) utilize native HTML `<dialog>` and standard browser APIs.
-* **No Composer Packages**: Relies exclusively on PHP's standard cURL, PDO, and session modules.
+* **No Composer Packages**: Relies exclusively on PHP's standard built-in extensions (`session`, `filter`, `pdo_sqlite`) and the native HTTP client (`web/lib/api.php`) with automatic fallback to native PHP HTTP stream wrappers (`stream_context_create`) if `ext-curl` is not installed or enabled.
+* **Front Controller Hardening**: `web/index.php` provides built-in static asset serving with MIME mapping for development/embedded mode, production error boundaries (`web/pages/error.php`), and strict session cookie security defaults.
 
 ---
 

@@ -445,6 +445,12 @@ CREATE INDEX IF NOT EXISTS idx_tx_tenant_type_category ON transactions(tenant_id
 5. **Schedule E Tax & Net Operating Income (NOI)**:
    $$\text{NOI} = \sum \text{Operating Income (Rent, Fees)} - \sum \text{Operating Expenses (Schedule E Categories)}$$
 
+6. **Chart of Accounts & QuickBooks Compatibility (`0002_quickbooks_compatibility.sql`)**:
+   - Manages customizable standard Chart of Accounts mapping (`chart_of_accounts`) to QuickBooks standard account types (Bank, AccountsReceivable, OtherCurrentAsset, OtherCurrentLiability, Income, Expense).
+   - Generates balanced double-entry journal entries from single-entry property operations with property class tracking.
+   - Exports universal formats: QuickBooks Online Journal CSV, QuickBooks Desktop IIF, and Web Connect Bank Feed (.QBO).
+   - Tracks export state with `quickbooks_export_logs` and audit timestamps on `transactions`.
+
 ### 4.6. Maintenance Module (`modules/maintenance/backend/migrations/0001_maintenance.sql`)
 
 ```sql
@@ -586,6 +592,11 @@ All REST endpoints return standardized JSON structures:
 - `GET /api/v1/accounting/export/rent-roll.csv`: Streams standard CSV Rent Roll.
 - `GET /api/v1/accounting/export/schedule-e.csv`: Streams IRS Schedule E year-end income & expense breakdown.
 - `GET /api/v1/accounting/export/ledger/:leaseId.csv`: Streams itemized tenant ledger statement.
+- `GET /api/v1/accounting/chart-of-accounts`: Lists Chart of Accounts.
+- `GET /api/v1/accounting/quickbooks/preview`: Previews balanced double-entry journal entries.
+- `GET /api/v1/accounting/export/quickbooks/qbo-journal.csv`: Streams QuickBooks Online Journal CSV.
+- `GET /api/v1/accounting/export/quickbooks/desktop.iif`: Streams QuickBooks Desktop IIF.
+- `GET /api/v1/accounting/export/quickbooks/bank-feed.qbo`: Streams Web Connect (.QBO) bank feed.
 - `GET /api/v1/system/backup`: Safely creates a WAL-checkpointed snapshot of the SQLite database.
 
 ---
