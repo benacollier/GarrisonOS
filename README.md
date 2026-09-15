@@ -37,7 +37,7 @@ The GarrisonOS MVP is focused strictly on delivering a self-hosted property mana
 
 * **Day-to-Day Operations**: Physical property structures, rentable unit inventories, status lifecycle tracking, human directory management (tenants, owners, vendors, emergency contacts), and maintenance work order dispatching.
 * **Lease Agreements**: Residential lease lifecycles, terms, security deposit tracking, and multi-party signatory assignments.
-* **Cash-Basis Accounting & Recordkeeping**: Single-entry cash ledger mapped to IRS Schedule E categories, tenant running balances, automated monthly rent charge generation with mid-month proration, waterfall payment allocation, move-out deposit disposition, and streamed CSV exports (Rent Roll, Schedule E P&L, itemized tenant statements).
+* **Native Double-Entry General Ledger & Accounting**: Native, immutable double-entry journal engine (`journal_entries` and `journal_lines`) enforcing balanced zero-sum debit/credit invariants, Chart of Accounts mapped to IRS Schedule E categories, Trial Balance verification, tenant running balances, automated monthly rent charge generation with mid-month proration, waterfall payment allocation, move-out deposit disposition, and streamed exports (Rent Roll, Schedule E P&L, tenant ledgers, QuickBooks QBO/IIF/OFX).
 * **Self-Hosting & Privacy**: Single-tenant or multi-tenant deployment, local SQLite database storage, and complete data portability.
 
 ---
@@ -53,7 +53,8 @@ The GarrisonOS MVP is focused strictly on delivering a self-hosted property mana
    * Repositories and business logic resolve `tenant_id` implicitly from execution context—never from untrusted request bodies or URL parameters.
 3. **Financial Precision & Tax Alignment**:
    * All currency values are strictly stored and calculated as **INTEGER cents** (e.g., $1,450.00 is stored as `145000`). Floating-point arithmetic for currency is strictly prohibited.
-   * Single-entry cash-basis ledger mapped to standard IRS Schedule E expense categories for tax preparation and Net Operating Income (NOI) calculation.
+   * **Native Double-Entry General Ledger**: Immutable, append-only bookkeeping engine (`journal_entries` and `journal_lines`) requiring every transaction to satisfy $\sum \text{Debits} \equiv \sum \text{Credits} > 0$. Corrections are posted exclusively via explicit reversal entries.
+   * Standard Chart of Accounts mapped to standard IRS Form 1040 Schedule E expense categories for tax preparation, Net Operating Income (NOI) calculation, and QuickBooks integration.
 4. **Deterministic Identity & Time Standards**:
    * **Primary Keys**: RFC 9562 **UUIDv7** (time-ordered 128-bit UUIDs generated natively via `node:crypto.randomBytes`).
    * **Timestamps**: Stored strictly as **INTEGER milliseconds** (UTC epoch ms via `Date.now()`).
@@ -139,18 +140,17 @@ GarrisonOS is intentionally architected with **zero external runtime package dep
 * **Terms & Financials**: Recurring rent amount, security deposit requirements, deposit held, rent due day, late fee grace periods, and late fee amounts.
 * **Multi-Party Signatories**: `lease_contacts` junction supporting Primary Tenants, Co-Tenants, Guarantors, and Occupants with financial responsibility tracking.
 
-### 4. Cash-Basis Accounting & Financials (`modules/accounting`)
+### 4. Native Double-Entry General Ledger & Financials (`modules/accounting`)
 
-* **Single-Entry Ledger**: Real-time transaction logging for charges, tenant payments, operating expenses, refunds, and security deposit trust activity.
-* **IRS Schedule E Tax Mapping**: Categorization mapped directly to IRS Schedule E expense lines (Advertising, Cleaning & Maintenance, Insurance, Legal/Professional, Management Fees, Mortgage Interest, Repairs, Supplies, Property Taxes, Utilities, HOA Fees, Capital Improvements).
-* **Running Tenant Balances**: Real-time balance computation:
-  $$\text{Tenant Balance} = \sum (\text{charges} + \text{deposit\_returns} + \text{deposit\_deductions}) - \sum (\text{payments} + \text{refunds})$$
-* **Strict Payment Allocation Waterfall**: When partial payments are recorded, funds apply in strict order:
+* **Native Double-Entry Engine**: First-class, immutable double-entry journal entries (`journal_entries`) and lines (`journal_lines`) enforcing strict zero-sum debit/credit balance proofs across all operational transactions.
+* **Trial Balance Reporting**: Live verification report proving $\sum \text{Debits} \equiv \sum \text{Credits}$ across all active accounts with period and property filters.
+* **Audit Trail & Reversal Accounting**: Strictly immutable posted entries; voids and adjustments generate explicit contra/reversal entries with linked `reversed_by_entry_id` references.
+* **IRS Schedule E Tax Mapping**: Standard Chart of Accounts directly mapped to IRS Form 1040 Schedule E lines (Advertising, Cleaning & Maintenance, Insurance, Legal/Professional, Management Fees, Mortgage Interest, Repairs, Supplies, Property Taxes, Utilities, HOA Fees, Capital Improvements).
+* **Running Tenant Balances & Waterfall**: Real-time tenant balance calculation and strict priority waterfall payment allocation:
   $$\text{Late Fees} \longrightarrow \text{Utility Rebill / Fees} \longrightarrow \text{Oldest Rent Charges} \longrightarrow \text{Current Rent}$$
 * **Move-Out Deposit Disposition**: Automatic computation of deposit refunds minus unpaid rent and itemized damage deductions.
-* **Automated Monthly Rent Generation**: Scheduled batch generation with idempotency keys (`rent_charge:{lease_id}:{YYYY_MM}`) and mid-month proration calculations.
-* **Financial Data Exports**: Streamed CSV generation for Rent Roll, Schedule E income/expense statements, and tenant ledgers.
-* **Chart of Accounts & QuickBooks Compatibility**: Customizable standard Chart of Accounts (Bank, AR, Liabilities, Income, Schedule E Expenses), balanced double-entry journal preview, and universal exports for QuickBooks Online (`.csv`), QuickBooks Desktop (`.iif`), and Web Connect bank feeds (`.qbo`).
+* **Automated Monthly Rent Generation**: Scheduled batch generation with idempotency keys (`rent_charge:{lease_id}:{YYYY_MM}`) posting balanced Dr: Accounts Receivable / Cr: Rental Income entries with mid-month proration.
+* **Financial Data & Accounting Exports**: Streamed exports for Rent Roll, Schedule E statements, tenant statements, and direct persistent ledger exports for QuickBooks Online (`.csv`), QuickBooks Desktop (`.iif`), and Web Connect bank feeds (`.qbo`).
 
 ### 5. Maintenance & Work Orders (`modules/maintenance`)
 
