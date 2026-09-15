@@ -11,6 +11,7 @@ Welcome to the official documentation for **GarrisonOS**, the zero-dependency, o
 
 ```text
 docs/
+├── ROADMAP.md             # Phased MVP development roadmap and milestone deliverables
 ├── architecture/          # Core engine design, multi-tenancy, data schemas, and blueprints
 │   ├── overview.md        # Polyglot architecture, zero-dependency engine, and request lifecycle
 │   ├── multi-tenancy.md   # Strict row-level isolation, AsyncLocalStorage, and X-Tenant-ID
@@ -49,6 +50,7 @@ docs/
 
 ## Quick Reference Links
 
+* **Roadmap**: [MVP Roadmap](ROADMAP.md)
 * **Core Architecture**: [Architecture Overview](architecture/overview.md) | [Multi-Tenancy Guide](architecture/multi-tenancy.md) | [Data Model Standards](architecture/data-model.md)
 * **Domain Modules**: [Properties](modules/properties.md) | [Contacts](modules/contacts.md) | [Leases](modules/leases.md) | [Accounting](modules/accounting.md) | [Maintenance](modules/maintenance.md) | [Backup](modules/backup.md)
 * **API & Events**: [REST API Reference](api/rest-api.md) | [EventBus Reference](api/events.md)

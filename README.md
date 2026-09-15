@@ -175,6 +175,8 @@ GarrisonOS is intentionally architected with **zero external runtime package dep
 
 ## Project Milestones
 
+For a comprehensive phase-by-phase implementation plan, milestone deliverables, and technical task breakdowns, see the [GarrisonOS MVP Roadmap](docs/ROADMAP.md).
+
 | Milestone | Focus Area | Status | Description |
 | :--- | :--- | :---: | :--- |
 | **Milestone 1** | **Foundation & Core Subsystems** | Completed | Zero-dependency Node.js HTTP engine, `AsyncLocalStorage` multi-tenant context, embedded SQLite WAL engine, native RFC 9562 UUIDv7 generator, `scrypt` hashing, dynamic module loader, and native `node:test` suite. |
@@ -229,6 +231,7 @@ garrison-os/
 │
 ├── docs/                          # Comprehensive Documentation Hierarchy
 │   ├── README.md                  # Documentation navigation index
+│   ├── ROADMAP.md                 # Phased MVP development roadmap and milestones
 │   ├── architecture/              # Core engine, multi-tenancy, data model & blueprints
 │   ├── modules/                   # Properties, contacts, leases, accounting, maintenance
 │   ├── api/                       # REST API endpoints & EventBus catalog
@@ -391,8 +394,10 @@ The test suite validates:
 
 ## Documentation
 
-Full architectural specifications, module details, API contracts, development guides, and deployment instructions are available in the [`docs/`](docs/README.md) directory:
+Full architectural specifications, module details, API contracts, development guides, deployment instructions, and the product roadmap are available in the [`docs/`](docs/README.md) directory:
 
+* **Roadmap & Planning**:
+  * [MVP Development Roadmap](docs/ROADMAP.md)
 * **Architecture**:
   * [System Architecture Overview](docs/architecture/overview.md)
   * [Strict Multi-Tenancy & Isolation](docs/architecture/multi-tenancy.md)
