@@ -15,3 +15,4 @@ $errorCode = $errorCode ?? 'ERROR';
         <button onclick="window.location.reload()" class="btn btn-primary">Retry Request</button>
     </div>
 </div>
+

@@ -40,7 +40,7 @@ class ApiClient {
 
     public function request(string $method, string $path, ?array $data = null): array {
         $url = $this->baseUrl . (str_starts_with($path, '/') ? $path : '/' . $path);
-        $ch = curl_init();
+        $methodUpper = strtoupper($method);
 
         $headers = [
             'Accept: application/json',
@@ -55,27 +55,67 @@ class ApiClient {
             }
         }
 
-        curl_setopt($ch, CURLOPT_URL, $url);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_CUSTOMREQUEST, strtoupper($method));
-        curl_setopt($ch, CURLOPT_TIMEOUT, 10);
-
-        if ($data !== null && in_array(strtoupper($method), ['POST', 'PUT', 'PATCH'])) {
-            $json = json_encode($data);
+        $body = null;
+        if ($data !== null && in_array($methodUpper, ['POST', 'PUT', 'PATCH'])) {
+            $body = json_encode($data);
             $headers[] = 'Content-Type: application/json';
-            $headers[] = 'Content-Length: ' . strlen($json);
-            curl_setopt($ch, CURLOPT_POSTFIELDS, $json);
+            $headers[] = 'Content-Length: ' . strlen($body);
         }
 
-        curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+        $response = false;
+        $httpCode = 0;
+        $transportError = '';
 
-        $response = curl_exec($ch);
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $curlError = curl_error($ch);
-        curl_close($ch);
+        if (function_exists('curl_init')) {
+            $ch = curl_init();
+            curl_setopt($ch, CURLOPT_URL, $url);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_CUSTOMREQUEST, $methodUpper);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+
+            if ($body !== null) {
+                curl_setopt($ch, CURLOPT_POSTFIELDS, $body);
+            }
+
+            curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+
+            $response = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $transportError = curl_error($ch);
+            curl_close($ch);
+        } else {
+            $opts = [
+                'http' => [
+                    'method' => $methodUpper,
+                    'header' => implode("\r\n", $headers) . "\r\n",
+                    'timeout' => 10,
+                    'ignore_errors' => true
+                ]
+            ];
+            if ($body !== null) {
+                $opts['http']['content'] = $body;
+            }
+            $context = stream_context_create($opts);
+            $fp = @fopen($url, 'r', false, $context);
+            if ($fp) {
+                $meta = stream_get_meta_data($fp);
+                $response = stream_get_contents($fp);
+                fclose($fp);
+                if (isset($meta['wrapper_data']) && is_array($meta['wrapper_data'])) {
+                    foreach ($meta['wrapper_data'] as $headerLine) {
+                        if (preg_match('#^HTTP/\S+\s+(\d+)#', $headerLine, $matches)) {
+                            $httpCode = (int)$matches[1];
+                        }
+                    }
+                }
+            } else {
+                $lastErr = error_get_last();
+                $transportError = $lastErr['message'] ?? 'Failed to open stream';
+            }
+        }
 
         if ($response === false) {
-            throw new ApiException("Failed to connect to GarrisonOS Engine at {$this->baseUrl}: {$curlError}", 'CONNECTION_ERROR', 503);
+            throw new ApiException("Failed to connect to GarrisonOS Engine at {$this->baseUrl}: {$transportError}", 'CONNECTION_ERROR', 503);
         }
 
         $decoded = json_decode($response, true);
