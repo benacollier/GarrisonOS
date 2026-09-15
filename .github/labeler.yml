@@ -1,0 +1,69 @@
+# GarrisonOS Pull Request Path-Based Label Configuration
+# Used by actions/labeler in .github/workflows/labeler.yml
+
+# Scopes
+scope/core:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'core/**'
+          - 'database/**'
+          - 'tsconfig.json'
+
+scope/api:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'api/**'
+
+scope/web:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'web/**'
+
+scope/accounting:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'modules/accounting/**'
+
+scope/properties:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'modules/properties/**'
+
+scope/leases:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'modules/leases/**'
+
+scope/contacts:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'modules/contacts/**'
+
+scope/maintenance:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'modules/maintenance/**'
+
+scope/backup:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'modules/backup/**'
+
+# Types
+type/docs:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'docs/**'
+          - '*.md'
+          - 'LICENSE'
+
+type/ci:
+  - changed-files:
+      - any-glob-to-any-file:
+          - '.github/**'
+
+type/test:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'test/**'
+          - '**/test/**'

@@ -1,0 +1,38 @@
+name: Documentation
+description: Suggest improvements or additions to GarrisonOS documentation
+title: "docs: "
+labels: ["type/docs"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for helping us improve GarrisonOS documentation!
+  - type: dropdown
+    id: scope
+    attributes:
+      label: Documentation Area
+      description: Select which documentation section needs updates.
+      options:
+        - "Architecture & Guardrails (AGENTS.md, docs/architecture)"
+        - "Module Guides (docs/modules)"
+        - "API Documentation (docs/api)"
+        - "Deployment & Operations (docs/deployment)"
+        - "Contributing & Development Guides"
+        - "Legal & Licensing (docs/legal)"
+        - "README & General Overview"
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: Documentation Issue / Proposed Improvement
+      description: Describe what needs to be added, corrected, or expanded.
+    validations:
+      required: true
+  - type: textarea
+    id: suggested-content
+    attributes:
+      label: Suggested Content or Diff
+      description: Provide an outline, sample text, or links to relevant sections.
+    validations:
+      required: false

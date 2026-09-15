@@ -1,0 +1,127 @@
+name: PR Status
+
+on:
+  pull_request_target:
+    types: [opened, reopened, ready_for_review, converted_to_draft, synchronize, closed]
+  pull_request_review:
+    types: [submitted]
+  workflow_run:
+    workflows: ["CI", "Security"]
+    types: [completed]
+
+permissions:
+  pull-requests: write
+  issues: write
+
+jobs:
+  update-status:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Update PR Status Label
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const ALL_STATUS_LABELS = [
+              'status/draft',
+              'status/needs-review',
+              'status/changes-requested',
+              'status/ci-failing',
+              'status/ready-to-merge',
+              'status/merged'
+            ];
+
+            async function syncLabels(prNumber, toAdd, toRemove) {
+              const { data: issue } = await github.rest.issues.get({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber
+              });
+              const currentNames = (issue.labels || []).map(l => (typeof l === 'string' ? l : l.name));
+
+              for (const rem of toRemove) {
+                if (currentNames.includes(rem)) {
+                  try {
+                    await github.rest.issues.removeLabel({
+                      owner: context.repo.owner,
+                      repo: context.repo.repo,
+                      issue_number: prNumber,
+                      name: rem
+                    });
+                  } catch (e) {
+                    core.warning(`Failed to remove label ${rem}: ${e.message}`);
+                  }
+                }
+              }
+
+              const adding = toAdd.filter(name => !currentNames.includes(name));
+              if (adding.length > 0) {
+                await github.rest.issues.addLabels({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: prNumber,
+                  labels: adding
+                });
+              }
+            }
+
+            // 1. Workflow Run Trigger (CI / Security Scan Completed)
+            if (context.eventName === 'workflow_run') {
+              const run = context.payload.workflow_run;
+              if (!run.pull_requests || run.pull_requests.length === 0) return;
+
+              for (const pr of run.pull_requests) {
+                if (run.conclusion === 'failure' || run.conclusion === 'timed_out') {
+                  await syncLabels(pr.number, ['status/ci-failing'], ['status/ready-to-merge']);
+                } else if (run.conclusion === 'success') {
+                  await syncLabels(pr.number, [], ['status/ci-failing']);
+                }
+              }
+              return;
+            }
+
+            // 2. Review Submitted Trigger
+            if (context.eventName === 'pull_request_review') {
+              const pr = context.payload.pull_request;
+              const review = context.payload.review;
+              if (!pr || !review) return;
+
+              if (review.state === 'approved') {
+                await syncLabels(pr.number, ['status/ready-to-merge'], ['status/needs-review', 'status/changes-requested', 'status/ci-failing']);
+              } else if (review.state === 'changes_requested') {
+                await syncLabels(pr.number, ['status/changes-requested'], ['status/needs-review', 'status/ready-to-merge']);
+              }
+              return;
+            }
+
+            // 3. Pull Request Target Trigger
+            if (context.eventName === 'pull_request_target') {
+              const pr = context.payload.pull_request;
+              const action = context.payload.action;
+              if (!pr) return;
+
+              if (action === 'closed') {
+                if (pr.merged) {
+                  await syncLabels(pr.number, ['status/merged'], ALL_STATUS_LABELS.filter(l => l !== 'status/merged'));
+                }
+                return;
+              }
+
+              if (pr.draft || action === 'converted_to_draft') {
+                await syncLabels(pr.number, ['status/draft'], ['status/needs-review', 'status/changes-requested', 'status/ready-to-merge', 'status/ci-failing']);
+                return;
+              }
+
+              if (action === 'opened' || action === 'reopened' || action === 'ready_for_review') {
+                await syncLabels(pr.number, ['status/needs-review'], ['status/draft', 'status/changes-requested', 'status/ready-to-merge', 'status/ci-failing']);
+                return;
+              }
+
+              if (action === 'synchronize') {
+                // New commits pushed: if changes were requested, return to needs-review
+                const currentLabels = (pr.labels || []).map(l => l.name);
+                if (currentLabels.includes('status/changes-requested')) {
+                  await syncLabels(pr.number, ['status/needs-review'], ['status/changes-requested']);
+                }
+                return;
+              }
+            }
