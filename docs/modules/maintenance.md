@@ -23,12 +23,14 @@ stateDiagram-v2
 ## 2. Priority & Category Matrices
 
 ### Priority Levels
+
 * `low`: Cosmetic or non-urgent repairs (e.g., paint touch-up)
 * `medium`: Standard maintenance issues (e.g., sticking door lock, running toilet)
 * `high`: Functional disruption affecting tenancy (e.g., oven broken, hot water out)
 * `emergency`: Urgent threat to habitability or property safety (e.g., burst pipe, gas leak, HVAC failure in winter)
 
 ### Category Types
+
 * `plumbing`
 * `electrical`
 * `hvac`
@@ -55,4 +57,3 @@ The **Accounting** module listens for this event and can automatically record a 
 * `GET /api/v1/maintenance/:id`: Fetch work order details and vendor contact card
 * `PUT /api/v1/maintenance/:id`: Update status, priority, entry instructions, and actual cost
 * `DELETE /api/v1/maintenance/:id`: Soft delete work order
-

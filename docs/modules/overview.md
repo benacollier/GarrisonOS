@@ -67,4 +67,3 @@ On startup, `core/module-loader.ts` discovers and initializes modules through th
 3. **Route Mounting**: Calls `registerRoutes(router)` to mount REST endpoints under `/api/v1/[module_name]`.
 4. **Event Registration**: Calls `registerSubscribers(eventBus)` to attach listeners for cross-module events.
 5. **UI Aggregation**: PHP `web/lib/hooks.php` scans `frontend/hooks.php` to populate navigation menus and composite dashboard widgets.
-

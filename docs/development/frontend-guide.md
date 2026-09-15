@@ -43,7 +43,9 @@ Hooks::registerDashboardMetric(function($api) {
 ## 3. Session & CSRF Security
 
 ### Session Cookie Hygiene & Hardening
+
 Production PHP configurations (`php.ini` or front controller) must enforce strict cookie hygiene:
+
 ```ini
 session.cookie_httponly = 1
 session.cookie_secure = 1
@@ -52,6 +54,7 @@ session.use_strict_mode = 1
 ```
 
 ### CSRF Protection
+
 Every state-modifying form in PHP must include the CSRF token:
 
 ```html
@@ -61,5 +64,5 @@ Every state-modifying form in PHP must include the CSRF token:
     <button type="submit" class="btn btn-primary">Save Property</button>
 </form>
 ```
-The front controller (`web/index.php`) automatically verifies `csrf_token` on all `POST`, `PUT`, and `DELETE` requests before dispatching to page templates.
 
+The front controller (`web/index.php`) automatically verifies `csrf_token` on all `POST`, `PUT`, and `DELETE` requests before dispatching to page templates.

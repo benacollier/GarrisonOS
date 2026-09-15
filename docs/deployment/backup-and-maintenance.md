@@ -15,6 +15,7 @@ curl -X GET http://127.0.0.1:3000/api/v1/system/backup \
 ```
 
 ### What Happens Internally
+
 1. Executes `PRAGMA wal_checkpoint(TRUNCATE)` to flush WAL log frames into the main `.sqlite` file.
 2. Uses SQLite's online backup API or atomic filesystem copy to generate a timestamped snapshot in `storage/backups/`.
 
@@ -50,4 +51,3 @@ sqlite3 garrison.sqlite "PRAGMA optimize;"
 # Reclaim unused disk space
 sqlite3 garrison.sqlite "VACUUM;"
 ```
-

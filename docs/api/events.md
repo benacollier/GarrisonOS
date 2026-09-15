@@ -29,7 +29,9 @@ eventBus.subscribe('work_order.completed', async (payload) => {
 ## 2. Event Catalog & Payload Schemas
 
 ### `lease.activated`
+
 Fired when a lease agreement transitions to `active`.
+
 ```typescript
 interface LeaseActivatedEvent {
   tenantId: string;
@@ -41,7 +43,9 @@ interface LeaseActivatedEvent {
 ```
 
 ### `lease.terminated`
+
 Fired when a lease agreement reaches `terminated` status.
+
 ```typescript
 interface LeaseTerminatedEvent {
   tenantId: string;
@@ -52,7 +56,9 @@ interface LeaseTerminatedEvent {
 ```
 
 ### `payment.recorded`
+
 Fired when a tenant payment is posted to the ledger.
+
 ```typescript
 interface PaymentRecordedEvent {
   tenantId: string;
@@ -64,7 +70,9 @@ interface PaymentRecordedEvent {
 ```
 
 ### `work_order.completed`
+
 Fired when a work order transitions to `completed`.
+
 ```typescript
 interface WorkOrderCompletedEvent {
   tenantId: string;
@@ -75,4 +83,3 @@ interface WorkOrderCompletedEvent {
   vendorContactId?: string;
 }
 ```
-

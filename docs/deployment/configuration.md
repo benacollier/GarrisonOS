@@ -28,8 +28,8 @@ In production, `APP_SECRET` must be a high-entropy cryptographically secure secr
 node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))"
 ```
 
-### Security Considerations:
+### Security Considerations
+
 * **HMAC-SHA256 Token Validation**: The Node.js engine signs and validates auth tokens using `APP_SECRET`.
 * **PHP Session & CSRF Protection**: The PHP presentation layer generates a cryptographic CSRF token stored in `$_SESSION['_csrf_token']` using `bin2hex(random_bytes(32))` and validates incoming POST/PUT/DELETE requests before proxying commands to the backend engine over loopback.
 * **Secret Protection**: Ensure `.env` is never committed to source control and is readable only by the web service user (`chmod 600 .env`).
-

@@ -130,4 +130,3 @@ For answers to common questions about this code of conduct, see the FAQ at
 [mozilla-coc]: https://github.com/mozilla/diversity
 [faq]: https://www.contributor-covenant.org/faq
 [translations]: https://www.contributor-covenant.org/translations
-

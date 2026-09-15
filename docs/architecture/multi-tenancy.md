@@ -9,6 +9,7 @@ GarrisonOS is architected from first principles to guarantee strict logical mult
 1. **Mandatory Tenant Column**: Every operational database table contains a `tenant_id TEXT NOT NULL` column referencing `tenants(id)`.
 2. **Implicit Context Propagation**: Business logic and repositories must NEVER accept `tenant_id` from request bodies or URL route parameters. It is always resolved implicitly from `RequestContext.getTenantId()`.
 3. **Compound Tenant Indexing**: Every operational table features compound indexes where `tenant_id` is the leading column:
+
    ```sql
    CREATE INDEX IF NOT EXISTS idx_units_tenant_property ON units(tenant_id, property_id);
    CREATE INDEX IF NOT EXISTS idx_tx_tenant_lease_date ON transactions(tenant_id, lease_id, transaction_date);
@@ -48,6 +49,7 @@ sequenceDiagram
 ## 3. Code Conventions
 
 ### Request Context Access
+
 ```typescript
 import { RequestContext } from '../core/context.js';
 
@@ -64,6 +66,6 @@ export class PropertyRepository {
 ```
 
 ### Safety Guarantees
+
 - Attempting to access repository queries outside an active request context throws `Error('No active request context found in execution store')`.
 - All SQL statements use parameterized queries to prevent SQL injection and ensure tenant keys are properly bound.
-

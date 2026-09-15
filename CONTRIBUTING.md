@@ -11,13 +11,16 @@ Please review this guide before submitting issues or Pull Requests. All particip
 To ensure that GarrisonOS remains legally protected and sustainable, all contributors must sign our [Contributor License Agreement (CLA)](docs/legal/CLA.md) before their contributions can be merged.
 
 ### Why do we require a CLA?
-GarrisonOS operates under an open-source model licensed under the **GNU Affero General Public License v3 (AGPLv3)** with a Section 7 UI attribution requirement. To sustainably support and fund ongoing open-source engineering, the project utilizes a **dual-licensing / commercial licensing model**. 
+
+GarrisonOS operates under an open-source model licensed under the **GNU Affero General Public License v3 (AGPLv3)** with a Section 7 UI attribution requirement. To sustainably support and fund ongoing open-source engineering, the project utilizes a **dual-licensing / commercial licensing model**.
 
 Under our CLA:
+
 1. **You keep ownership** of your contributions.
 2. You grant the project a perpetual, royalty-free license to distribute your code under the AGPLv3 open-source license as well as commercial/proprietary editions.
 
 ### Automated CLA Check
+
 When you open a Pull Request, an automated **CLA Assistant** GitHub Action will check whether your GitHub account has signed the agreement. If you have not yet signed, the bot will post a comment on your PR with a link and simple instructions to agree in one click.
 
 ---
@@ -47,26 +50,35 @@ All contributions must strictly adhere to the project's non-negotiable architect
 ## 3. Development Workflow
 
 ### Prerequisites
-* **Node.js**: v22.5.0 or newer (Node v24 LTS recommended)
-* **PHP**: 8.2 or newer (with `pdo_sqlite`, `curl`, `filter`, and `session` enabled)
+
+- **Node.js**: v22.5.0 or newer (Node v24 LTS recommended)
+- **PHP**: 8.2 or newer (with `pdo_sqlite`, `curl`, `filter`, and `session` enabled)
 
 ### Local Setup
+
 1. Clone the repository:
+
    ```bash
    git clone https://github.com/garrisonos/GarrisonOS.git
    cd GarrisonOS
    ```
+
 2. Install compile-time dependencies:
+
    ```bash
    npm install
    ```
+
 3. Run the automated preflight and setup tool:
+
    ```bash
    npm run setup
    # or with seed demo data:
    npm run setup -- --seed
    ```
-4. Start development server (Node.js engine + PHP web frontend on http://localhost:8080):
+
+4. Start development server (Node.js engine + PHP web frontend on <http://localhost:8080>):
+
    ```bash
    npm run dev
    # or with custom port:
@@ -78,8 +90,9 @@ All contributions must strictly adhere to the project's non-negotiable architect
 ## 4. Testing Requirements
 
 All PRs introducing new modules, features, or bug fixes must include corresponding tests using the native Node.js test runner (`node:test` and `node:assert`):
-* **Core Subsystem Tests**: Co-located in `test/` for core primitives, routers, crypto, and multi-tenant context.
-* **Module-Packaged Tests**: Co-located within the module's `modules/[module_name]/test/` directory for repositories, routes, events, and business workflows.
+
+- **Core Subsystem Tests**: Co-located in `test/` for core primitives, routers, crypto, and multi-tenant context.
+- **Module-Packaged Tests**: Co-located within the module's `modules/[module_name]/test/` directory for repositories, routes, events, and business workflows.
 
 ```bash
 # Run the full automated test suite (executes core and all module tests)
@@ -100,4 +113,3 @@ Tests must pass with zero failures and maintain 100% tenant isolation. All modul
 6. Push to your fork and submit a Pull Request to `main`.
 7. Fill out the Pull Request template checklist.
 8. Sign the automated CLA when prompted by the CLA bot.
-

@@ -108,6 +108,3 @@ This document establishes the mandatory engineering standards, architectural con
 
 * **Output Sanitization**: All dynamic values rendered in PHP templates must be strictly escaped using `htmlspecialchars($val, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8')` or a designated escaping helper to eliminate XSS vectors.
 * **Script & Content Isolation**: Inline dynamic scripts and unvalidated DOM injections (`innerHTML`, `eval()`) are forbidden; preserve strict Content Security Policy (CSP) compliance.
-
-
-

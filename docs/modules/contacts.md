@@ -41,4 +41,3 @@ Every contact entity (`contacts`) is classified by role:
 * `GET /api/v1/contacts/:id`: Fetch contact details, active leases, and assigned work orders
 * `PUT /api/v1/contacts/:id`: Update contact details
 * `DELETE /api/v1/contacts/:id`: Soft delete contact
-

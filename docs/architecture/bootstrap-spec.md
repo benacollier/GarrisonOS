@@ -155,17 +155,20 @@ Every functional module under `modules/[module_name]/` must adhere strictly to t
 ```
 
 ### 3.2. Backend Contracts (`backend/`)
-* **`migrations/`**: Sequentially numbered SQL migrations prefixed with module identifier (e.g., `0001_properties.sql`). Executed automatically on boot.
-* **`routes.ts`**: Exports `registerRoutes(router: Router): void`. Routes are mounted under `/api/v1/[module_id]`.
-* **`events.ts`**: Exports `registerSubscribers(eventBus: EventBus): void`.
-* **`repository.ts`**: Encapsulates all SQL execution, strictly accepting only the tenant context from `RequestContext.get()` and query arguments.
+
+- **`migrations/`**: Sequentially numbered SQL migrations prefixed with module identifier (e.g., `0001_properties.sql`). Executed automatically on boot.
+- **`routes.ts`**: Exports `registerRoutes(router: Router): void`. Routes are mounted under `/api/v1/[module_id]`.
+- **`events.ts`**: Exports `registerSubscribers(eventBus: EventBus): void`.
+- **`repository.ts`**: Encapsulates all SQL execution, strictly accepting only the tenant context from `RequestContext.get()` and query arguments.
 
 ### 3.3. Frontend Contracts (`frontend/`)
-* **`hooks.php`**: Registers navigation links, dashboard summary cards, and detail view tabs with the central hook registry.
-* **`pages/`**: PHP view scripts dispatched dynamically by `web/index.php` when navigating to `/[module_name]/[view]`.
+
+- **`hooks.php`**: Registers navigation links, dashboard summary cards, and detail view tabs with the central hook registry.
+- **`pages/`**: PHP view scripts dispatched dynamically by `web/index.php` when navigating to `/[module_name]/[view]`.
 
 ### 3.4. Test Contracts (`test/`)
-* **`[module_name].test.ts`**: Co-located unit and integration test suite executing under native `node:test` and `node:assert`. Covers module repositories, route endpoints, lifecycle states, and tenant context isolation. Automatically discovered and executed on `npm test`.
+
+- **`[module_name].test.ts`**: Co-located unit and integration test suite executing under native `node:test` and `node:assert`. Covers module repositories, route endpoints, lifecycle states, and tenant context isolation. Automatically discovered and executed on `npm test`.
 
 ---
 
@@ -419,7 +422,8 @@ CREATE INDEX IF NOT EXISTS idx_tx_tenant_property_date ON transactions(tenant_id
 CREATE INDEX IF NOT EXISTS idx_tx_tenant_type_category ON transactions(tenant_id, transaction_type, category);
 ```
 
-#### Financial Logic & Calculation Standards:
+#### Financial Logic & Calculation Standards
+
 1. **Running Tenant Balance**:
    $$\text{Tenant Balance} = \sum (\text{charges} + \text{deposit\_returns} + \text{deposit\_deductions}) - \sum (\text{payments} + \text{refunds})$$
    *(Positive balance indicates amount owed by tenant; zero is paid in full; negative is credit balance).*
@@ -430,12 +434,12 @@ CREATE INDEX IF NOT EXISTS idx_tx_tenant_type_category ON transactions(tenant_id
 
 3. **Security Deposit Trust Disposition at Move-Out**:
    $$\text{Final Refund Amount} = \text{Deposit Held} - (\text{Unpaid Rent Charges} + \text{Itemized Damage Deductions})$$
-   * When deductions occur, a `deposit_deduction` transaction converts trust liability into operating income or expense reimbursement.
+   - When deductions occur, a `deposit_deduction` transaction converts trust liability into operating income or expense reimbursement.
 
 4. **Automated Monthly Recurring Rent Generation**:
-   * Endpoint: `POST /api/v1/accounting/generate-rent-charges`
-   * Idempotency Key: `rent_charge:{lease_id}:{YYYY_MM}`
-   * Mid-month proration formula for new leases:
+   - Endpoint: `POST /api/v1/accounting/generate-rent-charges`
+   - Idempotency Key: `rent_charge:{lease_id}:{YYYY_MM}`
+   - Mid-month proration formula for new leases:
      $$\text{Prorated Rent Cents} = \left\lfloor \frac{\text{Monthly Rent Cents}}{\text{Days in Month}} \times \text{Days Remaining (inclusive)} \right\rfloor$$
 
 5. **Schedule E Tax & Net Operating Income (NOI)**:
@@ -481,7 +485,9 @@ CREATE INDEX IF NOT EXISTS idx_work_orders_tenant_property ON work_orders(tenant
 ## 5. Core Engine & Subsystems Architecture
 
 ### 5.1. Context Propagation (`core/context.ts`)
+
 Encapsulates request isolation via `node:async_hooks.AsyncLocalStorage`.
+
 ```typescript
 export interface RequestContext {
   tenantId: string;
@@ -489,33 +495,39 @@ export interface RequestContext {
   correlationId: string;
 }
 ```
-* Methods: `RequestContext.run(context, fn)`, `RequestContext.get(): RequestContext`, `RequestContext.getTenantId(): string`.
-* Throws `Error('No active request context')` if accessed outside an active context.
+
+- Methods: `RequestContext.run(context, fn)`, `RequestContext.get(): RequestContext`, `RequestContext.getTenantId(): string`.
+- Throws `Error('No active request context')` if accessed outside an active context.
 
 ### 5.2. Native RFC 9562 UUIDv7 & Cryptography (`core/crypto.ts`)
+
 1. **UUIDv7 Generator**: Generates 128-bit time-ordered UUIDv7 identifiers using `node:crypto.randomBytes`:
-   * **Bits 0–47**: 48-bit UNIX timestamp (milliseconds).
-   * **Bits 48–51**: Version `7` (`0b0111`).
-   * **Bits 52–63**: 12-bit random data (or sub-millisecond sequence).
-   * **Bits 64–65**: Variant `2` (`0b10`).
-   * **Bits 66–127**: 62-bit random entropy.
+   - **Bits 0–47**: 48-bit UNIX timestamp (milliseconds).
+   - **Bits 48–51**: Version `7` (`0b0111`).
+   - **Bits 52–63**: 12-bit random data (or sub-millisecond sequence).
+   - **Bits 64–65**: Variant `2` (`0b10`).
+   - **Bits 66–127**: 62-bit random entropy.
 2. **Password Hashing**: Formats hashes as `$scrypt$N=16384,r=8,p=1$salt$hash` using `node:crypto.scrypt` with 16-byte random salt and constant-time comparison via `node:crypto.timingSafeEqual`.
 3. **Session Tokens**: Stateless HMAC-SHA256 tokens signed with `APP_SECRET`.
 
 ### 5.3. In-Process Event Bus (`core/events.ts`)
+
 Decoupled asynchronous cross-module messaging using `node:events.EventEmitter`:
-* Standard event catalog:
-  * `lease.activated`: `{ leaseId, unitId, tenantId, rentAmountCents }`
-  * `lease.terminated`: `{ leaseId, unitId, tenantId }`
-  * `payment.recorded`: `{ transactionId, leaseId, amountCents, tenantId }`
-  * `work_order.completed`: `{ workOrderId, propertyId, unitId, actualCostCents, tenantId }`
+
+- Standard event catalog:
+  - `lease.activated`: `{ leaseId, unitId, tenantId, rentAmountCents }`
+  - `lease.terminated`: `{ leaseId, unitId, tenantId }`
+  - `payment.recorded`: `{ transactionId, leaseId, amountCents, tenantId }`
+  - `work_order.completed`: `{ workOrderId, propertyId, unitId, actualCostCents, tenantId }`
     *(Auto-triggers optional recording of an accounting expense transaction).*
 
 ### 5.4. Local Storage Driver (`core/storage.ts`)
-* Abstract `StorageDriver` interface: `save(path, buffer, mimeType)`, `read(path)`, `delete(path)`, `exists(path)`.
-* `LocalDiskStorageDriver` implementation uses `node:fs/promises`, sanitizes path traversal attempts, and stores files with sanitized UUID names in partitioned directories (`uploads/YYYY/MM/uuid`).
+
+- Abstract `StorageDriver` interface: `save(path, buffer, mimeType)`, `read(path)`, `delete(path)`, `exists(path)`.
+- `LocalDiskStorageDriver` implementation uses `node:fs/promises`, sanitizes path traversal attempts, and stores files with sanitized UUID names in partitioned directories (`uploads/YYYY/MM/uuid`).
 
 ### 5.5. Dynamic Module Loader (`core/module-loader.ts`)
+
 1. Scans `modules/` using `node:fs.readdirSync()`.
 2. Reads and validates each `module.json` manifest.
 3. Automatically applies any pending SQL migrations in `modules/[name]/backend/migrations/` via `database/migrator.ts`.
@@ -527,12 +539,14 @@ Decoupled asynchronous cross-module messaging using `node:events.EventEmitter`:
 ## 6. Zero-Dependency API Layer
 
 ### 6.1. Native HTTP Router (`api/router.ts`)
-* Built directly on `node:http.IncomingMessage` and `node:http.ServerResponse`.
-* Supports standard HTTP verbs: `GET`, `POST`, `PUT`, `PATCH`, `DELETE`.
-* Route parameter extraction (e.g., `/api/v1/properties/:id/units/:unitId`).
-* Automatic streaming JSON request body parser with a 1MB default payload ceiling.
+
+- Built directly on `node:http.IncomingMessage` and `node:http.ServerResponse`.
+- Supports standard HTTP verbs: `GET`, `POST`, `PUT`, `PATCH`, `DELETE`.
+- Route parameter extraction (e.g., `/api/v1/properties/:id/units/:unitId`).
+- Automatic streaming JSON request body parser with a 1MB default payload ceiling.
 
 ### 6.2. Standard Response Envelopes (`api/response.ts`)
+
 All REST endpoints return standardized JSON structures:
 
 ```typescript
@@ -559,6 +573,7 @@ All REST endpoints return standardized JSON structures:
 ```
 
 ### 6.3. Middleware Pipeline (`api/middleware.ts`)
+
 1. **Correlation ID**: Extract `X-Request-ID` or generate new UUIDv7.
 2. **Security Headers**: Set `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Content-Security-Policy: default-src 'self'`.
 3. **Sliding-Window Rate Limiting**: In-memory IP/tenant rate limiter on `/api/v1/auth/*` (max 5 failed attempts per 15 minutes).
@@ -567,37 +582,41 @@ All REST endpoints return standardized JSON structures:
 6. **Global Error Trap**: Catch unhandled exceptions and format safe 500 JSON responses.
 
 ### 6.4. Data Portability & Backup Endpoints
-* `GET /api/v1/accounting/export/rent-roll.csv`: Streams standard CSV Rent Roll.
-* `GET /api/v1/accounting/export/schedule-e.csv`: Streams IRS Schedule E year-end income & expense breakdown.
-* `GET /api/v1/accounting/export/ledger/:leaseId.csv`: Streams itemized tenant ledger statement.
-* `GET /api/v1/system/backup`: Safely creates a WAL-checkpointed snapshot of the SQLite database.
+
+- `GET /api/v1/accounting/export/rent-roll.csv`: Streams standard CSV Rent Roll.
+- `GET /api/v1/accounting/export/schedule-e.csv`: Streams IRS Schedule E year-end income & expense breakdown.
+- `GET /api/v1/accounting/export/ledger/:leaseId.csv`: Streams itemized tenant ledger statement.
+- `GET /api/v1/system/backup`: Safely creates a WAL-checkpointed snapshot of the SQLite database.
 
 ---
 
 ## 7. Native PHP Presentation Layer
 
 ### 7.1. Front Controller & CSRF Protection (`web/index.php`)
-* Initializes PHP session and loads `web/lib/api.php`, `web/lib/auth.php`, `web/lib/csrf.php`, and `web/lib/hooks.php`.
-* Validates CSRF token on all incoming `POST`, `PUT`, and `DELETE` requests before dispatching.
-* Resolves request URIs:
-  * Static core routes: `/`, `/login`, `/dashboard`.
-  * Dynamic module routes: `/[module_name]/[action]` $\rightarrow$ Dispatches to `modules/[module_name]/frontend/pages/[action].php`.
-* Catches API errors and injects session flash alerts.
+
+- Initializes PHP session and loads `web/lib/api.php`, `web/lib/auth.php`, `web/lib/csrf.php`, and `web/lib/hooks.php`.
+- Validates CSRF token on all incoming `POST`, `PUT`, and `DELETE` requests before dispatching.
+- Resolves request URIs:
+  - Static core routes: `/`, `/login`, `/dashboard`.
+  - Dynamic module routes: `/[module_name]/[action]` $\rightarrow$ Dispatches to `modules/[module_name]/frontend/pages/[action].php`.
+- Catches API errors and injects session flash alerts.
 
 ### 7.2. Native API Client (`web/lib/api.php`)
-* Wraps PHP `curl_init()` to communicate with Node.js engine at `http://127.0.0.1:3000`.
-* Forwards `X-Tenant-ID` from `$_SESSION['tenant_id']`, `X-User-ID` from `$_SESSION['user_id']`, and `Authorization: Bearer <token>`.
-* Automatically decodes JSON envelopes, raising structured exceptions on API errors.
+
+- Wraps PHP `curl_init()` to communicate with Node.js engine at `http://127.0.0.1:3000`.
+- Forwards `X-Tenant-ID` from `$_SESSION['tenant_id']`, `X-User-ID` from `$_SESSION['user_id']`, and `Authorization: Bearer <token>`.
+- Automatically decodes JSON envelopes, raising structured exceptions on API errors.
 
 ### 7.3. UI Slot & Hook System (`web/lib/hooks.php`)
-* Scans all `modules/*/frontend/hooks.php` at runtime.
-* Modules register:
-  * **Sidebar Navigation items** (with icons and sort order).
-  * **Dashboard Metric Cards** (Occupancy rate, Delinquent amount, Expiring leases count, Open work orders).
-  * **Detail View Extension Tabs** (e.g., Tenant Payment History tab, Unit Work Orders tab).
+
+- Scans all `modules/*/frontend/hooks.php` at runtime.
+- Modules register:
+  - **Sidebar Navigation items** (with icons and sort order).
+  - **Dashboard Metric Cards** (Occupancy rate, Delinquent amount, Expiring leases count, Open work orders).
+  - **Detail View Extension Tabs** (e.g., Tenant Payment History tab, Unit Work Orders tab).
 
 ### 7.4. Semantic HTML5 & Vanilla CSS Design System (`web/public/css/`)
-* Uses CSS Custom Properties for typography, colors, borders, shadows, and light/dark theme variables.
-* Fully responsive layout using CSS Grid and Flexbox without utility frameworks.
-* Native HTML `<dialog>` for modal interactions and accessible semantic tables for ledger data.
 
+- Uses CSS Custom Properties for typography, colors, borders, shadows, and light/dark theme variables.
+- Fully responsive layout using CSS Grid and Flexbox without utility frameworks.
+- Native HTML `<dialog>` for modal interactions and accessible semantic tables for ledger data.

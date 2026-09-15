@@ -19,6 +19,7 @@ flowchart LR
 ## 2. Setting Up Systemd Services
 
 ### 1. Node.js Core Backend Service (`/etc/systemd/system/garrison-engine.service`)
+
 ```ini
 [Unit]
 Description=GarrisonOS Core Engine
@@ -38,6 +39,7 @@ WantedBy=multi-user.target
 ```
 
 ### 2. Enable and Start Services
+
 ```bash
 sudo systemctl daemon-reload
 sudo systemctl enable --now garrison-engine
@@ -48,6 +50,7 @@ sudo systemctl enable --now garrison-engine
 ## 3. Web Server & Reverse Proxy Configuration
 
 ### Caddy Configuration (`/etc/caddy/Caddyfile`)
+
 ```caddy
 garrison.yourdomain.com {
     root * /var/www/garrison-os/web
@@ -67,6 +70,7 @@ garrison.yourdomain.com {
 ```
 
 ### Nginx Configuration (`/etc/nginx/sites-available/garrison`)
+
 ```nginx
 server {
     listen 80;
@@ -100,20 +104,23 @@ server {
 
 1. **File Permissions**:
    - Ensure SQLite database files (`garrison.db`, `garrison.db-wal`, `garrison.db-shm`) and `.env` have restrictive permissions:
+
      ```bash
      chmod 600 garrison.db* .env
      chown www-data:www-data garrison.db* .env
      ```
+
 2. **Loopback Isolation**:
    - The Node.js engine must bind strictly to `127.0.0.1:3000` (`HOST=127.0.0.1` in `.env`). Never bind to `0.0.0.0` or expose the Node.js port directly to the public Internet.
 3. **PHP Session Hardening (`php.ini`)**:
    - Enforce secure session cookies:
+
      ```ini
      session.cookie_httponly = 1
      session.cookie_secure = 1
      session.cookie_samesite = "Strict"
      session.use_strict_mode = 1
      ```
+
 4. **Storage Directory Outside Web Root**:
    - Ensure `STORAGE_PATH` (where attachments, receipts, and documents are saved) is placed entirely outside the web root (e.g. `/var/www/garrison-storage`).
-

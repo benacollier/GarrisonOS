@@ -7,14 +7,18 @@ The **Properties** module (`modules/properties/`) manages physical real estate p
 ## 1. Domain Entities
 
 ### Portfolios (`portfolios`)
+
 Represents ownership entities (such as an LLC, holding company, or individual trust).
+
 * `id` (UUIDv7): Primary key
 * `tenant_id` (UUIDv7): Owning tenant
 * `name` (TEXT): Entity name (e.g., "Maple Ridge Holdings LLC")
 * `tax_id` (TEXT): Employer Identification Number (EIN) or SSN last 4
 
 ### Properties (`properties`)
+
 Represents physical physical locations, buildings, or parcels.
+
 * `id` (UUIDv7): Primary key
 * `tenant_id` (UUIDv7): Owning tenant
 * `portfolio_id` (UUIDv7): Parent ownership portfolio
@@ -24,7 +28,9 @@ Represents physical physical locations, buildings, or parcels.
 * `year_built` (INTEGER)
 
 ### Units (`units`)
+
 Represents distinct rentable living or commercial units within a property.
+
 * `id` (UUIDv7): Primary key
 * `tenant_id` (UUIDv7): Owning tenant
 * `property_id` (UUIDv7): Parent physical property
@@ -48,4 +54,3 @@ Represents distinct rentable living or commercial units within a property.
 * `POST /api/v1/properties/:id/units`: Create unit under property
 * `GET /api/v1/properties/units/:unitId`: Get unit details
 * `PUT /api/v1/properties/units/:unitId`: Update unit details / status
-

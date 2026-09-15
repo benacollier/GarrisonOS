@@ -20,6 +20,7 @@ The GarrisonOS REST API is exposed by the headless Node.js backend (`api/server.
 All JSON responses conform to standardized envelopes:
 
 ### Success Response (`HTTP 200 / 201`)
+
 ```json
 {
   "success": true,
@@ -36,6 +37,7 @@ All JSON responses conform to standardized envelopes:
 ```
 
 ### Error Response (`HTTP 4xx / 5xx`)
+
 ```json
 {
   "success": false,
@@ -50,6 +52,7 @@ All JSON responses conform to standardized envelopes:
 ```
 
 ### Error Codes
+
 * `VALIDATION_ERROR` (`400`)
 * `UNAUTHORIZED` (`401`)
 * `FORBIDDEN` (`403`)
@@ -74,6 +77,7 @@ All JSON responses conform to standardized envelopes:
 ## 4. Module Endpoint Directory
 
 ### Properties & Units
+
 * `GET /api/v1/properties`: List properties
 * `POST /api/v1/properties`: Create property
 * `GET /api/v1/properties/:id`: Get property with units
@@ -84,6 +88,7 @@ All JSON responses conform to standardized envelopes:
 * `PUT /api/v1/properties/units/:unitId`: Update unit
 
 ### Contacts
+
 * `GET /api/v1/contacts`: Query contacts with role and search filters
 * `POST /api/v1/contacts`: Create contact
 * `GET /api/v1/contacts/:id`: Contact details and linked entities
@@ -91,6 +96,7 @@ All JSON responses conform to standardized envelopes:
 * `DELETE /api/v1/contacts/:id`: Soft delete contact
 
 ### Leases
+
 * `GET /api/v1/leases`: List leases
 * `POST /api/v1/leases`: Create lease with signatories
 * `GET /api/v1/leases/:id`: Get lease details and signatories
@@ -98,6 +104,7 @@ All JSON responses conform to standardized envelopes:
 * `POST /api/v1/leases/:id/signatories`: Add signatory
 
 ### Accounting
+
 * `GET /api/v1/accounting/transactions`: List financial transactions
 * `POST /api/v1/accounting/transactions`: Record charge, payment, or expense
 * `GET /api/v1/accounting/ledger/:leaseId`: Calculate running balance
@@ -108,9 +115,9 @@ All JSON responses conform to standardized envelopes:
 * `GET /api/v1/accounting/export/ledger/:leaseId.csv`: Stream Ledger Statement CSV
 
 ### Maintenance
+
 * `GET /api/v1/maintenance`: List work orders
 * `POST /api/v1/maintenance`: Create work order
 * `GET /api/v1/maintenance/:id`: Work order details
 * `PUT /api/v1/maintenance/:id`: Update work order status and costs
 * `DELETE /api/v1/maintenance/:id`: Soft delete work order
-

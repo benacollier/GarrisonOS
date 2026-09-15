@@ -20,6 +20,7 @@ stateDiagram-v2
 ```
 
 ### Supported Statuses
+
 * `draft`: Prepared agreement awaiting execution
 * `active`: Currently in effect
 * `expiring`: Reaching the end of the contractual term
@@ -32,6 +33,7 @@ stateDiagram-v2
 ## 2. Multi-Party Signatories (`lease_contacts`)
 
 Residential tenancies frequently involve multiple roommates, co-signers, and non-financially responsible dependents:
+
 * `primary_tenant`: Primary billing contact and occupant
 * `co_tenant`: Co-signing resident with joint liability
 * `guarantor`: Non-occupant financial guarantor
@@ -58,4 +60,3 @@ Residential tenancies frequently involve multiple roommates, co-signers, and non
 * `PUT /api/v1/leases/:id`: Update lease terms or status
 * `POST /api/v1/leases/:id/signatories`: Add signatory to lease
 * `DELETE /api/v1/leases/:id/signatories/:contactId`: Remove signatory from lease
-

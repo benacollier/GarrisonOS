@@ -18,6 +18,7 @@ npm run test:module properties
 ```
 
 This supports:
+
 * **Core Subsystem Tests** (`test/`): `crypto.test.ts`, `context.test.ts`, `isolation.test.ts`, `router.test.ts`, `modules.test.ts`.
 * **Module-Packaged Domain Tests** (`modules/<module_name>/test/`): Automatically discovered and executed on demand for existing and newly created modules.
 
@@ -26,6 +27,7 @@ This supports:
 ## 2. Writing Unit & Integration Tests
 
 ### Example Module Test Structure
+
 ```typescript
 import { describe, it, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
@@ -53,4 +55,3 @@ describe('Properties Module - Lifecycle & Inventory Management', () => {
 1. **Context Isolation**: Every test must execute within an explicit `RequestContext.run()` wrapper to simulate isolated request execution.
 2. **Deterministic Time**: Tests must use fixed or relative timestamp offsets to avoid flaky assertions.
 3. **Zero Test Framework Dependencies**: Do not introduce Jest, Mocha, Chai, Vitest, or Sinon. Use standard Node.js built-ins.
-

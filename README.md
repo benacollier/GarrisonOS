@@ -6,13 +6,15 @@
 [![Status](https://img.shields.io/badge/Status-Pre--Production%20Prototype-yellow.svg)](#pre-production-disclaimer)
 [![Node.js](https://img.shields.io/badge/Node.js-v22.5%2B-green.svg)](https://nodejs.org/)
 [![PHP](https://img.shields.io/badge/PHP-8.2%2B-purple.svg)](https://www.php.net/)
-[![Dependencies](https://img.shields.io/badge/Runtime_Dependencies-0-brightgreen.svg)](#zero-runtime-dependencies)
-[![Multi-Tenancy](https://img.shields.io/badge/Multi--Tenancy-Row--Level_Isolation-orange.svg)](#strict-multi-tenancy--isolation)
+[![Dependencies](https://img.shields.io/badge/Runtime_Dependencies-0-brightgreen.svg)](#dependencies--runtime-prerequisites)
+[![Multi-Tenancy](https://img.shields.io/badge/Multi--Tenancy-Row--Level_Isolation-orange.svg)](#architectural-principles)
 
 ---
 
 > [!WARNING]
-> ### Pre-Production Disclaimer
+>
+> ## Pre-Production Disclaimer
+>
 > GarrisonOS is currently in **pre-production prototyping** and active development. This software is **not ready for production use and should not be installed or deployed by end users** until an official, stable release is made available. Core APIs, internal schemas, and functionality remain subject to breaking changes without notice. Developers and contributors are welcome to explore and test the codebase in isolated development environments.
 
 ---
@@ -32,6 +34,7 @@ Built from first principles around **zero external runtime dependencies**, Garri
 The GarrisonOS MVP is focused strictly on delivering a self-hosted property management suite tailored for **small residential portfolios (up to 50 units)**, including single-family residences, duplexes/triplexes/fourplexes, small multifamily buildings, and scattered sites.
 
 ### In Scope for MVP
+
 * **Day-to-Day Operations**: Physical property structures, rentable unit inventories, status lifecycle tracking, human directory management (tenants, owners, vendors, emergency contacts), and maintenance work order dispatching.
 * **Lease Agreements**: Residential lease lifecycles, terms, security deposit tracking, and multi-party signatory assignments.
 * **Cash-Basis Accounting & Recordkeeping**: Single-entry cash ledger mapped to IRS Schedule E categories, tenant running balances, automated monthly rent charge generation with mid-month proration, waterfall payment allocation, move-out deposit disposition, and streamed CSV exports (Rent Roll, Schedule E P&L, itemized tenant statements).
@@ -42,24 +45,24 @@ The GarrisonOS MVP is focused strictly on delivering a self-hosted property mana
 ## Architectural Principles
 
 1. **Zero External Runtime Dependencies**:
-   - **Backend Engine**: Built exclusively on native Node.js standard modules (`node:http`, `node:sqlite`, `node:crypto`, `node:async_hooks`, `node:events`, `node:fs`, `node:path`, `node:test`, `node:assert`). No npm packages at runtime (no Express, Fastify, Prisma, TypeORM, Zod, uuid, or bcrypt).
-   - **Frontend Presentation**: Built exclusively on native PHP 8.2+ with standard built-in extensions (`pdo_sqlite`, `curl`, `session`, `filter`) and semantic HTML5 with vanilla CSS Custom Properties. No Composer packages, CSS preprocessors, or frontend JavaScript frameworks.
+   * **Backend Engine**: Built exclusively on native Node.js standard modules (`node:http`, `node:sqlite`, `node:crypto`, `node:async_hooks`, `node:events`, `node:fs`, `node:path`, `node:test`, `node:assert`). No npm packages at runtime (no Express, Fastify, Prisma, TypeORM, Zod, uuid, or bcrypt).
+   * **Frontend Presentation**: Built exclusively on native PHP 8.2+ with standard built-in extensions (`pdo_sqlite`, `curl`, `session`, `filter`) and semantic HTML5 with vanilla CSS Custom Properties. No Composer packages, CSS preprocessors, or frontend JavaScript frameworks.
 2. **Strict Multi-Tenancy & Row-Level Isolation**:
-   - Every operational database table includes a `tenant_id TEXT NOT NULL` column referencing `tenants(id)`.
-   - Tenant context is extracted from request headers (`X-Tenant-ID`) or authenticated session tokens and propagated down the execution stack using `AsyncLocalStorage`.
-   - Repositories and business logic resolve `tenant_id` implicitly from execution context—never from untrusted request bodies or URL parameters.
+   * Every operational database table includes a `tenant_id TEXT NOT NULL` column referencing `tenants(id)`.
+   * Tenant context is extracted from request headers (`X-Tenant-ID`) or authenticated session tokens and propagated down the execution stack using `AsyncLocalStorage`.
+   * Repositories and business logic resolve `tenant_id` implicitly from execution context—never from untrusted request bodies or URL parameters.
 3. **Financial Precision & Tax Alignment**:
-   - All currency values are strictly stored and calculated as **INTEGER cents** (e.g., $1,450.00 is stored as `145000`). Floating-point arithmetic for currency is strictly prohibited.
-   - Single-entry cash-basis ledger mapped to standard IRS Schedule E expense categories for tax preparation and Net Operating Income (NOI) calculation.
+   * All currency values are strictly stored and calculated as **INTEGER cents** (e.g., $1,450.00 is stored as `145000`). Floating-point arithmetic for currency is strictly prohibited.
+   * Single-entry cash-basis ledger mapped to standard IRS Schedule E expense categories for tax preparation and Net Operating Income (NOI) calculation.
 4. **Deterministic Identity & Time Standards**:
-   - **Primary Keys**: RFC 9562 **UUIDv7** (time-ordered 128-bit UUIDs generated natively via `node:crypto.randomBytes`).
-   - **Timestamps**: Stored strictly as **INTEGER milliseconds** (UTC epoch ms via `Date.now()`).
-   - **Soft Deletes**: Standardized `deleted_at INTEGER` timestamp column across all entity tables (`NULL` when active).
+   * **Primary Keys**: RFC 9562 **UUIDv7** (time-ordered 128-bit UUIDs generated natively via `node:crypto.randomBytes`).
+   * **Timestamps**: Stored strictly as **INTEGER milliseconds** (UTC epoch ms via `Date.now()`).
+   * **Soft Deletes**: Standardized `deleted_at INTEGER` timestamp column across all entity tables (`NULL` when active).
 5. **Decoupled API-First Architecture**:
-   - The core Node.js engine exposes a zero-dependency HTTP REST API.
-   - The native PHP frontend communicates with the engine via internal loopback HTTP requests, forwarding user session context, authentication tokens, and tenant headers.
+   * The core Node.js engine exposes a zero-dependency HTTP REST API.
+   * The native PHP frontend communicates with the engine via internal loopback HTTP requests, forwarding user session context, authentication tokens, and tenant headers.
 6. **Drop-in Modularity**:
-   - Domain features are encapsulated in self-contained directories under `modules/[module_name]/` containing their own migrations, backend routes, event subscribers, repositories, and frontend views/hooks.
+   * Domain features are encapsulated in self-contained directories under `modules/[module_name]/` containing their own migrations, backend routes, event subscribers, repositories, and frontend views/hooks.
 
 ---
 
@@ -68,6 +71,7 @@ The GarrisonOS MVP is focused strictly on delivering a self-hosted property mana
 GarrisonOS is intentionally architected with **zero external runtime package dependencies**.
 
 ### Backend Engine
+
 * **Runtime**: [Node.js](https://nodejs.org/) `v22.5.0` or newer (`v24.x LTS` recommended for built-in `node:sqlite` support).
 * **Standard Library Modules Utilized**:
   * `node:http`: Low-latency HTTP server, custom streaming JSON parser, and REST router.
@@ -83,6 +87,7 @@ GarrisonOS is intentionally architected with **zero external runtime package dep
   * `@types/node` (`^24.0.0`): TypeScript definitions for Node.js standard modules.
 
 ### Frontend Presentation Layer
+
 * **Runtime**: [PHP](https://www.php.net/) `8.2` or newer.
 * **Standard PHP Extensions Required**:
   * `curl`: HTTP client for backend REST API communication.
@@ -95,6 +100,7 @@ GarrisonOS is intentionally architected with **zero external runtime package dep
   * Minimal progressive enhancement JavaScript (no client-side build pipeline required).
 
 ### Storage & Database
+
 * **Database**: Embedded SQLite 3 (managed natively via `node:sqlite`).
 * **Database Modes**: Write-Ahead Logging (`PRAGMA journal_mode = WAL`), Foreign Key enforcement (`PRAGMA foreign_keys = ON`), Busy Timeout (`PRAGMA busy_timeout = 5000`).
 * **File Attachments**: Local disk storage partitioned by year, month, and UUID.
@@ -103,7 +109,7 @@ GarrisonOS is intentionally architected with **zero external runtime package dep
 
 ## Target MVP Capabilities
 
-```
+```text
 ┌────────────────────────────────────────────────────────────────────────┐
 │                              GarrisonOS                                │
 ├──────────────┬──────────────┬──────────────┬─────────────┬─────────────┤
@@ -113,22 +119,26 @@ GarrisonOS is intentionally architected with **zero external runtime package dep
 ```
 
 ### 1. Properties & Portfolios (`modules/properties`)
+
 * **Legal Portfolios**: Organize holdings by legal entity / LLC with tax identification.
 * **Physical Properties**: Manage Single-Family Homes, Multifamily Buildings, Condominiums, Townhouses, and Commercial spaces with address, year built, and metadata.
 * **Rentable Units**: Track unit inventories, unit numbers, bedroom/bathroom configurations, square footage, market rent, and target deposits.
 * **Unit Lifecycle States**: `vacant`, `occupied`, `notice_given`, `turnover`, and `maintenance_hold`.
 
 ### 2. Contacts Directory (`modules/contacts`)
+
 * **Unified Humans Directory**: Centralized management of tenants, property owners, maintenance vendors, co-signers/guarantors, prospects, and emergency contacts.
 * **Vendor Profiles**: Specialization tracking (plumbing, electrical, HVAC, general repair, roofing, turnover cleaning).
 * **Communication & Identity**: Primary/secondary phone numbers, email addresses, tax IDs, and entity linkages.
 
 ### 3. Lease Management (`modules/leases`)
+
 * **Contract Lifecycle**: `draft` $\rightarrow$ `active` $\rightarrow$ `expiring` $\rightarrow$ `renewed` $\rightarrow$ `terminated` / `month_to_month`.
 * **Terms & Financials**: Recurring rent amount, security deposit requirements, deposit held, rent due day, late fee grace periods, and late fee amounts.
 * **Multi-Party Signatories**: `lease_contacts` junction supporting Primary Tenants, Co-Tenants, Guarantors, and Occupants with financial responsibility tracking.
 
 ### 4. Cash-Basis Accounting & Financials (`modules/accounting`)
+
 * **Single-Entry Ledger**: Real-time transaction logging for charges, tenant payments, operating expenses, refunds, and security deposit trust activity.
 * **IRS Schedule E Tax Mapping**: Categorization mapped directly to IRS Schedule E expense lines (Advertising, Cleaning & Maintenance, Insurance, Legal/Professional, Management Fees, Mortgage Interest, Repairs, Supplies, Property Taxes, Utilities, HOA Fees, Capital Improvements).
 * **Running Tenant Balances**: Real-time balance computation:
@@ -140,12 +150,14 @@ GarrisonOS is intentionally architected with **zero external runtime package dep
 * **Financial Data Exports**: Streamed CSV generation for Rent Roll, Schedule E income/expense statements, and tenant ledgers.
 
 ### 5. Maintenance & Work Orders (`modules/maintenance`)
+
 * **Work Order Tracking**: Lifecycle management (`open`, `assigned`, `in_progress`, `on_hold`, `completed`, `cancelled`).
 * **Triage & Priority**: Low, Medium, High, and Emergency priority matrix across trade categories (Plumbing, Electrical, HVAC, Appliance, Structural, Cosmetic, Pest).
 * **Access Control**: Permission-to-enter tracking and custom entry instructions.
 * **Vendor Assignment & Cost Conversion**: Vendor assignment, scheduled repair dates, estimated vs. actual costs, with automatic creation of accounting expenses upon completion via the Event Bus.
 
 ### 6. Web Presentation Layer & Executive Dashboard (`web/`)
+
 * **Executive KPI Dashboard**: Real-time portfolio summary cards (occupancy rate %, monthly rent roll total, outstanding delinquency amount, open work order count).
 * **Security & Session Hygiene**: Cryptographic CSRF validation on all state-modifying requests, timing-safe credential verification, and sliding-window rate limiting on authentication routes.
 * **Dynamic Hook & Slot System**: Dynamic navigation menu aggregation, dashboard summary card registration, and detail tab extensions.
@@ -267,7 +279,9 @@ garrison-os/
 ## Getting Started
 
 ### 1. Prerequisites
+
 Ensure you have the following installed on your system:
+
 * **Node.js**: `v22.5.0` or higher (`node -v`)
 * **PHP**: `8.2` or higher (`php -v`) with `curl`, `session`, `filter`, and `pdo_sqlite` extensions enabled
 
@@ -281,11 +295,13 @@ Ensure you have the following installed on your system:
 Install directly from GitHub Releases with a single terminal command:
 
 #### Windows (PowerShell)
+
 ```powershell
 irm https://raw.githubusercontent.com/garrisonos/GarrisonOS/main/scripts/install.ps1 | iex
 ```
 
 **Linux / macOS**:
+
 ```bash
 curl -fsSL https://raw.githubusercontent.com/garrisonos/GarrisonOS/main/scripts/install.sh | bash
 ```
@@ -297,17 +313,20 @@ curl -fsSL https://raw.githubusercontent.com/garrisonos/GarrisonOS/main/scripts/
 For manual repository setup or development:
 
 1. **Clone the repository**:
+
    ```bash
    git clone https://github.com/garrisonos/GarrisonOS.git
    cd GarrisonOS
    ```
 
 2. **Run the automated preflight and setup tool**:
+
    ```bash
    npm run setup
    # or with realistic 20-unit demo portfolio seeded:
    npm run setup -- --seed
    ```
+
    *(This tool automatically validates prerequisites, generates `.env` with a secure random `APP_SECRET`, compiles TypeScript, and executes SQLite migrations).*
 
 ---
@@ -330,6 +349,7 @@ npm run dev
 Once running, open your web browser at **`http://localhost:8080`**.
 
 #### Demo Credentials
+
 * **Email**: `operator@garrisonos.local`
 * **Password**: `Password123!`
 * **Tenant ID**: `tenant-demo`
@@ -346,6 +366,7 @@ npm test
 ```
 
 The test suite validates:
+
 * **Core Subsystems** (`test/`):
   * **Cryptography & Identity**: RFC 9562 UUIDv7 structure, monotonic timestamp sorting, `scrypt` password hashing, and HMAC session token verification.
   * **Multi-Tenant Context**: `AsyncLocalStorage` propagation across concurrent asynchronous operations and strict rejection outside context.

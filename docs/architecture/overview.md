@@ -52,7 +52,9 @@ flowchart TD
 ## 1. Architectural Philosophy
 
 ### Zero External Runtime Dependencies
+
 The core backend relies exclusively on Node.js standard libraries:
+
 * `node:http`: REST API server and streaming request dispatch.
 * `node:sqlite`: High-speed embedded database client with WAL mode and atomic transaction management.
 * `node:crypto`: RFC 9562 UUIDv7 generation, scrypt password hashing, and HMAC-SHA256 session token verification.
@@ -70,6 +72,7 @@ The presentation layer relies exclusively on standard PHP 8.2+ extensions (`pdo_
 The frontend communicates with the backend exclusively via internal loopback HTTP calls (`http://127.0.0.1:3000`).
 
 ### Benefits
+
 1. **Security Isolation**: The web layer never opens raw database handles or constructs SQL queries directly.
 2. **Headless Reusability**: The REST API engine can support native mobile clients, automated CLI utilities, or background jobs without altering presentation logic.
 3. **Zero Build Step**: PHP serves dynamic HTML5 immediately without node bundling steps, webpack, or minification pipelines.
@@ -89,4 +92,3 @@ The frontend communicates with the backend exclusively via internal loopback HTT
 | **Database** | [`database/`](file:///e:/projects/GarrisonOS/database/) | SQLite client, WAL mode settings, migrations runner, and seeder. |
 | **Modules** | [`modules/`](file:///e:/projects/GarrisonOS/modules/) | Self-contained domain modules (`properties`, `contacts`, `leases`, `accounting`, `maintenance`). |
 | **Presentation** | [`web/`](file:///e:/projects/GarrisonOS/web/) | PHP templates, layouts, dynamic hook registry, and vanilla CSS. |
-

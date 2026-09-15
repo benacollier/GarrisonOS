@@ -20,11 +20,13 @@ This guide walks through setting up your local development environment for Garri
 You can install and initialize GarrisonOS directly using the automated installers:
 
 ### Windows (PowerShell)
+
 ```powershell
 irm https://raw.githubusercontent.com/garrisonos/GarrisonOS/main/scripts/install.ps1 | iex
 ```
 
 Linux / macOS:
+
 ```bash
 curl -fsSL https://raw.githubusercontent.com/garrisonos/GarrisonOS/main/scripts/install.sh | bash
 ```
@@ -36,23 +38,28 @@ curl -fsSL https://raw.githubusercontent.com/garrisonos/GarrisonOS/main/scripts/
 If cloning from source:
 
 1. **Clone the Repository**:
+
    ```bash
    git clone https://github.com/garrisonos/GarrisonOS.git
    cd GarrisonOS
    ```
 
 2. **Install Dev Dependencies**:
+
    ```bash
    npm install
    ```
+
    *(Installs compile-time TypeScript and type declarations. Zero runtime dependencies are installed.)*
 
 3. **Run the Preflight & Setup Tool**:
+
    ```bash
    npm run setup
    # or automatically seed the 20-unit demo portfolio:
    npm run setup -- --seed
    ```
+
    *(This validates runtime versions, creates `.env` with a secure random `APP_SECRET`, ensures storage directories exist, compiles TypeScript, and executes migrations).*
 
 ---

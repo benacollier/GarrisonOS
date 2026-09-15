@@ -23,6 +23,7 @@ All transactions are recorded as positive integer cents accompanied by a `transa
 ## 2. IRS Schedule E Tax Categorization
 
 Operating expenses align with standard IRS Form 1040 Schedule E line items:
+
 * `advertising`
 * `auto_travel`
 * `cleaning_maintenance`
@@ -44,16 +45,20 @@ Operating expenses align with standard IRS Form 1040 Schedule E line items:
 ## 3. Financial Mathematics & Algorithms
 
 ### 3.1. Tenant Running Balance
+
 $$\text{Tenant Balance} = \sum (\text{charges} + \text{deposit\_returns} + \text{deposit\_deductions}) - \sum (\text{payments} + \text{refunds})$$
 
 ### 3.2. Payment Priority Waterfall
+
 When recording partial payments against an unpaid ledger, funds apply in strict order:
 $$\text{Late Fees} \longrightarrow \text{Utility / Other Charges} \longrightarrow \text{Oldest Unpaid Rent} \longrightarrow \text{Current Month Rent}$$
 
 ### 3.3. Mid-Month Rent Proration
+
 $$\text{Prorated Rent Cents} = \left\lfloor \frac{\text{Monthly Rent Cents}}{\text{Days in Month}} \times \text{Days Remaining (inclusive)} \right\rfloor$$
 
 ### 3.4. Net Operating Income (NOI)
+
 $$\text{NOI} = \text{Operating Income (Rent, Fees)} - \text{Operating Expenses (Schedule E)}$$
 
 ---
@@ -68,4 +73,3 @@ $$\text{NOI} = \text{Operating Income (Rent, Fees)} - \text{Operating Expenses (
 * `GET /api/v1/accounting/export/rent-roll.csv`: Stream Rent Roll CSV
 * `GET /api/v1/accounting/export/schedule-e.csv`: Stream IRS Schedule E P&L breakdown CSV
 * `GET /api/v1/accounting/export/ledger/:leaseId.csv`: Stream itemized tenant ledger statement CSV
-
