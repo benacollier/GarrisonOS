@@ -46,16 +46,8 @@ jobs:
       - name: Run Repository Hygiene Check
         run: npm run check:hygiene
 
-      - name: Install and Run Betterleaks
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh release download --repo betterleaks/betterleaks --pattern "*_linux_x64.tar.gz" --output betterleaks.tar.gz
-          tar -xzf betterleaks.tar.gz
-          sudo mv betterleaks /usr/local/bin/
-          betterleaks git . --gitleaks-ignore-path .betterleaksignore --exit-code 1
-
       - name: Run Automated Test Suite
         run: npm test
+
 
 

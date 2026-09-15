@@ -1,0 +1,35 @@
+name: Security
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  betterleaks:
+    name: Betterleaks Secret Scan
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Run Repository Hygiene Check
+        run: node scripts/check-hygiene.js
+
+      - name: Install and Run Betterleaks
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release download --repo betterleaks/betterleaks --pattern "*_linux_x64.tar.gz" --output betterleaks.tar.gz
+          tar -xzf betterleaks.tar.gz
+          sudo mv betterleaks /usr/local/bin/
+          betterleaks git . --gitleaks-ignore-path .betterleaksignore --exit-code 1
