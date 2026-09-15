@@ -109,6 +109,8 @@ GarrisonOS is intentionally architected with **zero external runtime package dep
 
 ## Target MVP Capabilities
 
+![GarrisonOS Executive Dashboard Preview](docs/assets/portal-dashboard.png)
+
 ```text
 ┌────────────────────────────────────────────────────────────────────────┐
 │                              GarrisonOS                                │
@@ -236,7 +238,7 @@ garrison-os/
 │   ├── README.md                  # Documentation navigation index
 │   ├── ROADMAP.md                 # Phased MVP development roadmap and milestones
 │   ├── architecture/              # Core engine, multi-tenancy, data model & blueprints
-│   ├── modules/                   # Properties, contacts, leases, accounting, maintenance
+│   ├── modules/                   # Properties, contacts, leases, accounting, maintenance, backup
 │   ├── api/                       # REST API endpoints & EventBus catalog
 │   ├── development/               # Getting started, frontend guide & testing standards
 │   ├── deployment/                # Self-hosting, configuration & SQLite WAL maintenance
@@ -268,15 +270,23 @@ garrison-os/
 │   ├── properties/                # Portfolios, Properties, Units & test/
 │   ├── contacts/                  # Human & Organization Directory & test/
 │   ├── leases/                    # Lease Contracts, Signatories & test/
-│   ├── accounting/                # Ledger, Billing, Schedule E & test/
-│   └── maintenance/               # Work Orders, Dispatch & test/
+│   ├── accounting/                # Ledger, Billing, Schedule E, Chart of Accounts & test/
+│   ├── maintenance/               # Work Orders, Dispatch & test/
+│   └── backup/                    # SQLite Snapshots, Portability & test/
 │
 ├── web/                           # Native PHP Presentation Layer
 │   ├── index.php                  # Front controller, CSRF validator & dynamic router
 │   ├── lib/                       # API client, session auth, CSRF, and UI hooks
 │   ├── templates/                 # Base layout, header, dynamic sidebar, flash alerts
-│   ├── pages/                     # Dashboard and login view controllers
+│   ├── pages/                     # Dashboard, login, and setup wizard view controllers
 │   └── public/                    # Design tokens, CSS styles, and minimal JavaScript
+│
+├── scripts/                       # Zero-Dependency Operational & CI Tooling
+│   ├── setup.js                   # Automated preflight environment validator & seeder
+│   ├── serve.js                   # Unified Node API & PHP-FPM development runner
+│   ├── test.js                    # Dynamic multi-module test runner harness
+│   ├── restore.js                 # Disaster recovery & snapshot restore utility
+│   └── check-hygiene.js           # Secret scanning & repository hygiene checks
 │
 └── test/                          # Core System node:test & node:assert Suite
     ├── helpers.ts                 # In-memory SQLite fixtures & mock harnesses
@@ -342,6 +352,14 @@ For manual repository setup or development:
 
    *(This tool automatically validates prerequisites, generates `.env` with a secure random `APP_SECRET`, compiles TypeScript, and executes SQLite migrations).*
 
+   > [!TIP]
+   > **Windows PowerShell Users**: If your terminal restricts PowerShell script execution (`PSSecurityException`), run commands using `npm.cmd` or invoke Node directly:
+   > ```powershell
+   > npm.cmd run setup
+   > # or directly via node:
+   > node scripts/setup.js --seed
+   > ```
+
 ---
 
 ### 4. Running the Application
@@ -357,6 +375,9 @@ npm start -- --port=8080 --api-port=3000
 
 # For auto-reloading development mode:
 npm run dev
+
+# On Windows PowerShell (if needed):
+npm.cmd start
 ```
 
 Once running, open your web browser at **`http://localhost:8080`**.
@@ -378,6 +399,10 @@ GarrisonOS includes comprehensive automated unit, integration, and security isol
 ```bash
 # Run full automated test suite (executes core and all module-packaged tests)
 npm test
+
+# On Windows PowerShell (or directly via node):
+npm.cmd test
+# or: node scripts/test.js
 ```
 
 The test suite validates:
@@ -394,6 +419,7 @@ The test suite validates:
   * **Contacts**: Human directory filtering, vendor specializations, and soft-delete lifecycle.
   * **Leases**: Contract lifecycle transitions, multi-party signatories, and financial terms.
   * **Maintenance**: Work order priority triage, vendor assignments, and cross-module expense event triggers.
+  * **Backup**: Point-in-time SQLite snapshot integrity (`VACUUM INTO`), tenant-isolated clean-slate/merge restore, and disaster recovery CLI validations.
 
 ---
 
@@ -416,6 +442,7 @@ Full architectural specifications, module details, API contracts, development gu
   * [Lease Management](docs/modules/leases.md)
   * [Accounting & IRS Schedule E](docs/modules/accounting.md)
   * [Maintenance Work Orders](docs/modules/maintenance.md)
+  * [Backup & Portability](docs/modules/backup.md)
 * **API & Events**:
   * [REST API Reference](docs/api/rest-api.md)
   * [In-Process EventBus Reference](docs/api/events.md)
