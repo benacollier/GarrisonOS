@@ -179,12 +179,13 @@ For a comprehensive phase-by-phase implementation plan, milestone deliverables, 
 
 | Milestone | Focus Area | Status | Description |
 | :--- | :--- | :---: | :--- |
-| **Milestone 1** | **Foundation & Core Subsystems** | Completed | Zero-dependency Node.js HTTP engine, `AsyncLocalStorage` multi-tenant context, embedded SQLite WAL engine, native RFC 9562 UUIDv7 generator, `scrypt` hashing, dynamic module loader, and native `node:test` suite. |
-| **Milestone 2** | **Residential Domain Modules** | Completed | Data schemas, migrations, repositories, and REST endpoints for Properties & Units, Contacts Directory, Leases & Signatories, Cash-Basis Schedule E Accounting, and Maintenance Work Orders. |
-| **Milestone 3** | **Presentation Layer & UI** | Completed | Native PHP front controller, CSRF protection, executive KPI dashboard, dynamic module navigation/slot aggregators, and responsive semantic HTML5/CSS design system. |
-| **Milestone 4** | **Automation & Financial Workflows** | Completed | Automated recurring monthly rent charge generation with mid-month proration, 4-tier waterfall payment allocation, move-out deposit disposition, CSV export endpoints (Rent Roll, Schedule E, Tenant Ledgers), and SQLite backup snapshotting. |
-| **Milestone 5** | **Testing & Production Hardening** | In Progress | Full automated test suite coverage (crypto, context isolation, multi-tenant leaks, ledger math, proration, routing), seed data fixtures, self-hosting documentation, and production runtime hardening. |
-| **Milestone 6** | **Self-Hosting Packaging & Distribution** | Planned | Docker compose deployment recipes, systemd service templates, automated backup rotation scripts, and one-click self-hosting guides. |
+| **Phase 1** | **Core Engine & Multi-Tenant Foundation** | Completed | Zero-dependency Node.js HTTP/SQLite engine (`node:http`, `node:sqlite`, `node:crypto`), `AsyncLocalStorage` context propagation, tenant isolation (`X-Tenant-ID`), auth, session/token management, rate limiting, and in-process `EventBus` pub/sub backbone. |
+| **Phase 2** | **Base Entity & Inventory Management** | Completed | Portfolios, properties, rentable unit inventory, multi-role contacts directory (tenants, owners, vendors, emergency contacts), foundational relationships, validation schemas, and REST CRUD APIs. |
+| **Phase 3** | **Core Property Operations (Leasing & Maintenance)** | Completed | Residential leasing lifecycle (draft, active, renewal, termination), maintenance work order triage, vendor assignment, and operational event publishing (`lease.created`, `maintenance.completed`). |
+| **Phase 4** | **Financial Ledger & Accounting Subsystem** | Completed | Immutable cash-basis ledger with integer-cents tracking, standardized Chart of Accounts (Schedule E and QuickBooks compatibility), running tenant balances, waterfall payment allocation, deposit disposition, automated rent generation, and financial exports. |
+| **Phase 5** | **Native Presentation Layer & User Experience** | Completed | Zero-framework native PHP-FPM presentation architecture, executive KPI dashboard, responsive semantic HTML5/CSS design system, CSRF protection, and operator views for properties, contacts, leases, maintenance, and ledger reporting. |
+| **Phase 6** | **Data Portability, Resilience & Backup** | Completed | Point-in-time SQLite database snapshots (`VACUUM INTO`), safe WAL checkpointing, tenant-isolated data export/import workflows (`.json.gz`), SHA-256 integrity verification, and disaster recovery CLI tooling. |
+| **Phase 7** | **MVP Verification, Hardening & Self-Hosting Packaging** | In Progress | End-to-end integration and tenant isolation regression test suites, security review (input sanitization, CSP/XSS defense, timing-safe auth checks), and production packaging (Systemd / Supervisord configs, reverse proxy templates, and single-command local setup scripts). |
 
 ---
 
