@@ -24,7 +24,8 @@ docs/
 │   ├── contacts.md        # Directory of tenants, owners, vendors, and emergency contacts
 │   ├── leases.md          # Lease agreements, terms, signatories, and lifecycle transitions
 │   ├── accounting.md      # Cash ledger, Schedule E, Chart of Accounts, and QuickBooks compatibility
-│   └── maintenance.md     # Work order triage, vendor dispatch, and expense conversion
+│   ├── maintenance.md     # Work order triage, vendor dispatch, and expense conversion
+│   └── backup.md          # Point-in-time snapshots, tenant portability, and disaster recovery
 │
 ├── api/                   # REST API and EventBus contracts
 │   ├── rest-api.md        # Zero-dependency HTTP REST endpoints, headers, and error envelopes
@@ -49,7 +50,7 @@ docs/
 ## Quick Reference Links
 
 * **Core Architecture**: [Architecture Overview](architecture/overview.md) | [Multi-Tenancy Guide](architecture/multi-tenancy.md) | [Data Model Standards](architecture/data-model.md)
-* **Domain Modules**: [Properties](modules/properties.md) | [Contacts](modules/contacts.md) | [Leases](modules/leases.md) | [Accounting](modules/accounting.md) | [Maintenance](modules/maintenance.md)
+* **Domain Modules**: [Properties](modules/properties.md) | [Contacts](modules/contacts.md) | [Leases](modules/leases.md) | [Accounting](modules/accounting.md) | [Maintenance](modules/maintenance.md) | [Backup](modules/backup.md)
 * **API & Events**: [REST API Reference](api/rest-api.md) | [EventBus Reference](api/events.md)
 * **Developer Workflow**: [Getting Started](development/getting-started.md) | [Frontend Guide](development/frontend-guide.md) | [Testing Guide](development/testing.md)
 * **Production Operations**: [Self-Hosting Guide](deployment/self-hosting.md) | [Configuration Reference](deployment/configuration.md) | [Database Maintenance](deployment/backup-and-maintenance.md)

@@ -157,7 +157,13 @@ GarrisonOS is intentionally architected with **zero external runtime package dep
 * **Access Control**: Permission-to-enter tracking and custom entry instructions.
 * **Vendor Assignment & Cost Conversion**: Vendor assignment, scheduled repair dates, estimated vs. actual costs, with automatic creation of accounting expenses upon completion via the Event Bus.
 
-### 6. Web Presentation Layer & Executive Dashboard (`web/`)
+### 6. Backup & Disaster Recovery (`modules/backup`)
+* **Point-in-Time SQLite Snapshots**: Safe WAL checkpointing and online SQLite `VACUUM INTO` snapshots with gzip compression (`.sqlite.gz`).
+* **Tenant Data Portability**: Tenant-isolated data export and restore (`.json.gz`) with user-selectable **Clean-Slate** (replace) or **Merge** (upsert) modes.
+* **Integrity Hashing**: Cryptographic SHA-256 integrity verification upon creation and on-demand.
+* **CLI Disaster Recovery Tool**: Standalone `node scripts/restore.js <path-to-snapshot>` utility with binary header validation and stale WAL cleanup.
+
+### 7. Web Presentation Layer & Executive Dashboard (`web/`)
 
 * **Executive KPI Dashboard**: Real-time portfolio summary cards (occupancy rate %, monthly rent roll total, outstanding delinquency amount, open work order count).
 * **Security & Session Hygiene**: Cryptographic CSRF validation on all state-modifying requests, timing-safe credential verification, and sliding-window rate limiting on authentication routes.

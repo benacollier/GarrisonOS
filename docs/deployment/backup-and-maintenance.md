@@ -4,20 +4,36 @@ GarrisonOS uses SQLite in Write-Ahead Logging (`WAL`) mode with `synchronous = N
 
 ---
 
-## 1. Automated Snapshot Backup Endpoint
+## 1. Modular Backup System (`modules/backup`)
 
-The core engine provides an administrative backup endpoint:
+GarrisonOS packages a native, zero-dependency Backup Module exposing administrative and tenant-level backup and restoration endpoints:
 
-```bash
-curl -X GET http://127.0.0.1:3000/api/v1/system/backup \
-  -H "X-Tenant-ID: <admin_tenant_id>" \
-  -H "Authorization: Bearer <admin_token>"
-```
+* `GET /api/v1/backups`: Lists active backups for the tenant context.
+* `POST /api/v1/backups`: Triggers either a point-in-time full database snapshot (`full_system`) or an isolated tenant data export (`tenant_data`).
+* `POST /api/v1/backups/:id/verify`: Validates the physical file against its recorded SHA-256 checksum.
+* `POST /api/v1/backups/:id/restore`: Restores tenant data in **Clean-Slate** (replace) or **Merge** (upsert) mode.
 
 ### What Happens Internally
+1. Executes `PRAGMA wal_checkpoint(TRUNCATE)` to flush WAL log frames into the main database file.
+2. Uses SQLite's online `VACUUM INTO` command to generate an uncorrupted snapshot.
+3. Streams through native Node.js `node:zlib` Gzip compression.
+4. Computes SHA-256 checksum for integrity assurance.
 
-1. Executes `PRAGMA wal_checkpoint(TRUNCATE)` to flush WAL log frames into the main `.sqlite` file.
-2. Uses SQLite's online backup API or atomic filesystem copy to generate a timestamped snapshot in `storage/backups/`.
+---
+
+## 2. Full System Disaster Recovery CLI
+
+For offline instance recovery:
+
+```bash
+# Safely restore full SQLite database from snapshot
+node scripts/restore.js storage/backups/garrison-db-<timestamp>.sqlite.gz
+```
+
+The script:
+1. Validates SQLite binary format header (`SQLite format 3`).
+2. Purges stale `-wal` and `-shm` cache files to prevent corruption.
+3. Overwrites the database and automatically applies pending migrations (`runMigrations()`).
 
 ---
 
