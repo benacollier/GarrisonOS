@@ -13,6 +13,7 @@
     "dev:engine": "node --watch dist/api/server.js",
     "migrate": "node dist/database/migrator.js",
     "seed": "node dist/database/seed.js",
+    "check:hygiene": "node scripts/check-hygiene.js",
     "test": "node scripts/test.js",
     "test:core": "node scripts/test.js core",
     "test:module": "node scripts/test.js"

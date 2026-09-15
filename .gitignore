@@ -20,14 +20,27 @@ dist/
 # File Uploads & Storage
 storage/uploads/*
 !storage/uploads/.gitkeep
+storage/backups/*
+!storage/backups/.gitkeep
+
+# Logs and Debug Output
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.dump
 
 # Operating System & IDE
 .DS_Store
 Thumbs.db
+desktop.ini
+.directory
 .idea/
 .vscode/
 *.swp
 *.swo
+*.orig
+*.rej
 
 # Test & Coverage Output
 coverage/
