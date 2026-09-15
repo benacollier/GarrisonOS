@@ -3,10 +3,17 @@
 > An open-source, modular, zero-dependency, lightweight property management framework designed to liberate property managers from closed vendor lock-in, inflexible data schemas, and proprietary software silos.
 
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](LICENSE)
+[![Status](https://img.shields.io/badge/Status-Pre--Production%20Prototype-yellow.svg)](#pre-production-disclaimer)
 [![Node.js](https://img.shields.io/badge/Node.js-v22.5%2B-green.svg)](https://nodejs.org/)
 [![PHP](https://img.shields.io/badge/PHP-8.2%2B-purple.svg)](https://www.php.net/)
 [![Dependencies](https://img.shields.io/badge/Runtime_Dependencies-0-brightgreen.svg)](#zero-runtime-dependencies)
 [![Multi-Tenancy](https://img.shields.io/badge/Multi--Tenancy-Row--Level_Isolation-orange.svg)](#strict-multi-tenancy--isolation)
+
+---
+
+> [!WARNING]
+> ### Pre-Production Disclaimer
+> GarrisonOS is currently in **pre-production prototyping** and active development. This software is **not ready for production use and should not be installed or deployed by end users** until an official, stable release is made available. Core APIs, internal schemas, and functionality remain subject to breaking changes without notice. Developers and contributors are welcome to explore and test the codebase in isolated development environments.
 
 ---
 
@@ -267,6 +274,9 @@ Ensure you have the following installed on your system:
 ---
 
 ### 2. Automated One-Line Installation
+
+> [!NOTE]
+> The automated installation scripts below are provided for developer evaluation, testing, and preview environments. As noted in the [Pre-Production Disclaimer](#pre-production-disclaimer), end users should not install this software for production property operations until an official stable release is issued.
 
 Install directly from GitHub Releases with a single terminal command:
 

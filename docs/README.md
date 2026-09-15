@@ -2,6 +2,9 @@
 
 Welcome to the official documentation for **GarrisonOS**, the zero-dependency, open-source property management platform engineered for independent landlords, property managers, and real estate operators.
 
+> [!WARNING]
+> **Pre-Production Disclaimer**: GarrisonOS is currently in active pre-production prototyping. It is not ready for production environments and should not be installed by end users until an official stable release is made available.
+
 ---
 
 ## Documentation Navigation
