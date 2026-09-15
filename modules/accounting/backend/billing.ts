@@ -57,15 +57,22 @@ export function generateMonthlyRentCharges(targetYearMonth?: string): RecurringR
 
   // Find all leases that are active during this target month
   const activeLeases = db.prepare(`
-    SELECT l.*, u.property_id
+    SELECT
+      l.id,
+      l.unit_id,
+      l.rent_amount_cents,
+      l.start_date,
+      l.end_date,
+      l.rent_due_day,
+      u.property_id
     FROM leases l
-    JOIN units u ON l.unit_id = u.id
+    JOIN units u ON l.unit_id = u.id AND u.deleted_at IS NULL
     WHERE l.tenant_id = ?
       AND l.status IN ('active', 'renewed', 'month_to_month', 'expiring')
       AND l.start_date <= ?
       AND l.end_date >= ?
       AND l.deleted_at IS NULL
-  `).all(tenantId, monthEndMs, monthStartMs) as Array<{
+  `).all(tenantId, monthEndMs, monthStartMs) as unknown as Array<{
     id: string;
     unit_id: string;
     property_id: string;

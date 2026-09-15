@@ -75,7 +75,7 @@ export class MaintenanceRepository {
       params.push(filter.unit_id);
     }
 
-    sql += ' ORDER BY CASE w.priority WHEN "emergency" THEN 1 WHEN "high" THEN 2 WHEN "medium" THEN 3 ELSE 4 END, w.created_at DESC';
+    sql += " ORDER BY CASE w.priority WHEN 'emergency' THEN 1 WHEN 'high' THEN 2 WHEN 'medium' THEN 3 ELSE 4 END, w.created_at DESC";
 
     return db.prepare(sql).all(...params) as unknown as WorkOrderWithDetails[];
   }

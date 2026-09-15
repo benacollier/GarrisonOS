@@ -14,6 +14,10 @@ export interface DatabaseOptions {
  * Configure and initialize SQLite DatabaseSync instance with production pragmas.
  */
 export function getDatabase(options: DatabaseOptions = {}): DatabaseSync {
+  if (globalDb && options.inMemory === undefined && options.path === undefined) {
+    return globalDb;
+  }
+
   const dbPath = options.inMemory
     ? ':memory:'
     : options.path || process.env['SQLITE_PATH'] || './garrison.sqlite';
