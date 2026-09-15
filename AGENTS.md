@@ -67,4 +67,41 @@ This document establishes the mandatory engineering standards, architectural con
 * **Core Subsystems**: When modifying core primitives (`core/`, `api/`, `database/`), execute core tests via `npm run test:core`.
 * **Full Regression**: Execute `npm test` only before submitting pull requests or when modifying runtime engine dependencies / core compilation configurations (`tsconfig.json`, `package.json` runtime scripts).
 
+---
+
+## 8. Database & Transaction Safety
+
+* **Parameterized Queries**: Raw SQL string concatenation and template literal interpolation for variable data are strictly prohibited. All queries must use parameterized placeholders (`?` or named parameters).
+* **Atomic Transactions**: Multi-step state mutations must execute within explicit transaction boundaries (`db.transaction(...)` / `BEGIN IMMEDIATE`) to prevent concurrency anomalies and SQLite locking contention.
+* **Schema Evolution**: Schema modifications must be performed exclusively through standard versioned migrations; direct runtime DDL executions outside migration lifecycles are forbidden.
+
+---
+
+## 9. Input Validation & Type Safety
+
+* **Native Validation**: With zero runtime validation libraries permitted, every API handler must execute explicit native validation guards (checking primitive types, field presence, integer ranges, and string lengths) before passing inputs to domain logic.
+* **Strict Equality**: Always enforce strict equality (`===` / `!==`) in both TypeScript and PHP layers. Loose comparisons are prohibited.
+
+---
+
+## 10. Error Handling & Information Disclosure
+
+* **Structured Errors**: Use standardized application error classes carrying explicit HTTP status codes and machine-readable error codes.
+* **Information Leak Prevention**: Database driver errors, internal stack traces, and sensitive query parameter dumps must never be returned in client-facing HTTP response payloads.
+
+---
+
+## 11. Event Handlers & Background Tasks
+
+* **Handler Resilience**: All listeners attached to `EventBus` (`core/events.ts`) must handle their own errors gracefully with try/catch blocks to ensure background failures do not disrupt the primary request flow.
+* **Non-Blocking Operations**: Do not execute long-running CPU-bound loops or blocking synchronous operations directly inside HTTP request handlers.
+
+---
+
+## 12. Safe PHP Presentation & Output Encoding
+
+* **Output Sanitization**: All dynamic values rendered in PHP templates must be strictly escaped using `htmlspecialchars($val, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8')` or a designated escaping helper to eliminate XSS vectors.
+* **Script & Content Isolation**: Inline dynamic scripts and unvalidated DOM injections (`innerHTML`, `eval()`) are forbidden; preserve strict Content Security Policy (CSP) compliance.
+
+
 
