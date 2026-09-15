@@ -122,7 +122,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 <tr>
                     <td>
                         <strong><a href="/maintenance/show?id=<?= urlencode($wo['id']) ?>"><?= htmlspecialchars($wo['title']) ?></a></strong>
-                        <div class="text-muted text-sm">#<?= substr($wo['id'], 0, 8) ?> • <?= date('M j, Y', $wo['created_at'] / 1000) ?></div>
+                        <div class="text-muted text-sm">#<?= substr($wo['id'], 0, 8) ?> • <?= date('M j, Y', (int)($wo['created_at'] / 1000)) ?></div>
                     </td>
                     <td>
                         <?= htmlspecialchars($wo['property_name']) ?>

@@ -73,7 +73,7 @@ try {
                     <?php else: ?>
                     <?php foreach ($recentTransactions as $tx): ?>
                     <tr>
-                        <td><?= date('M j', $tx['transaction_date'] / 1000) ?></td>
+                        <td><?= date('M j', (int)($tx['transaction_date'] / 1000)) ?></td>
                         <td><span class="badge"><?= htmlspecialchars(ucfirst($tx['transaction_type'])) ?></span></td>
                         <td><?= htmlspecialchars($tx['description']) ?></td>
                         <td>

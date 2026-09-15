@@ -122,7 +122,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                         <span class="badge <?= $statusClass ?>"><?= htmlspecialchars(ucwords(str_replace('_', ' ', $l['status']))) ?></span>
                     </td>
                     <td>
-                        <?= date('M j, Y', $l['start_date'] / 1000) ?> – <?= date('M j, Y', $l['end_date'] / 1000) ?>
+                        <?= date('M j, Y', (int)($l['start_date'] / 1000)) ?> – <?= date('M j, Y', (int)($l['end_date'] / 1000)) ?>
                     </td>
                     <td><strong>$<?= number_format($l['rent_amount_cents'] / 100, 2) ?></strong>/mo</td>
                     <td>$<?= number_format($l['deposit_held_cents'] / 100, 2) ?></td>

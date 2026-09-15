@@ -142,7 +142,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         if ($isPayment) $running -= $t['amount_cents'];
                 ?>
                 <tr>
-                    <td><?= date('M j, Y', $t['transaction_date'] / 1000) ?></td>
+                    <td><?= date('M j, Y', (int)($t['transaction_date'] / 1000)) ?></td>
                     <td><span class="badge"><?= htmlspecialchars(ucwords(str_replace('_', ' ', $t['transaction_type']))) ?></span></td>
                     <td><?= htmlspecialchars(ucwords(str_replace('_', ' ', $t['category']))) ?></td>
                     <td><?= htmlspecialchars($t['description']) ?></td>

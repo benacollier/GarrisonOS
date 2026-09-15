@@ -93,7 +93,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 <?php else: ?>
                 <?php foreach ($transactions as $t): ?>
                 <tr>
-                    <td><?= date('M j, Y', $t['transaction_date'] / 1000) ?></td>
+                    <td><?= date('M j, Y', (int)($t['transaction_date'] / 1000)) ?></td>
                     <td>
                         <?php
                             $badgeClass = match ($t['transaction_type']) {

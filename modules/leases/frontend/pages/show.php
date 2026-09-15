@@ -64,7 +64,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <h1 class="page-title"><?= htmlspecialchars($lease['property_name'] ?? 'Property') ?> – Unit <?= htmlspecialchars($lease['unit_number'] ?? '') ?></h1>
         <p class="page-subtitle">
             Status: <span class="badge badge-success"><?= htmlspecialchars(ucfirst($lease['status'])) ?></span> •
-            Term: <?= date('M j, Y', $lease['start_date'] / 1000) ?> to <?= date('M j, Y', $lease['end_date'] / 1000) ?>
+            Term: <?= date('M j, Y', (int)($lease['start_date'] / 1000)) ?> to <?= date('M j, Y', (int)($lease['end_date'] / 1000)) ?>
         </p>
     </div>
     <div class="btn-group">
