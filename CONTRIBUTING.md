@@ -113,3 +113,14 @@ Tests must pass with zero failures and maintain 100% tenant isolation. All modul
 6. Push to your fork and submit a Pull Request to `main`.
 7. Fill out the Pull Request template checklist.
 8. Sign the automated CLA when prompted by the CLA bot.
+
+---
+
+## 6. Attributions & Upstream Tooling
+
+GarrisonOS leverages and attributes several key open-source tooling standards:
+
+- **[Betterleaks](https://github.com/betterleaks/betterleaks)**: Automated secret and credential detection executed on CI for all pull requests.
+- **[Contributor Covenant](https://www.contributor-covenant.org)**: Standard community Code of Conduct framework.
+- **[CLA Assistant](https://cla-assistant.io/)**: Automated Contributor License Agreement signature workflow.
+- **[Conventional Commits](https://www.conventionalcommits.org/)**: Commit specification standard for structured changelogs.

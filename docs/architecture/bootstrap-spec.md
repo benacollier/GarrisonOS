@@ -60,7 +60,9 @@ garrison-os/
 ├── .github/
 │   └── workflows/
 │       ├── ci.yml             # Automated build and test workflow
-│       └── cla.yml            # Automated CLA Assistant check workflow
+│       ├── cla.yml            # Automated CLA Assistant check workflow
+│       └── security.yml       # Automated hygiene and Betterleaks secret scanning
+├── .betterleaksignore         # Secret scanning baseline exception rules
 ├── .env.example
 ├── .gitignore
 ├── AGENTS.md                  # Contributor & engineering guardrails
