@@ -111,5 +111,5 @@ Tests must pass with zero failures and maintain 100% tenant isolation. All modul
 4. Ensure all automated tests pass: `npm test`.
 5. Commit your changes using conventional commit messages (`feat: ...`, `fix: ...`, `test: ...`).
 6. Push to your fork and submit a Pull Request to `main`.
-7. Fill out the Pull Request template checklist.
+7. Fill out the Pull Request template completely, including a detailed **Walkthrough & Changes Summary**, **Verification & Testing Evidence**, and checklist items.
 8. Sign the automated CLA when prompted by the CLA bot.
