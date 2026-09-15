@@ -22,9 +22,10 @@ This document establishes the mandatory engineering standards, architectural con
   * `fix(scope): resolve issue`
   * `test(scope): add test coverage`
   * `refactor(scope): streamline implementation`
-* **Pull Request Template & Walkthrough Requirement**: When submitting pull requests, automated agents and contributors must strictly adhere to the repository PR template (`.github/PULL_REQUEST_TEMPLATE.md`). PR descriptions must always include:
-  * A comprehensive **Walkthrough / Changes Summary** detailing modified components, behaviors, and design decisions.
-  * A **Verification / Testing Evidence** section recording exact test commands executed and results observed.
+* **Atomic & Granular Commits**: Keep commits focused and atomic. Avoid bundling multiple unrelated features, refactors, fixes, or documentation edits into a single massive commit. Separate distinct logical units into discrete commits with concise, single-line summaries (50–72 characters) and minimal, high-signal descriptions.
+* **Pull Request Template & Walkthrough Requirement**: When submitting pull requests, automated agents and contributors must strictly adhere to the repository PR template (`.github/PULL_REQUEST_TEMPLATE.md`). PR descriptions and walkthroughs must remain concise, bulleted, and focused:
+  * A concise **Walkthrough / Changes Summary** outlining modified components and behaviors without overly verbose or duplicated prose.
+  * A brief **Verification / Testing Evidence** section recording exact test commands executed and results observed.
   * All items in the **Contributor Checklist** verified and checked off.
 
 ---

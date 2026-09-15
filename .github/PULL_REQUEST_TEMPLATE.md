@@ -2,7 +2,7 @@
 
 ## Description
 
-<!-- Provide a brief description of the changes introduced by this PR. -->
+<!-- Provide a concise, 1-2 sentence description of the changes introduced by this PR. -->
 
 ## Related Issues
 
@@ -18,14 +18,14 @@
 
 ## Walkthrough & Changes Summary
 
-<!-- Provide a structured walkthrough of changes made, grouped by component or file. -->
-- **Component / File**: Summary of changes and behavior updates.
+<!-- Provide a brief, bulleted walkthrough of changes made, grouped by component or file. Avoid excessive detail. -->
+- **Component / File**: Summary of change.
 
 ## Verification & Testing Evidence
 
-<!-- Detail testing performed, including commands run and outputs observed. -->
-- **Automated Tests**: e.g., `npm test` or `node scripts/test.js <module>` passed.
-- **Manual Verification**: Observations or flow validations.
+<!-- Briefly record test commands run and verification results. -->
+- **Automated Tests**: e.g., `npm.cmd test` or `node scripts/test.js <module>` passed.
+- **Manual Verification**: Brief note on validation.
 
 ## Contributor Checklist
 
