@@ -358,11 +358,12 @@ npm run dev
 
 Once running, open your web browser at **`http://localhost:8080`**.
 
-#### Demo Credentials
-
-* **Email**: `operator@garrisonos.local`
-* **Password**: `Password123!`
-* **Tenant ID**: `tenant-demo`
+#### First-Launch Onboarding
+* On a fresh installation, GarrisonOS automatically opens the **First-Launch Setup Wizard** (`/setup`), allowing you to define your Organization Name and create your Owner Administrator credentials (Email & Password), or restore from an existing backup snapshot.
+* If you ran setup with `--seed`, you can immediately sign in using the demo credentials:
+  * **Email**: `operator@garrisonos.local`
+  * **Password**: `Password123!`
+  * **Tenant ID**: `tenant-demo`
 
 ---
 

@@ -43,7 +43,7 @@ export const correlationMiddleware: Middleware = async (req, res, next) => {
  * In-memory sliding-window rate limiter for sensitive authentication routes
  */
 export const rateLimitMiddleware: Middleware = async (req, res, next) => {
-  if (req.path.startsWith('/api/v1/auth/')) {
+  if (req.path.startsWith('/api/v1/auth/') || req.path === '/api/v1/system/setup' || req.path === '/api/v1/system/restore') {
     const ip = (req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress || '127.0.0.1';
     const now = Date.now();
     const key = `ratelimit:${ip}:${req.path}`;
@@ -78,7 +78,10 @@ export const tenantContextMiddleware: Middleware = async (req, res, next) => {
     req.path === '/health' ||
     req.path === '/ready' ||
     req.path.startsWith('/api/v1/auth/') ||
-    req.path.startsWith('/api/v1/system/backup')
+    req.path.startsWith('/api/v1/system/backup') ||
+    req.path === '/api/v1/system/status' ||
+    req.path === '/api/v1/system/setup' ||
+    req.path === '/api/v1/system/restore'
   );
 
   let tenantId = (req.headers['x-tenant-id'] as string) || '';

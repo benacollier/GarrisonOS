@@ -39,6 +39,29 @@ HookRegistry::loadModuleHooks(__DIR__ . '/..');
 $requestUri = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH);
 $path = trim($requestUri, '/');
 
+// System Configuration Check (First-Launch Setup Detection)
+$isConfigured = true;
+try {
+    $statusRes = $api->get('/api/v1/system/status');
+    $isConfigured = !empty($statusRes['data']['is_configured']);
+} catch (Exception $e) {
+    // If status check fails, assume configured to avoid blocking normal auth
+}
+
+if (!$isConfigured && $path !== 'setup') {
+    header('Location: /setup');
+    exit;
+}
+
+if ($path === 'setup') {
+    if ($isConfigured) {
+        header('Location: /login');
+        exit;
+    }
+    require __DIR__ . '/pages/setup.php';
+    exit;
+}
+
 // Static / Authentication Routing
 if ($path === 'login') {
     require __DIR__ . '/pages/login.php';

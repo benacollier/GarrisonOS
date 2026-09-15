@@ -43,9 +43,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <p style="color: var(--text-muted); font-size: 0.9rem; margin-top: 0.25rem;">Zero-dependency Property Management</p>
         </div>
 
+        <?php foreach (Flash::get() as $flash): ?>
+            <div class="alert alert-<?= $flash['type'] === 'success' ? 'success' : 'danger' ?>" style="margin-bottom: 1.5rem;">
+                <?= htmlspecialchars($flash['message'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?>
+            </div>
+        <?php endforeach; ?>
+
         <?php if ($error): ?>
             <div class="alert alert-danger" style="margin-bottom: 1.5rem;">
-                <?= htmlspecialchars($error) ?>
+                <?= htmlspecialchars($error, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?>
             </div>
         <?php endif; ?>
 
