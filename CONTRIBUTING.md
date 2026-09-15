@@ -53,8 +53,8 @@ All contributions must strictly adhere to the project's non-negotiable architect
 ### Local Setup
 1. Clone the repository:
    ```bash
-   git clone https://github.com/garrisonos/garrison-os.git
-   cd garrison-os
+   git clone https://github.com/garrisonos/GarrisonOS.git
+   cd GarrisonOS
    ```
 2. Install compile-time dependencies:
    ```bash

@@ -2,7 +2,7 @@
 # GarrisonOS Windows PowerShell Automated Installer
 # ==============================================================================
 # Usage:
-#   irm https://raw.githubusercontent.com/garrisonos/garrison-os/main/scripts/install.ps1 | iex
+#   irm https://raw.githubusercontent.com/garrisonos/GarrisonOS/main/scripts/install.ps1 | iex
 # Or with parameters:
 #   .\scripts\install.ps1 -Port 8080 -Seed
 # ==============================================================================
@@ -91,7 +91,7 @@ $isExistingRepo = Test-Path $packageJsonPath
 
 if (-not $isExistingRepo) {
     Write-Host "[2/4] Fetching latest release from GitHub..." -ForegroundColor Yellow
-    $repo = "garrisonos/garrison-os"
+    $repo = "garrisonos/GarrisonOS"
     $apiUrl = if ($Version -eq "latest") {
         "https://api.github.com/repos/$repo/releases/latest"
     } else {
@@ -115,7 +115,7 @@ if (-not $isExistingRepo) {
         Write-Host "  ✔ Release files extracted" -ForegroundColor Green
     } catch {
         Write-Host "❌ Failed to download release from GitHub: $_" -ForegroundColor Red
-        Write-Host "   You can manually clone the repository with: git clone https://github.com/garrisonos/garrison-os.git" -ForegroundColor Yellow
+        Write-Host "   You can manually clone the repository with: git clone https://github.com/garrisonos/GarrisonOS.git" -ForegroundColor Yellow
         exit 1
     }
 } else {

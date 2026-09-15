@@ -21,12 +21,12 @@ You can install and initialize GarrisonOS directly using the automated installer
 
 ### Windows (PowerShell)
 ```powershell
-irm https://raw.githubusercontent.com/garrisonos/garrison-os/main/scripts/install.ps1 | iex
+irm https://raw.githubusercontent.com/garrisonos/GarrisonOS/main/scripts/install.ps1 | iex
 ```
 
-### Linux & macOS (Bash)
+Linux / macOS:
 ```bash
-curl -fsSL https://raw.githubusercontent.com/garrisonos/garrison-os/main/scripts/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/garrisonos/GarrisonOS/main/scripts/install.sh | bash
 ```
 
 ---
@@ -37,8 +37,8 @@ If cloning from source:
 
 1. **Clone the Repository**:
    ```bash
-   git clone https://github.com/garrisonos/garrison-os.git
-   cd garrison-os
+   git clone https://github.com/garrisonos/GarrisonOS.git
+   cd GarrisonOS
    ```
 
 2. **Install Dev Dependencies**:

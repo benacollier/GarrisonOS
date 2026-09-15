@@ -3,7 +3,7 @@
 # GarrisonOS Linux / macOS Automated Installer
 # ==============================================================================
 # Usage:
-#   curl -fsSL https://raw.githubusercontent.com/garrisonos/garrison-os/main/scripts/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/garrisonos/GarrisonOS/main/scripts/install.sh | bash
 # Or with parameters:
 #   ./scripts/install.sh --port 8080 --seed
 # ==============================================================================
@@ -114,7 +114,7 @@ TARGET_DIR=$(cd "$TARGET_DIR" && pwd)
 
 if [ ! -f "$TARGET_DIR/package.json" ]; then
     echo "[2/4] Fetching latest release from GitHub..."
-    REPO="garrisonos/garrison-os"
+    REPO="garrisonos/GarrisonOS"
     if [ "$VERSION" = "latest" ]; then
         API_URL="https://api.github.com/repos/$REPO/releases/latest"
     else
@@ -126,7 +126,7 @@ if [ ! -f "$TARGET_DIR/package.json" ]; then
 
     if [ -z "$TAR_URL" ]; then
         echo "❌ Could not find release tarball on GitHub."
-        echo "   You can clone the repository with: git clone https://github.com/garrisonos/garrison-os.git"
+        echo "   You can clone the repository with: git clone https://github.com/garrisonos/GarrisonOS.git"
         exit 1
     fi
 

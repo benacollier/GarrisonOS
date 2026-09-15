@@ -282,12 +282,12 @@ Install directly from GitHub Releases with a single terminal command:
 
 #### Windows (PowerShell)
 ```powershell
-irm https://raw.githubusercontent.com/garrisonos/garrison-os/main/scripts/install.ps1 | iex
+irm https://raw.githubusercontent.com/garrisonos/GarrisonOS/main/scripts/install.ps1 | iex
 ```
 
-#### Linux & macOS (Bash)
+**Linux / macOS**:
 ```bash
-curl -fsSL https://raw.githubusercontent.com/garrisonos/garrison-os/main/scripts/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/garrisonos/GarrisonOS/main/scripts/install.sh | bash
 ```
 
 ---
@@ -298,8 +298,8 @@ For manual repository setup or development:
 
 1. **Clone the repository**:
    ```bash
-   git clone https://github.com/garrisonos/garrison-os.git
-   cd garrison-os
+   git clone https://github.com/garrisonos/GarrisonOS.git
+   cd GarrisonOS
    ```
 
 2. **Run the automated preflight and setup tool**:
