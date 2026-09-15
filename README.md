@@ -1,6 +1,6 @@
 # GarrisonOS
 
-> Zero-dependency, open-source property management platform engineered for independent property managers, self-managing landlords, and real estate operators managing portfolios of up to 50 units (single-family residences, small multifamily, and scattered sites).
+> An open-source, modular, zero-dependency, lightweight property management framework designed to liberate property managers from closed vendor lock-in, inflexible data schemas, and proprietary software silos.
 
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](LICENSE)
 [![Node.js](https://img.shields.io/badge/Node.js-v22.5%2B-green.svg)](https://nodejs.org/)
@@ -12,23 +12,37 @@
 
 ## Overview
 
-GarrisonOS is a modern, privacy-respecting property management engine and web application designed to eliminate operational friction and recurring SaaS subscription overhead for small-scale real estate portfolios.
+GarrisonOS is engineered to provide self-managing landlords, independent property managers, and small real estate operators with a modern, privacy-respecting, self-hosted property management suite.
 
-Built from first principles around **zero external runtime dependencies**, GarrisonOS runs on the standard libraries of Node.js and native PHP, backed by an embedded SQLite engine operating in Write-Ahead Logging (WAL) mode.
+The software addresses day-to-day operational tasks, cash-basis accounting, and structured recordkeeping without the recurring subscription costs, vendor lock-in, or opaque data silos imposed by legacy property management platforms.
+
+Built from first principles around **zero external runtime dependencies**, GarrisonOS operates entirely on the standard libraries of Node.js and native PHP, backed by an embedded SQLite engine operating in Write-Ahead Logging (WAL) mode.
+
+---
+
+## Target MVP Scope
+
+The GarrisonOS MVP is focused strictly on delivering a self-hosted property management suite tailored for **small residential portfolios (up to 50 units)**, including single-family residences, duplexes/triplexes/fourplexes, small multifamily buildings, and scattered sites.
+
+### In Scope for MVP
+* **Day-to-Day Operations**: Physical property structures, rentable unit inventories, status lifecycle tracking, human directory management (tenants, owners, vendors, emergency contacts), and maintenance work order dispatching.
+* **Lease Agreements**: Residential lease lifecycles, terms, security deposit tracking, and multi-party signatory assignments.
+* **Cash-Basis Accounting & Recordkeeping**: Single-entry cash ledger mapped to IRS Schedule E categories, tenant running balances, automated monthly rent charge generation with mid-month proration, waterfall payment allocation, move-out deposit disposition, and streamed CSV exports (Rent Roll, Schedule E P&L, itemized tenant statements).
+* **Self-Hosting & Privacy**: Single-tenant or multi-tenant deployment, local SQLite database storage, and complete data portability.
 
 ---
 
 ## Architectural Principles
 
 1. **Zero External Runtime Dependencies**:
-   - The backend engine runs exclusively on native Node.js standard modules (`node:http`, `node:sqlite`, `node:crypto`, `node:async_hooks`, `node:events`, `node:fs`, `node:path`, `node:test`, `node:assert`). No npm packages at runtime (no Express, Fastify, Prisma, TypeORM, Zod, uuid, or bcrypt).
-   - The frontend presentation layer runs exclusively on native PHP 8.2+ with standard built-in extensions (`pdo_sqlite`, `curl`, `session`, `filter`) and semantic HTML5 with vanilla CSS Custom Properties. No Composer packages, CSS preprocessors, or frontend JavaScript frameworks.
+   - **Backend Engine**: Built exclusively on native Node.js standard modules (`node:http`, `node:sqlite`, `node:crypto`, `node:async_hooks`, `node:events`, `node:fs`, `node:path`, `node:test`, `node:assert`). No npm packages at runtime (no Express, Fastify, Prisma, TypeORM, Zod, uuid, or bcrypt).
+   - **Frontend Presentation**: Built exclusively on native PHP 8.2+ with standard built-in extensions (`pdo_sqlite`, `curl`, `session`, `filter`) and semantic HTML5 with vanilla CSS Custom Properties. No Composer packages, CSS preprocessors, or frontend JavaScript frameworks.
 2. **Strict Multi-Tenancy & Row-Level Isolation**:
    - Every operational database table includes a `tenant_id TEXT NOT NULL` column referencing `tenants(id)`.
-   - Tenant context is extracted from request headers (`X-Tenant-ID`) or authenticated session tokens and propagated down the call stack using `AsyncLocalStorage`.
-   - Business services and repositories resolve `tenant_id` implicitly from execution context—never from untrusted request bodies or URL parameters.
-3. **Financial Precision**:
-   - All currency values are strictly stored and calculated as **INTEGER cents** (e.g., $1,450.00 is stored as `145000`). Floating-point arithmetic for currency is prohibited.
+   - Tenant context is extracted from request headers (`X-Tenant-ID`) or authenticated session tokens and propagated down the execution stack using `AsyncLocalStorage`.
+   - Repositories and business logic resolve `tenant_id` implicitly from execution context—never from untrusted request bodies or URL parameters.
+3. **Financial Precision & Tax Alignment**:
+   - All currency values are strictly stored and calculated as **INTEGER cents** (e.g., $1,450.00 is stored as `145000`). Floating-point arithmetic for currency is strictly prohibited.
    - Single-entry cash-basis ledger mapped to standard IRS Schedule E expense categories for tax preparation and Net Operating Income (NOI) calculation.
 4. **Deterministic Identity & Time Standards**:
    - **Primary Keys**: RFC 9562 **UUIDv7** (time-ordered 128-bit UUIDs generated natively via `node:crypto.randomBytes`).
@@ -44,7 +58,7 @@ Built from first principles around **zero external runtime dependencies**, Garri
 
 ## Dependencies & Runtime Prerequisites
 
-GarrisonOS is intentionally architected to have **zero external runtime package dependencies**.
+GarrisonOS is intentionally architected with **zero external runtime package dependencies**.
 
 ### Backend Engine
 * **Runtime**: [Node.js](https://nodejs.org/) `v22.5.0` or newer (`v24.x LTS` recommended for built-in `node:sqlite` support).
@@ -81,8 +95,6 @@ GarrisonOS is intentionally architected to have **zero external runtime package 
 ---
 
 ## Target MVP Capabilities
-
-The GarrisonOS MVP delivers full lifecycle management for residential portfolios:
 
 ```
 ┌────────────────────────────────────────────────────────────────────────┐
@@ -131,6 +143,45 @@ The GarrisonOS MVP delivers full lifecycle management for residential portfolios
 * **Security & Session Hygiene**: Cryptographic CSRF validation on all state-modifying requests, timing-safe credential verification, and sliding-window rate limiting on authentication routes.
 * **Dynamic Hook & Slot System**: Dynamic navigation menu aggregation, dashboard summary card registration, and detail tab extensions.
 * **Responsive UI Design System**: Clean typography, light/dark theme toggle, native HTML `<dialog>` modals, and accessible ledger tables.
+
+---
+
+## Project Milestones
+
+| Milestone | Focus Area | Status | Description |
+| :--- | :--- | :---: | :--- |
+| **Milestone 1** | **Foundation & Core Subsystems** | Completed | Zero-dependency Node.js HTTP engine, `AsyncLocalStorage` multi-tenant context, embedded SQLite WAL engine, native RFC 9562 UUIDv7 generator, `scrypt` hashing, dynamic module loader, and native `node:test` suite. |
+| **Milestone 2** | **Residential Domain Modules** | Completed | Data schemas, migrations, repositories, and REST endpoints for Properties & Units, Contacts Directory, Leases & Signatories, Cash-Basis Schedule E Accounting, and Maintenance Work Orders. |
+| **Milestone 3** | **Presentation Layer & UI** | Completed | Native PHP front controller, CSRF protection, executive KPI dashboard, dynamic module navigation/slot aggregators, and responsive semantic HTML5/CSS design system. |
+| **Milestone 4** | **Automation & Financial Workflows** | Completed | Automated recurring monthly rent charge generation with mid-month proration, 4-tier waterfall payment allocation, move-out deposit disposition, CSV export endpoints (Rent Roll, Schedule E, Tenant Ledgers), and SQLite backup snapshotting. |
+| **Milestone 5** | **Testing & Production Hardening** | In Progress | Full automated test suite coverage (crypto, context isolation, multi-tenant leaks, ledger math, proration, routing), seed data fixtures, self-hosting documentation, and production runtime hardening. |
+| **Milestone 6** | **Self-Hosting Packaging & Distribution** | Planned | Docker compose deployment recipes, systemd service templates, automated backup rotation scripts, and one-click self-hosting guides. |
+
+---
+
+## Future Horizons (Out of Scope for MVP)
+
+To maintain focus, agility, and uncompromising simplicity, commercial-grade and enterprise-scale features are **strictly out of scope for the current MVP**. They are cataloged here for future roadmap consideration:
+
+* **Commercial Real Estate Management**:
+  * Triple Net (NNN) lease contracts, Common Area Maintenance (CAM) reconciliations, and expense stop calculations.
+  * Retail percentage rent based on tenant sales reporting.
+  * CPI-indexed and fixed annual lease escalation schedules.
+* **Enterprise Accounting & Finance**:
+  * Double-entry General Ledger (GL) with customizable Chart of Accounts.
+  * Formal trust/escrow bank account reconciliation and compliance reporting.
+  * Integrated payment processing gateways (direct ACH debit, credit card rails) and automated bank feed integrations (Plaid/OFX).
+  * Automated 1099-MISC / 1099-NEC vendor tax form generation and e-filing.
+* **Portals & External Interfaces**:
+  * Dedicated self-service Tenant Portal (online payments, maintenance ticket submission, lease document downloads).
+  * Dedicated Property Owner Portal (monthly distribution statements, capital expense approval workflows).
+  * Native iOS / Android mobile applications.
+* **Marketing & Syndication**:
+  * Automated vacancy syndication to listing aggregators (Zillow, Apartments.com, Realtor.com).
+  * Online rental application processing, background screening, and credit check integrations.
+* **Enterprise Identity & Governance**:
+  * Single Sign-On (SSO) via SAML 2.0 / OpenID Connect (OIDC).
+  * Hierarchical multi-branch organizational structures with granular role-based access control (RBAC).
 
 ---
 
@@ -251,11 +302,11 @@ npm run start
 # or for auto-reloading development mode:
 npm run dev
 
-# Terminal 2: Start the Native PHP Web Frontend (Port 8080)
-php -S localhost:8080 -t web web/index.php
+# Terminal 2: Start the Native PHP Web Frontend (Port 80)
+php -S localhost:80 -t web web/index.php
 ```
 
-Once running, navigate to `http://localhost:8080` in your web browser.
+Once running, navigate to `http://localhost` (or `http://localhost:80`) in your web browser.
 
 #### Demo Credentials
 * **Email**: `operator@garrisonos.local`
@@ -295,4 +346,3 @@ All contributions must adhere to the engineering standards specified in [AGENTS.
 ## License
 
 GarrisonOS is licensed under the [GNU Affero General Public License v3 (AGPLv3)](LICENSE) with a Section 7(b) attribution addendum. Dual-licensing and commercial licensing options are available for organizations requiring proprietary embedding.
-
