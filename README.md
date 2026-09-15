@@ -1,0 +1,348 @@
+# GarrisonOS
+
+> An open-source, modular, zero-dependency, lightweight property management framework designed to liberate property managers from closed vendor lock-in, inflexible data schemas, and proprietary software silos.
+
+[![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](LICENSE)
+[![Node.js](https://img.shields.io/badge/Node.js-v22.5%2B-green.svg)](https://nodejs.org/)
+[![PHP](https://img.shields.io/badge/PHP-8.2%2B-purple.svg)](https://www.php.net/)
+[![Dependencies](https://img.shields.io/badge/Runtime_Dependencies-0-brightgreen.svg)](#zero-runtime-dependencies)
+[![Multi-Tenancy](https://img.shields.io/badge/Multi--Tenancy-Row--Level_Isolation-orange.svg)](#strict-multi-tenancy--isolation)
+
+---
+
+## Overview
+
+GarrisonOS is engineered to provide self-managing landlords, independent property managers, and small real estate operators with a modern, privacy-respecting, self-hosted property management suite.
+
+The software addresses day-to-day operational tasks, cash-basis accounting, and structured recordkeeping without the recurring subscription costs, vendor lock-in, or opaque data silos imposed by legacy property management platforms.
+
+Built from first principles around **zero external runtime dependencies**, GarrisonOS operates entirely on the standard libraries of Node.js and native PHP, backed by an embedded SQLite engine operating in Write-Ahead Logging (WAL) mode.
+
+---
+
+## Target MVP Scope
+
+The GarrisonOS MVP is focused strictly on delivering a self-hosted property management suite tailored for **small residential portfolios (up to 50 units)**, including single-family residences, duplexes/triplexes/fourplexes, small multifamily buildings, and scattered sites.
+
+### In Scope for MVP
+* **Day-to-Day Operations**: Physical property structures, rentable unit inventories, status lifecycle tracking, human directory management (tenants, owners, vendors, emergency contacts), and maintenance work order dispatching.
+* **Lease Agreements**: Residential lease lifecycles, terms, security deposit tracking, and multi-party signatory assignments.
+* **Cash-Basis Accounting & Recordkeeping**: Single-entry cash ledger mapped to IRS Schedule E categories, tenant running balances, automated monthly rent charge generation with mid-month proration, waterfall payment allocation, move-out deposit disposition, and streamed CSV exports (Rent Roll, Schedule E P&L, itemized tenant statements).
+* **Self-Hosting & Privacy**: Single-tenant or multi-tenant deployment, local SQLite database storage, and complete data portability.
+
+---
+
+## Architectural Principles
+
+1. **Zero External Runtime Dependencies**:
+   - **Backend Engine**: Built exclusively on native Node.js standard modules (`node:http`, `node:sqlite`, `node:crypto`, `node:async_hooks`, `node:events`, `node:fs`, `node:path`, `node:test`, `node:assert`). No npm packages at runtime (no Express, Fastify, Prisma, TypeORM, Zod, uuid, or bcrypt).
+   - **Frontend Presentation**: Built exclusively on native PHP 8.2+ with standard built-in extensions (`pdo_sqlite`, `curl`, `session`, `filter`) and semantic HTML5 with vanilla CSS Custom Properties. No Composer packages, CSS preprocessors, or frontend JavaScript frameworks.
+2. **Strict Multi-Tenancy & Row-Level Isolation**:
+   - Every operational database table includes a `tenant_id TEXT NOT NULL` column referencing `tenants(id)`.
+   - Tenant context is extracted from request headers (`X-Tenant-ID`) or authenticated session tokens and propagated down the execution stack using `AsyncLocalStorage`.
+   - Repositories and business logic resolve `tenant_id` implicitly from execution context—never from untrusted request bodies or URL parameters.
+3. **Financial Precision & Tax Alignment**:
+   - All currency values are strictly stored and calculated as **INTEGER cents** (e.g., $1,450.00 is stored as `145000`). Floating-point arithmetic for currency is strictly prohibited.
+   - Single-entry cash-basis ledger mapped to standard IRS Schedule E expense categories for tax preparation and Net Operating Income (NOI) calculation.
+4. **Deterministic Identity & Time Standards**:
+   - **Primary Keys**: RFC 9562 **UUIDv7** (time-ordered 128-bit UUIDs generated natively via `node:crypto.randomBytes`).
+   - **Timestamps**: Stored strictly as **INTEGER milliseconds** (UTC epoch ms via `Date.now()`).
+   - **Soft Deletes**: Standardized `deleted_at INTEGER` timestamp column across all entity tables (`NULL` when active).
+5. **Decoupled API-First Architecture**:
+   - The core Node.js engine exposes a zero-dependency HTTP REST API.
+   - The native PHP frontend communicates with the engine via internal loopback HTTP requests, forwarding user session context, authentication tokens, and tenant headers.
+6. **Drop-in Modularity**:
+   - Domain features are encapsulated in self-contained directories under `modules/[module_name]/` containing their own migrations, backend routes, event subscribers, repositories, and frontend views/hooks.
+
+---
+
+## Dependencies & Runtime Prerequisites
+
+GarrisonOS is intentionally architected with **zero external runtime package dependencies**.
+
+### Backend Engine
+* **Runtime**: [Node.js](https://nodejs.org/) `v22.5.0` or newer (`v24.x LTS` recommended for built-in `node:sqlite` support).
+* **Standard Library Modules Utilized**:
+  * `node:http`: Low-latency HTTP server, custom streaming JSON parser, and REST router.
+  * `node:sqlite`: Synchronous embedded SQLite database engine with WAL mode and transaction wrapper.
+  * `node:crypto`: RFC 9562 UUIDv7 generator, `scrypt` password hashing with salt, and HMAC-SHA256 token signing.
+  * `node:async_hooks`: `AsyncLocalStorage` tenant context store.
+  * `node:events`: In-process asynchronous `EventBus` for cross-module events.
+  * `node:fs` / `node:fs/promises`: Local disk file storage driver and dynamic module loader.
+  * `node:path`: Filesystem path normalization and traversal prevention.
+  * `node:test` & `node:assert`: Native automated test runner and assertion library.
+* **Build-Time Development Dependencies** (zero runtime footprint):
+  * `typescript` (`^5.8.0`): Static typing and compilation to ES2022 JavaScript.
+  * `@types/node` (`^24.0.0`): TypeScript definitions for Node.js standard modules.
+
+### Frontend Presentation Layer
+* **Runtime**: [PHP](https://www.php.net/) `8.2` or newer.
+* **Standard PHP Extensions Required**:
+  * `curl`: HTTP client for backend REST API communication.
+  * `session`: Secure session management and CSRF token persistence.
+  * `filter`: Input validation and sanitization.
+  * `pdo_sqlite`: Standard SQLite database driver extension.
+* **Client-Side Stack**:
+  * Semantic HTML5.
+  * Vanilla CSS with CSS Custom Properties (supports Light and Dark themes).
+  * Minimal progressive enhancement JavaScript (no client-side build pipeline required).
+
+### Storage & Database
+* **Database**: Embedded SQLite 3 (managed natively via `node:sqlite`).
+* **Database Modes**: Write-Ahead Logging (`PRAGMA journal_mode = WAL`), Foreign Key enforcement (`PRAGMA foreign_keys = ON`), Busy Timeout (`PRAGMA busy_timeout = 5000`).
+* **File Attachments**: Local disk storage partitioned by year, month, and UUID.
+
+---
+
+## Target MVP Capabilities
+
+```
+┌────────────────────────────────────────────────────────────────────────┐
+│                              GarrisonOS                                │
+├──────────────┬──────────────┬──────────────┬─────────────┬─────────────┤
+│  Properties  │   Contacts   │    Leases    │ Accounting  │ Maintenance │
+│ & Portfolios │  Directory   │  Agreements  │  & Ledger   │ Work Orders │
+└──────────────┴──────────────┴──────────────┴─────────────┴─────────────┘
+```
+
+### 1. Properties & Portfolios (`modules/properties`)
+* **Legal Portfolios**: Organize holdings by legal entity / LLC with tax identification.
+* **Physical Properties**: Manage Single-Family Homes, Multifamily Buildings, Condominiums, Townhouses, and Commercial spaces with address, year built, and metadata.
+* **Rentable Units**: Track unit inventories, unit numbers, bedroom/bathroom configurations, square footage, market rent, and target deposits.
+* **Unit Lifecycle States**: `vacant`, `occupied`, `notice_given`, `turnover`, and `maintenance_hold`.
+
+### 2. Contacts Directory (`modules/contacts`)
+* **Unified Humans Directory**: Centralized management of tenants, property owners, maintenance vendors, co-signers/guarantors, prospects, and emergency contacts.
+* **Vendor Profiles**: Specialization tracking (plumbing, electrical, HVAC, general repair, roofing, turnover cleaning).
+* **Communication & Identity**: Primary/secondary phone numbers, email addresses, tax IDs, and entity linkages.
+
+### 3. Lease Management (`modules/leases`)
+* **Contract Lifecycle**: `draft` $\rightarrow$ `active` $\rightarrow$ `expiring` $\rightarrow$ `renewed` $\rightarrow$ `terminated` / `month_to_month`.
+* **Terms & Financials**: Recurring rent amount, security deposit requirements, deposit held, rent due day, late fee grace periods, and late fee amounts.
+* **Multi-Party Signatories**: `lease_contacts` junction supporting Primary Tenants, Co-Tenants, Guarantors, and Occupants with financial responsibility tracking.
+
+### 4. Cash-Basis Accounting & Financials (`modules/accounting`)
+* **Single-Entry Ledger**: Real-time transaction logging for charges, tenant payments, operating expenses, refunds, and security deposit trust activity.
+* **IRS Schedule E Tax Mapping**: Categorization mapped directly to IRS Schedule E expense lines (Advertising, Cleaning & Maintenance, Insurance, Legal/Professional, Management Fees, Mortgage Interest, Repairs, Supplies, Property Taxes, Utilities, HOA Fees, Capital Improvements).
+* **Running Tenant Balances**: Real-time balance computation:
+  $$\text{Tenant Balance} = \sum (\text{charges} + \text{deposit\_returns} + \text{deposit\_deductions}) - \sum (\text{payments} + \text{refunds})$$
+* **Strict Payment Allocation Waterfall**: When partial payments are recorded, funds apply in strict order:
+  $$\text{Late Fees} \longrightarrow \text{Utility Rebill / Fees} \longrightarrow \text{Oldest Rent Charges} \longrightarrow \text{Current Rent}$$
+* **Move-Out Deposit Disposition**: Automatic computation of deposit refunds minus unpaid rent and itemized damage deductions.
+* **Automated Monthly Rent Generation**: Scheduled batch generation with idempotency keys (`rent_charge:{lease_id}:{YYYY_MM}`) and mid-month proration calculations.
+* **Financial Data Exports**: Streamed CSV generation for Rent Roll, Schedule E income/expense statements, and tenant ledgers.
+
+### 5. Maintenance & Work Orders (`modules/maintenance`)
+* **Work Order Tracking**: Lifecycle management (`open`, `assigned`, `in_progress`, `on_hold`, `completed`, `cancelled`).
+* **Triage & Priority**: Low, Medium, High, and Emergency priority matrix across trade categories (Plumbing, Electrical, HVAC, Appliance, Structural, Cosmetic, Pest).
+* **Access Control**: Permission-to-enter tracking and custom entry instructions.
+* **Vendor Assignment & Cost Conversion**: Vendor assignment, scheduled repair dates, estimated vs. actual costs, with automatic creation of accounting expenses upon completion via the Event Bus.
+
+### 6. Web Presentation Layer & Executive Dashboard (`web/`)
+* **Executive KPI Dashboard**: Real-time portfolio summary cards (occupancy rate %, monthly rent roll total, outstanding delinquency amount, open work order count).
+* **Security & Session Hygiene**: Cryptographic CSRF validation on all state-modifying requests, timing-safe credential verification, and sliding-window rate limiting on authentication routes.
+* **Dynamic Hook & Slot System**: Dynamic navigation menu aggregation, dashboard summary card registration, and detail tab extensions.
+* **Responsive UI Design System**: Clean typography, light/dark theme toggle, native HTML `<dialog>` modals, and accessible ledger tables.
+
+---
+
+## Project Milestones
+
+| Milestone | Focus Area | Status | Description |
+| :--- | :--- | :---: | :--- |
+| **Milestone 1** | **Foundation & Core Subsystems** | Completed | Zero-dependency Node.js HTTP engine, `AsyncLocalStorage` multi-tenant context, embedded SQLite WAL engine, native RFC 9562 UUIDv7 generator, `scrypt` hashing, dynamic module loader, and native `node:test` suite. |
+| **Milestone 2** | **Residential Domain Modules** | Completed | Data schemas, migrations, repositories, and REST endpoints for Properties & Units, Contacts Directory, Leases & Signatories, Cash-Basis Schedule E Accounting, and Maintenance Work Orders. |
+| **Milestone 3** | **Presentation Layer & UI** | Completed | Native PHP front controller, CSRF protection, executive KPI dashboard, dynamic module navigation/slot aggregators, and responsive semantic HTML5/CSS design system. |
+| **Milestone 4** | **Automation & Financial Workflows** | Completed | Automated recurring monthly rent charge generation with mid-month proration, 4-tier waterfall payment allocation, move-out deposit disposition, CSV export endpoints (Rent Roll, Schedule E, Tenant Ledgers), and SQLite backup snapshotting. |
+| **Milestone 5** | **Testing & Production Hardening** | In Progress | Full automated test suite coverage (crypto, context isolation, multi-tenant leaks, ledger math, proration, routing), seed data fixtures, self-hosting documentation, and production runtime hardening. |
+| **Milestone 6** | **Self-Hosting Packaging & Distribution** | Planned | Docker compose deployment recipes, systemd service templates, automated backup rotation scripts, and one-click self-hosting guides. |
+
+---
+
+## Future Horizons (Out of Scope for MVP)
+
+To maintain focus, agility, and uncompromising simplicity, commercial-grade and enterprise-scale features are **strictly out of scope for the current MVP**. They are cataloged here for future roadmap consideration:
+
+* **Commercial Real Estate Management**:
+  * Triple Net (NNN) lease contracts, Common Area Maintenance (CAM) reconciliations, and expense stop calculations.
+  * Retail percentage rent based on tenant sales reporting.
+  * CPI-indexed and fixed annual lease escalation schedules.
+* **Enterprise Accounting & Finance**:
+  * Double-entry General Ledger (GL) with customizable Chart of Accounts.
+  * Formal trust/escrow bank account reconciliation and compliance reporting.
+  * Integrated payment processing gateways (direct ACH debit, credit card rails) and automated bank feed integrations (Plaid/OFX).
+  * Automated 1099-MISC / 1099-NEC vendor tax form generation and e-filing.
+* **Portals & External Interfaces**:
+  * Dedicated self-service Tenant Portal (online payments, maintenance ticket submission, lease document downloads).
+  * Dedicated Property Owner Portal (monthly distribution statements, capital expense approval workflows).
+  * Native iOS / Android mobile applications.
+* **Marketing & Syndication**:
+  * Automated vacancy syndication to listing aggregators (Zillow, Apartments.com, Realtor.com).
+  * Online rental application processing, background screening, and credit check integrations.
+* **Enterprise Identity & Governance**:
+  * Single Sign-On (SSO) via SAML 2.0 / OpenID Connect (OIDC).
+  * Hierarchical multi-branch organizational structures with granular role-based access control (RBAC).
+
+---
+
+## Directory Structure
+
+```text
+garrison-os/
+├── .github/
+│   └── workflows/
+│       ├── ci.yml                 # Automated build and test pipeline
+│       └── cla.yml                # Automated Contributor License Agreement check
+├── .env.example                   # Environment configuration template
+├── .gitignore
+├── AGENTS.md                      # Contributor rules & engineering guardrails
+├── BOOTSTRAP.md                   # Canonical architecture specification
+├── CLA.md                         # Contributor License Agreement
+├── CONTRIBUTING.md                # Contribution guide & development workflow
+├── LICENSE                        # AGPLv3 with Section 7(b) UI attribution addendum
+├── package.json                   # Zero runtime dependencies (typescript, @types/node)
+├── tsconfig.json                  # Strict TypeScript compiler options
+│
+├── core/                          # Foundation Engine
+│   ├── context.ts                 # AsyncLocalStorage tenant & user context
+│   ├── crypto.ts                  # RFC 9562 UUIDv7 generator, scrypt hashing, auth tokens
+│   ├── events.ts                  # In-process EventEmitter event bus
+│   ├── storage.ts                 # Path-safe local file storage abstraction
+│   ├── module-loader.ts           # Dynamic module scanner & registrar
+│   └── index.ts
+│
+├── api/                           # Zero-Dependency HTTP Layer
+│   ├── router.ts                  # Native HTTP router (regex matching, body parser)
+│   ├── middleware.ts              # Tenant resolution, auth verification, rate limiting
+│   ├── response.ts                # Standardized JSON response envelopes
+│   ├── server.ts                  # Native HTTP server harness & health checks
+│   └── index.ts
+│
+├── database/                      # SQLite Database Layer
+│   ├── client.ts                  # node:sqlite client with WAL mode & transactions
+│   ├── migrator.ts                # Native SQL migration runner & _migrations tracker
+│   ├── seed.ts                    # Realistic 20-unit sample portfolio seeder
+│   └── migrations/                # Core system migrations
+│       └── 0001_core_schema.sql
+│
+├── modules/                       # Self-Contained Domain Modules
+│   ├── properties/                # Portfolios, Properties, and Units
+│   ├── contacts/                  # Human & Organization Directory
+│   ├── leases/                    # Lease Contracts & Signatories
+│   ├── accounting/                # Cash-Basis Ledger, Billing, Schedule E & Proration
+│   └── maintenance/               # Work Orders, Vendor Dispatch & Expense Hooks
+│
+├── web/                           # Native PHP Presentation Layer
+│   ├── index.php                  # Front controller, CSRF validator & dynamic router
+│   ├── lib/                       # API client, session auth, CSRF, and UI hooks
+│   ├── templates/                 # Base layout, header, dynamic sidebar, flash alerts
+│   ├── pages/                     # Dashboard and login view controllers
+│   └── public/                    # Design tokens, CSS styles, and minimal JavaScript
+│
+└── test/                          # Native node:test & node:assert Suite
+    ├── helpers.ts                 # In-memory SQLite fixtures & mock harnesses
+    ├── crypto.test.ts             # UUIDv7 format, timestamp ordering & scrypt tests
+    ├── context.test.ts            # AsyncLocalStorage concurrency & isolation tests
+    ├── isolation.test.ts          # Cross-tenant data isolation & leak tests
+    ├── router.test.ts             # Route matching, params & body parsing tests
+    ├── ledger.test.ts             # Running balance, waterfall allocation & Schedule E tests
+    ├── billing.test.ts            # Recurring rent generator & proration tests
+    └── modules.test.ts            # Dynamic module discovery & migration runner tests
+```
+
+---
+
+## Getting Started
+
+### 1. Prerequisites
+Ensure you have the following installed on your system:
+* **Node.js**: `v22.5.0` or higher (`node -v`)
+* **PHP**: `8.2` or higher (`php -v`) with `curl`, `pdo_sqlite`, and `session` extensions enabled
+
+### 2. Installation & Setup
+
+1. **Clone the repository**:
+   ```bash
+   git clone https://github.com/garrisonos/garrison-os.git
+   cd garrison-os
+   ```
+
+2. **Install development build dependencies**:
+   ```bash
+   npm install
+   ```
+
+3. **Configure environment variables**:
+   ```bash
+   cp .env.example .env
+   ```
+
+4. **Compile TypeScript into JavaScript**:
+   ```bash
+   npm run build
+   ```
+
+5. **Execute database migrations**:
+   ```bash
+   npm run migrate
+   ```
+
+6. **Seed the demo dataset** (creates a realistic 20-unit portfolio with 12 months of historical data):
+   ```bash
+   npm run seed
+   ```
+
+### 3. Running the Application
+
+GarrisonOS runs via two decoupled processes:
+
+```bash
+# Terminal 1: Start the Node.js API Engine (Port 3000)
+npm run start
+# or for auto-reloading development mode:
+npm run dev
+
+# Terminal 2: Start the Native PHP Web Frontend (Port 8080)
+php -S localhost:8080 -t web web/index.php
+```
+
+Once running, navigate to `http://localhost:8080` in your web browser.
+
+#### Demo Credentials
+* **Email**: `operator@garrisonos.local`
+* **Password**: `Password123!`
+* **Tenant ID**: `tenant-demo`
+
+---
+
+## Automated Test Suite
+
+GarrisonOS includes automated unit, integration, and security isolation tests powered by Node.js built-in test runner (`node:test` and `node:assert`):
+
+```bash
+# Run full automated test suite
+npm test
+```
+
+The test suite validates:
+* **Cryptography & Identity**: RFC 9562 UUIDv7 structure, monotonic timestamp sorting, `scrypt` password hashing, and HMAC session token verification.
+* **Multi-Tenant Context**: `AsyncLocalStorage` propagation across concurrent asynchronous operations and strict rejection outside context.
+* **Row-Level Tenant Isolation**: Verification that Tenant A cannot query or mutate records belonging to Tenant B across all domain entities.
+* **Accounting & Financial Math**: Running tenant balances, payment allocation waterfalls, deposit trust dispositions, and Schedule E NOI calculations.
+* **Billing & Proration**: Monthly rent generation idempotency and mid-month proration formulas.
+* **HTTP Router**: Route parameter extraction, query string parsing, body streaming, and structured error responses.
+* **Module Loader**: Auto-discovery of manifests, migrations, routes, and subscribers.
+
+---
+
+## Contributing
+
+We welcome contributions from the community! Please review our [Contributing Guide](CONTRIBUTING.md) and [Contributor License Agreement (CLA)](CLA.md) before submitting Pull Requests.
+
+All contributions must adhere to the engineering standards specified in [AGENTS.md](AGENTS.md).
+
+---
+
+## License
+
+GarrisonOS is licensed under the [GNU Affero General Public License v3 (AGPLv3)](LICENSE) with a Section 7(b) attribution addendum. Dual-licensing and commercial licensing options are available for organizations requiring proprietary embedding.
