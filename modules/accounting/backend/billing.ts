@@ -1,6 +1,7 @@
 import { getDatabase, withTransaction } from '../../../database/client.js';
 import { RequestContext } from '../../../core/context.js';
 import { generateUUIDv7 } from '../../../core/crypto.js';
+import { AccountingRepository } from './repository.js';
 
 export interface RecurringRentGenerationResult {
   month: string;
@@ -30,6 +31,7 @@ export function calculateProratedRent(
 /**
  * Automatically generate monthly recurring rent charges for active leases.
  * Idempotent execution using reference key pattern: rent_charge:{lease_id}:{YYYY_MM}
+ * Automatically posts balanced double-entry journal entries via AccountingRepository.createTransaction.
  */
 export function generateMonthlyRentCharges(targetYearMonth?: string): RecurringRentGenerationResult {
   const tenantId = RequestContext.getTenantId();
@@ -64,7 +66,8 @@ export function generateMonthlyRentCharges(targetYearMonth?: string): RecurringR
       l.start_date,
       l.end_date,
       l.rent_due_day,
-      u.property_id
+      u.property_id,
+      (SELECT lc.contact_id FROM lease_contacts lc WHERE lc.lease_id = l.id AND lc.role = 'primary_tenant' AND lc.deleted_at IS NULL LIMIT 1) as contact_id
     FROM leases l
     JOIN units u ON l.unit_id = u.id AND u.deleted_at IS NULL
     WHERE l.tenant_id = ?
@@ -80,6 +83,7 @@ export function generateMonthlyRentCharges(targetYearMonth?: string): RecurringR
     start_date: number;
     end_date: number;
     rent_due_day: number;
+    contact_id: string | null;
   }>;
 
   const result: RecurringRentGenerationResult = {
@@ -91,64 +95,54 @@ export function generateMonthlyRentCharges(targetYearMonth?: string): RecurringR
     createdTransactionIds: []
   };
 
-  withTransaction((tx) => {
-    for (const lease of activeLeases) {
-      const idempotencyRef = `rent_charge:${lease.id}:${yyyyMm}`;
+  for (const lease of activeLeases) {
+    const idempotencyRef = `rent_charge:${lease.id}:${yyyyMm}`;
 
-      // Check if charge already exists
-      const existing = tx.prepare(`
-        SELECT id FROM transactions
-        WHERE tenant_id = ? AND lease_id = ? AND reference_number = ? AND deleted_at IS NULL
-      `).get(tenantId, lease.id, idempotencyRef);
+    // Check if charge already exists
+    const existing = db.prepare(`
+      SELECT id FROM transactions
+      WHERE tenant_id = ? AND lease_id = ? AND reference_number = ? AND deleted_at IS NULL
+    `).get(tenantId, lease.id, idempotencyRef);
 
-      if (existing) {
-        result.skippedExisting += 1;
-        continue;
-      }
-
-      // Check if lease starts mid-month during this target month
-      const leaseStartDate = new Date(lease.start_date);
-      const isStartMonth = leaseStartDate.getUTCFullYear() === year && leaseStartDate.getUTCMonth() === monthIndex;
-      let chargeAmountCents = lease.rent_amount_cents;
-
-      if (isStartMonth && leaseStartDate.getUTCDate() > 1) {
-        chargeAmountCents = calculateProratedRent(
-          lease.rent_amount_cents,
-          year,
-          monthIndex,
-          leaseStartDate.getUTCDate()
-        );
-      }
-
-      const txId = generateUUIDv7();
-      const dueDay = Math.min(lease.rent_due_day || 1, 28);
-      const chargeDateMs = Date.UTC(year, monthIndex, dueDay);
-
-      tx.prepare(`
-        INSERT INTO transactions (
-          id, tenant_id, transaction_type, category, amount_cents,
-          transaction_date, description, reference_number,
-          property_id, unit_id, lease_id, created_at, updated_at
-        ) VALUES (?, ?, 'charge', 'rent', ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `).run(
-        txId,
-        tenantId,
-        chargeAmountCents,
-        chargeDateMs,
-        `Monthly Rent – ${yyyyMm}${isStartMonth && leaseStartDate.getUTCDate() > 1 ? ' (Prorated)' : ''}`,
-        idempotencyRef,
-        lease.property_id,
-        lease.unit_id,
-        lease.id,
-        Date.now(),
-        Date.now()
-      );
-
-      result.chargesCreated += 1;
-      result.totalChargesCents += chargeAmountCents;
-      result.createdTransactionIds.push(txId);
+    if (existing) {
+      result.skippedExisting += 1;
+      continue;
     }
-  }, db);
+
+    // Check if lease starts mid-month during this target month
+    const leaseStartDate = new Date(lease.start_date);
+    const isStartMonth = leaseStartDate.getUTCFullYear() === year && leaseStartDate.getUTCMonth() === monthIndex;
+    let chargeAmountCents = lease.rent_amount_cents;
+
+    if (isStartMonth && leaseStartDate.getUTCDate() > 1) {
+      chargeAmountCents = calculateProratedRent(
+        lease.rent_amount_cents,
+        year,
+        monthIndex,
+        leaseStartDate.getUTCDate()
+      );
+    }
+
+    const dueDay = Math.min(lease.rent_due_day || 1, 28);
+    const chargeDateMs = Date.UTC(year, monthIndex, dueDay);
+
+    const tx = AccountingRepository.createTransaction({
+      transaction_type: 'charge',
+      category: 'rent',
+      amount_cents: chargeAmountCents,
+      transaction_date: chargeDateMs,
+      description: `Monthly Rent – ${yyyyMm}${isStartMonth && leaseStartDate.getUTCDate() > 1 ? ' (Prorated)' : ''}`,
+      reference_number: idempotencyRef,
+      property_id: lease.property_id,
+      unit_id: lease.unit_id,
+      lease_id: lease.id,
+      payer_contact_id: lease.contact_id
+    });
+
+    result.chargesCreated += 1;
+    result.totalChargesCents += chargeAmountCents;
+    result.createdTransactionIds.push(tx.id);
+  }
 
   return result;
 }

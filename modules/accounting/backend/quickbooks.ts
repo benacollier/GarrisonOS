@@ -3,6 +3,7 @@ import { RequestContext } from '../../../core/context.js';
 import { generateUUIDv7 } from '../../../core/crypto.js';
 import { TransactionRecord } from './ledger.js';
 import { ChartOfAccountsRepository, ChartOfAccountRecord } from './chart_of_accounts.js';
+import { JournalService, JournalEntryRecord } from './journal.js';
 
 export interface JournalLine {
   id: string;
@@ -37,9 +38,11 @@ export interface QuickBooksExportResult {
 
 export class QuickBooksService {
   /**
-   * Synthesize balanced double-entry General Ledger journal entries from GarrisonOS transactions.
+   * Fetch persistent double-entry journal entries from the General Ledger and map
+   * them into QuickBooks export structures.
+   * If transactions are provided, extracts corresponding persistent journal entries.
    */
-  public static generateJournalEntries(transactions: TransactionRecord[]): JournalEntry[] {
+  public static generateJournalEntries(transactions?: TransactionRecord[]): JournalEntry[] {
     const tenantId = RequestContext.getTenantId();
     const db = getDatabase();
 
@@ -58,281 +61,59 @@ export class QuickBooksService {
       contactMap.set(c.id, name);
     }
 
-    // Default GL accounts
-    const operatingBank = ChartOfAccountsRepository.getAccountByMapping('operating_bank') || {
-      account_number: '1010',
-      account_name: 'Operating Checking',
-      account_type: 'Bank'
-    };
-    const trustBank = ChartOfAccountsRepository.getAccountByMapping('trust_bank') || {
-      account_number: '1020',
-      account_name: 'Security Deposit Trust Checking',
-      account_type: 'Bank'
-    };
-    const accountsReceivable = ChartOfAccountsRepository.getAccountByMapping('accounts_receivable') || {
-      account_number: '1100',
-      account_name: 'Accounts Receivable (Tenant Receivables)',
-      account_type: 'AccountsReceivable'
-    };
-    const depositLiability = ChartOfAccountsRepository.getAccountByMapping('security_deposit') || {
-      account_number: '2100',
-      account_name: 'Tenant Security Deposits Held',
-      account_type: 'OtherCurrentLiability'
-    };
+    let persistentEntries: JournalEntryRecord[] = [];
 
-    const entries: JournalEntry[] = [];
+    if (transactions && transactions.length > 0) {
+      // Ensure transactions have backfilled journal entries
+      JournalService.backfillLegacyTransactions();
 
-    for (const tx of transactions) {
-      if (tx.deleted_at || tx.amount_cents <= 0) continue;
+      const txEntryIds = transactions
+        .map((t) => t.journal_entry_id)
+        .filter((id): id is string => Boolean(id));
 
-      const className = tx.property_id ? (propertyMap.get(tx.property_id) || 'General') : 'General';
-      const entityName = (tx.payer_contact_id && contactMap.get(tx.payer_contact_id)) ||
-                         (tx.payee_contact_id && contactMap.get(tx.payee_contact_id)) ||
-                         '';
-
-      const entryId = generateUUIDv7();
-      const lines: JournalLine[] = [];
-
-      // Resolve category-specific revenue or expense account
-      const mappedAccount = ChartOfAccountsRepository.getAccountByMapping(tx.category);
-
-      switch (tx.transaction_type) {
-        case 'charge': {
-          // Tenant Charge:
-          // Debit: Accounts Receivable (1100)
-          // Credit: Income Account (e.g. 4010 Rental Income, 4020 Late Fee Income)
-          const revenueAccount = mappedAccount || {
-            account_number: '4010',
-            account_name: 'Rental Income',
-            account_type: 'Income'
-          };
-
-          lines.push({
-            id: generateUUIDv7(),
-            account_number: accountsReceivable.account_number || '1100',
-            account_name: accountsReceivable.account_name,
-            account_type: accountsReceivable.account_type,
-            debit_cents: tx.amount_cents,
-            credit_cents: 0,
-            description: tx.description,
-            entity_name: entityName,
-            class_name: className
-          });
-
-          lines.push({
-            id: generateUUIDv7(),
-            account_number: revenueAccount.account_number || '4010',
-            account_name: revenueAccount.account_name,
-            account_type: revenueAccount.account_type,
-            debit_cents: 0,
-            credit_cents: tx.amount_cents,
-            description: tx.description,
-            entity_name: entityName,
-            class_name: className
-          });
-          break;
-        }
-
-        case 'payment': {
-          // Tenant Payment:
-          // Debit: Operating Bank (1010)
-          // Credit: Accounts Receivable (1100)
-          lines.push({
-            id: generateUUIDv7(),
-            account_number: operatingBank.account_number || '1010',
-            account_name: operatingBank.account_name,
-            account_type: operatingBank.account_type,
-            debit_cents: tx.amount_cents,
-            credit_cents: 0,
-            description: tx.description,
-            entity_name: entityName,
-            class_name: className
-          });
-
-          lines.push({
-            id: generateUUIDv7(),
-            account_number: accountsReceivable.account_number || '1100',
-            account_name: accountsReceivable.account_name,
-            account_type: accountsReceivable.account_type,
-            debit_cents: 0,
-            credit_cents: tx.amount_cents,
-            description: tx.description,
-            entity_name: entityName,
-            class_name: className
-          });
-          break;
-        }
-
-        case 'expense': {
-          // Property Operating Expense (Schedule E):
-          // Debit: Expense Account (e.g. 5100 Repairs, 5120 Taxes, 5130 Utilities)
-          // Credit: Operating Bank (1010)
-          const expenseAccount = mappedAccount || {
-            account_number: '5100',
-            account_name: 'Repairs & Maintenance',
-            account_type: 'Expense'
-          };
-
-          lines.push({
-            id: generateUUIDv7(),
-            account_number: expenseAccount.account_number || '5100',
-            account_name: expenseAccount.account_name,
-            account_type: expenseAccount.account_type,
-            debit_cents: tx.amount_cents,
-            credit_cents: 0,
-            description: tx.description,
-            entity_name: entityName,
-            class_name: className
-          });
-
-          lines.push({
-            id: generateUUIDv7(),
-            account_number: operatingBank.account_number || '1010',
-            account_name: operatingBank.account_name,
-            account_type: operatingBank.account_type,
-            debit_cents: 0,
-            credit_cents: tx.amount_cents,
-            description: tx.description,
-            entity_name: entityName,
-            class_name: className
-          });
-          break;
-        }
-
-        case 'deposit_inflow': {
-          // Security Deposit Collection into Escrow:
-          // Debit: Security Deposit Trust Checking (1020)
-          // Credit: Tenant Security Deposits Held Liability (2100)
-          lines.push({
-            id: generateUUIDv7(),
-            account_number: trustBank.account_number || '1020',
-            account_name: trustBank.account_name,
-            account_type: trustBank.account_type,
-            debit_cents: tx.amount_cents,
-            credit_cents: 0,
-            description: tx.description,
-            entity_name: entityName,
-            class_name: className
-          });
-
-          lines.push({
-            id: generateUUIDv7(),
-            account_number: depositLiability.account_number || '2100',
-            account_name: depositLiability.account_name,
-            account_type: depositLiability.account_type,
-            debit_cents: 0,
-            credit_cents: tx.amount_cents,
-            description: tx.description,
-            entity_name: entityName,
-            class_name: className
-          });
-          break;
-        }
-
-        case 'deposit_return': {
-          // Security Deposit Returned to Tenant:
-          // Debit: Tenant Security Deposits Held Liability (2100)
-          // Credit: Security Deposit Trust Checking (1020)
-          lines.push({
-            id: generateUUIDv7(),
-            account_number: depositLiability.account_number || '2100',
-            account_name: depositLiability.account_name,
-            account_type: depositLiability.account_type,
-            debit_cents: tx.amount_cents,
-            credit_cents: 0,
-            description: tx.description,
-            entity_name: entityName,
-            class_name: className
-          });
-
-          lines.push({
-            id: generateUUIDv7(),
-            account_number: trustBank.account_number || '1020',
-            account_name: trustBank.account_name,
-            account_type: trustBank.account_type,
-            debit_cents: 0,
-            credit_cents: tx.amount_cents,
-            description: tx.description,
-            entity_name: entityName,
-            class_name: className
-          });
-          break;
-        }
-
-        case 'deposit_deduction': {
-          // Security Deposit Applied to Damages or Unpaid Rent:
-          // Debit: Tenant Security Deposits Held Liability (2100)
-          // Credit: Operating Checking (or Rental Income/Repairs Rebill)
-          lines.push({
-            id: generateUUIDv7(),
-            account_number: depositLiability.account_number || '2100',
-            account_name: depositLiability.account_name,
-            account_type: depositLiability.account_type,
-            debit_cents: tx.amount_cents,
-            credit_cents: 0,
-            description: tx.description,
-            entity_name: entityName,
-            class_name: className
-          });
-
-          lines.push({
-            id: generateUUIDv7(),
-            account_number: accountsReceivable.account_number || '1100',
-            account_name: accountsReceivable.account_name,
-            account_type: accountsReceivable.account_type,
-            debit_cents: 0,
-            credit_cents: tx.amount_cents,
-            description: tx.description,
-            entity_name: entityName,
-            class_name: className
-          });
-          break;
-        }
-
-        case 'refund': {
-          // Tenant Refund:
-          // Debit: Accounts Receivable (or Rental Income)
-          // Credit: Operating Bank (1010)
-          lines.push({
-            id: generateUUIDv7(),
-            account_number: accountsReceivable.account_number || '1100',
-            account_name: accountsReceivable.account_name,
-            account_type: accountsReceivable.account_type,
-            debit_cents: tx.amount_cents,
-            credit_cents: 0,
-            description: tx.description,
-            entity_name: entityName,
-            class_name: className
-          });
-
-          lines.push({
-            id: generateUUIDv7(),
-            account_number: operatingBank.account_number || '1010',
-            account_name: operatingBank.account_name,
-            account_type: operatingBank.account_type,
-            debit_cents: 0,
-            credit_cents: tx.amount_cents,
-            description: tx.description,
-            entity_name: entityName,
-            class_name: className
-          });
-          break;
-        }
+      if (txEntryIds.length > 0) {
+        persistentEntries = txEntryIds
+          .map((id) => JournalService.getEntryById(id))
+          .filter((e): e is JournalEntryRecord => Boolean(e));
       }
-
-      if (lines.length > 0) {
-        entries.push({
-          entry_id: entryId,
-          transaction_id: tx.id,
-          date_ms: tx.transaction_date,
-          reference_number: tx.reference_number || `TX-${tx.id.slice(0, 8)}`,
-          memo: tx.description,
-          lines
-        });
-      }
+    } else {
+      const result = JournalService.listEntries({ limit: 5000 });
+      persistentEntries = result.entries;
     }
 
-    return entries;
+    const exportEntries: JournalEntry[] = [];
+
+    for (const pe of persistentEntries) {
+      if (pe.deleted_at || !pe.lines || pe.lines.length === 0) continue;
+
+      const lines: JournalLine[] = pe.lines.map((l) => {
+        const className = l.property_id ? (propertyMap.get(l.property_id) || 'General') : 'General';
+        const entityName = l.contact_id ? (contactMap.get(l.contact_id) || '') : '';
+
+        return {
+          id: l.id,
+          account_number: l.account_number || '',
+          account_name: l.account_name || 'General Account',
+          account_type: l.account_type || 'Expense',
+          debit_cents: l.debit_cents,
+          credit_cents: l.credit_cents,
+          description: l.description || pe.memo,
+          entity_name: entityName,
+          class_name: className
+        };
+      });
+
+      exportEntries.push({
+        entry_id: pe.id,
+        transaction_id: pe.source_id || pe.id,
+        date_ms: pe.date_ms,
+        reference_number: `JE-${pe.entry_number.toString().padStart(5, '0')}`,
+        memo: pe.memo,
+        lines
+      });
+    }
+
+    return exportEntries;
   }
 
   /**
@@ -427,8 +208,6 @@ export class QuickBooksService {
 
       if (entry.lines.length === 0) continue;
 
-      // In IIF, TRNS is the primary line, subsequent are SPL lines.
-      // Debits are positive (+), Credits are negative (-) in IIF convention.
       let i = 0;
       for (const line of entry.lines) {
         totalDebitCents += line.debit_cents;
@@ -481,42 +260,67 @@ export class QuickBooksService {
     const txIds: string[] = [];
 
     const now = new Date();
-    const serverDate = now.toISOString().replace(/[-:T]/g, '').slice(0, 14) + '[-5:EST]';
+    const serverDate = now.toISOString().replace(/[-:T]/g, '').slice(0, 14);
 
     let stmtTrns = '';
 
     for (const tx of transactions) {
       if (tx.deleted_at || tx.amount_cents <= 0) continue;
-      txIds.push(tx.id);
 
-      const d = new Date(tx.transaction_date);
-      const dtPosted = d.toISOString().replace(/[-:T]/g, '').slice(0, 14) + '[-5:EST]';
-
+      let isBankImpact = false;
+      let amountSignedCents = 0;
       let trnType = 'OTHER';
-      let amountStr = '';
 
-      if (tx.transaction_type === 'payment' || tx.transaction_type === 'deposit_inflow') {
-        trnType = 'CREDIT'; // Deposit into bank
-        amountStr = (tx.amount_cents / 100).toFixed(2);
-        totalDebitCents += tx.amount_cents; // Bank debit = cash increase
-      } else if (tx.transaction_type === 'expense' || tx.transaction_type === 'refund' || tx.transaction_type === 'deposit_return') {
-        trnType = 'DEBIT'; // Outflow disbursement
-        amountStr = (-tx.amount_cents / 100).toFixed(2);
-        totalCreditCents += tx.amount_cents; // Bank credit = cash decrease
-      } else {
-        // Non-cash bank transactions (e.g. non-cash accrued charges) skipped for OFX bank feed
-        continue;
+      switch (tx.transaction_type) {
+        case 'payment':
+          isBankImpact = true;
+          amountSignedCents = tx.amount_cents;
+          trnType = 'CREDIT'; // Deposit into bank
+          break;
+        case 'expense':
+          isBankImpact = true;
+          amountSignedCents = -tx.amount_cents;
+          trnType = 'DEBIT'; // Outflow from bank
+          break;
+        case 'refund':
+          isBankImpact = true;
+          amountSignedCents = -tx.amount_cents;
+          trnType = 'DEBIT';
+          break;
+        case 'deposit_inflow':
+          isBankImpact = true;
+          amountSignedCents = tx.amount_cents;
+          trnType = 'DEP';
+          break;
+        case 'deposit_return':
+          isBankImpact = true;
+          amountSignedCents = -tx.amount_cents;
+          trnType = 'DEBIT';
+          break;
       }
+
+      if (!isBankImpact) continue;
+
+      txIds.push(tx.id);
+      if (amountSignedCents > 0) {
+        totalDebitCents += amountSignedCents;
+      } else {
+        totalCreditCents += Math.abs(amountSignedCents);
+      }
+
+      const txDate = new Date(tx.transaction_date).toISOString().replace(/[-:T]/g, '').slice(0, 14);
+      const amountFormatted = (amountSignedCents / 100).toFixed(2);
+      const fitId = `GARRISON-${tx.id.replace(/-/g, '').slice(0, 20)}`;
+      const memo = QuickBooksService.sanitizeXml(tx.description || tx.category);
 
       stmtTrns += `
 <STMTTRN>
 <TRNTYPE>${trnType}</TRNTYPE>
-<DTPOSTED>${dtPosted}</DTPOSTED>
-<TRNAMT>${amountStr}</TRNAMT>
-<FITID>${tx.id}</FITID>
-<CHECKNUM>${tx.reference_number || ''}</CHECKNUM>
-<NAME>${QuickBooksService.sanitizeXml(tx.description)}</NAME>
-<MEMO>${QuickBooksService.sanitizeXml(tx.category)}</MEMO>
+<DTPOSTED>${txDate}</DTPOSTED>
+<TRNAMT>${amountFormatted}</TRNAMT>
+<FITID>${fitId}</FITID>
+<NAME>${memo.slice(0, 32)}</NAME>
+<MEMO>${memo}</MEMO>
 </STMTTRN>`;
     }
 
@@ -539,7 +343,6 @@ NEWFILEUID:NONE
 </STATUS>
 <DTSERVER>${serverDate}</DTSERVER>
 <LANGUAGE>ENG</LANGUAGE>
-<INTU.BID>3000</INTU.BID>
 </SONRS>
 </SIGNONMSGSRSV1>
 <BANKMSGSRSV1>

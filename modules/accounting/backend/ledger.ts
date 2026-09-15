@@ -13,9 +13,19 @@ export interface TransactionRecord {
   lease_id?: string | null;
   payer_contact_id?: string | null;
   payee_contact_id?: string | null;
+  journal_entry_id?: string | null;
   created_at: number;
   updated_at: number;
   deleted_at?: number | null;
+}
+
+export interface JournalLineBalanceItem {
+  account_type: string;
+  debit_cents: number;
+  credit_cents: number;
+  contact_id?: string | null;
+  property_id?: string | null;
+  unit_id?: string | null;
 }
 
 export const INCOME_CATEGORIES = [
@@ -74,6 +84,14 @@ export function calculateTenantBalance(transactions: TransactionRecord[]): numbe
   }
 
   return balanceCents;
+}
+
+/**
+ * Calculate tenant receivable balance from double-entry journal lines.
+ * AccountsReceivable normal balance: Debits increase receivable (charges), Credits decrease receivable (payments).
+ */
+export function calculateTenantBalanceFromJournalLines(lines: Array<{ debit_cents: number; credit_cents: number }>): number {
+  return lines.reduce((bal, line) => bal + (line.debit_cents - line.credit_cents), 0);
 }
 
 export interface AllocatedCharge {
@@ -226,4 +244,3 @@ export function calculateScheduleE(transactions: TransactionRecord[]): ScheduleE
     expenseByCategory
   };
 }
-

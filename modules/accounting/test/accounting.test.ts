@@ -48,6 +48,10 @@ describe('Accounting Module - Repository & Financial Workflows', () => {
       assert.ok(payments.some((t) => t.id === tx1.id));
       assert.ok(!payments.some((t) => t.id === tx2.id));
 
+      // Verify double-entry General Ledger linkage on created transactions
+      assert.ok(tx1.journal_entry_id, 'Payment transaction should have linked journal_entry_id');
+      assert.ok(tx2.journal_entry_id, 'Expense transaction should have linked journal_entry_id');
+
       // Calculate Schedule E report
       const scheduleE = AccountingRepository.getScheduleEReport();
       assert.ok(scheduleE.totalIncomeCents >= 175000);
