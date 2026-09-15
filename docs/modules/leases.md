@@ -58,3 +58,4 @@ Residential tenancies frequently involve multiple roommates, co-signers, and non
 * `PUT /api/v1/leases/:id`: Update lease terms or status
 * `POST /api/v1/leases/:id/signatories`: Add signatory to lease
 * `DELETE /api/v1/leases/:id/signatories/:contactId`: Remove signatory from lease
+

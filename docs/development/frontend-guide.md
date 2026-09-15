@@ -52,3 +52,4 @@ Every state-modifying form in PHP must include the CSRF token:
 </form>
 ```
 The front controller (`web/index.php`) automatically verifies `csrf_token` on all `POST`, `PUT`, and `DELETE` requests before dispatching to page templates.
+

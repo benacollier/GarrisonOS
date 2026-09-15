@@ -63,3 +63,4 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_users_tenant_email
 ON users(tenant_id, email) 
 WHERE deleted_at IS NULL;
 ```
+

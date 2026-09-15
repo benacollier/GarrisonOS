@@ -75,3 +75,4 @@ interface WorkOrderCompletedEvent {
   vendorContactId?: string;
 }
 ```
+

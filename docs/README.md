@@ -51,3 +51,4 @@ docs/
 * **Developer Workflow**: [Getting Started](development/getting-started.md) | [Frontend Guide](development/frontend-guide.md) | [Testing Guide](development/testing.md)
 * **Production Operations**: [Self-Hosting Guide](deployment/self-hosting.md) | [Configuration Reference](deployment/configuration.md) | [Database Maintenance](deployment/backup-and-maintenance.md)
 * **Legal**: [Contributor License Agreement](legal/CLA.md) | [Project License](../LICENSE)
+

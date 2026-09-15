@@ -48,3 +48,4 @@ Represents distinct rentable living or commercial units within a property.
 * `POST /api/v1/properties/:id/units`: Create unit under property
 * `GET /api/v1/properties/units/:unitId`: Get unit details
 * `PUT /api/v1/properties/units/:unitId`: Update unit details / status
+

@@ -25,3 +25,4 @@ In production, generate a cryptographically strong 32-byte hexadecimal string:
 node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))"
 ```
 Assign the output to `APP_SECRET` in your production `.env` file.
+

@@ -68,3 +68,4 @@ Access the application web UI at `http://localhost:8080`.
 
 * **Email**: `operator@garrison.local`
 * **Password**: `GarrisonAdmin2026!`
+

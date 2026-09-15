@@ -66,3 +66,4 @@ export class PropertyRepository {
 ### Safety Guarantees
 - Attempting to access repository queries outside an active request context throws `Error('No active request context found in execution store')`.
 - All SQL statements use parameterized queries to prevent SQL injection and ensure tenant keys are properly bound.
+

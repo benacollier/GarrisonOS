@@ -119,3 +119,4 @@ This document provides a technical critique of the GarrisonOS architecture, runt
 | **Medium** | **Security** | Inability to revoke stateless HMAC tokens | Add `token_version` claim check against `users` table |
 | **Medium** | **Frontend API** | Sequential cURL overhead on composite pages | Provide composite/batch API endpoint for dashboard hydration |
 | **Low** | **Accounting** | Single-entry trust liability co-mingling | Add dedicated escrow/trust account tagging and reconciliation |
+

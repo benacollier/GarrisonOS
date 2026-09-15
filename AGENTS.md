@@ -57,3 +57,13 @@ This document establishes the mandatory engineering standards, architectural con
 * Whenever a new module is introduced, its associated unit and integration test suite must be co-located within the module's `test/` directory.
 * Cross-module communication must use the asynchronous in-process `EventBus` (`core/events.ts`).
 
+---
+
+## 7. Efficient Test Execution & Verification
+
+* **Documentation / Asset Changes**: Do not execute the test suite when making documentation-only or asset-only changes.
+* **Modular Changes**: When modifying a single module, execute only that module's test suite: `npm run test:module <module_name>` or `node scripts/test.js <module_name>`.
+* **Core Subsystems**: When modifying core primitives (`core/`, `api/`, `database/`), execute core tests via `npm run test:core`.
+* **Full Regression**: Execute `npm test` before submitting pull requests or after touching global configuration / dependencies.
+
+

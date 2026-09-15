@@ -600,3 +600,4 @@ All REST endpoints return standardized JSON structures:
 * Uses CSS Custom Properties for typography, colors, borders, shadows, and light/dark theme variables.
 * Fully responsive layout using CSS Grid and Flexbox without utility frameworks.
 * Native HTML `<dialog>` for modal interactions and accessible semantic tables for ledger data.
+

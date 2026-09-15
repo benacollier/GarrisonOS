@@ -10,8 +10,9 @@
     "dev": "node --watch dist/api/server.js",
     "migrate": "node dist/database/migrator.js",
     "seed": "node dist/database/seed.js",
-    "frontend": "php -S localhost:80 -t web web/index.php",
-    "test": "node --test dist/**/*.test.js"
+    "test": "node scripts/test.js",
+    "test:core": "node scripts/test.js core",
+    "test:module": "node scripts/test.js"
   },
   "keywords": [
     "property-management",

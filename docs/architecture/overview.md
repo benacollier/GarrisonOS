@@ -89,3 +89,4 @@ The frontend communicates with the backend exclusively via internal loopback HTT
 | **Database** | [`database/`](file:///e:/projects/GarrisonOS/database/) | SQLite client, WAL mode settings, migrations runner, and seeder. |
 | **Modules** | [`modules/`](file:///e:/projects/GarrisonOS/modules/) | Self-contained domain modules (`properties`, `contacts`, `leases`, `accounting`, `maintenance`). |
 | **Presentation** | [`web/`](file:///e:/projects/GarrisonOS/web/) | PHP templates, layouts, dynamic hook registry, and vanilla CSS. |
+

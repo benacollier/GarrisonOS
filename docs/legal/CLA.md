@@ -51,3 +51,4 @@ Except as warranted herein, You provide Your Contributions on an "AS IS" BASIS, 
 ### 7. Agreement Procedure
 
 By submitting a Pull Request to the GarrisonOS repository, or by typing `I have read the CLA Document and I hereby sign the CLA` in response to the automated CLA Assistant bot, You confirm Your acceptance of the terms of this Agreement.
+

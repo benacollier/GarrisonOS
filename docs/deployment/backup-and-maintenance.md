@@ -50,3 +50,4 @@ sqlite3 garrison.sqlite "PRAGMA optimize;"
 # Reclaim unused disk space
 sqlite3 garrison.sqlite "VACUUM;"
 ```
+

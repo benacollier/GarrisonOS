@@ -7,18 +7,19 @@ GarrisonOS adheres to a zero-dependency testing strategy using Node.js built-in 
 ## 1. Running the Test Suite
 
 ```bash
-# Build TypeScript artifacts and run all test suites
+# Run all test suites across core and modules
 npm test
+
+# Run only core subsystem tests
+npm run test:core
+
+# Run a specific module's test suite dynamically (e.g. properties, accounting, or any new module)
+npm run test:module properties
 ```
 
-This runs:
+This supports:
 * **Core Subsystem Tests** (`test/`): `crypto.test.ts`, `context.test.ts`, `isolation.test.ts`, `router.test.ts`, `modules.test.ts`.
-* **Module-Packaged Domain Tests** (`modules/*/test/`):
-  * `modules/properties/test/properties.test.ts`
-  * `modules/contacts/test/contacts.test.ts`
-  * `modules/leases/test/leases.test.ts`
-  * `modules/accounting/test/` (`billing.test.ts`, `ledger.test.ts`, `accounting.test.ts`)
-  * `modules/maintenance/test/maintenance.test.ts`
+* **Module-Packaged Domain Tests** (`modules/<module_name>/test/`): Automatically discovered and executed on demand for existing and newly created modules.
 
 ---
 
@@ -52,3 +53,4 @@ describe('Properties Module - Lifecycle & Inventory Management', () => {
 1. **Context Isolation**: Every test must execute within an explicit `RequestContext.run()` wrapper to simulate isolated request execution.
 2. **Deterministic Time**: Tests must use fixed or relative timestamp offsets to avoid flaky assertions.
 3. **Zero Test Framework Dependencies**: Do not introduce Jest, Mocha, Chai, Vitest, or Sinon. Use standard Node.js built-ins.
+

@@ -55,3 +55,4 @@ The **Accounting** module listens for this event and can automatically record a 
 * `GET /api/v1/maintenance/:id`: Fetch work order details and vendor contact card
 * `PUT /api/v1/maintenance/:id`: Update status, priority, entry instructions, and actual cost
 * `DELETE /api/v1/maintenance/:id`: Soft delete work order
+

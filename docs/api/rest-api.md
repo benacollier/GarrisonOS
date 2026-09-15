@@ -113,3 +113,4 @@ All JSON responses conform to standardized envelopes:
 * `GET /api/v1/maintenance/:id`: Work order details
 * `PUT /api/v1/maintenance/:id`: Update work order status and costs
 * `DELETE /api/v1/maintenance/:id`: Soft delete work order
+
