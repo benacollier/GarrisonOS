@@ -2,6 +2,8 @@ import { Router } from '../../../api/router.js';
 import { successResponse, errorResponse } from '../../../api/response.js';
 import { AccountingRepository } from './repository.js';
 import { generateMonthlyRentCharges } from './billing.js';
+import { ChartOfAccountsRepository } from './chart_of_accounts.js';
+import { QuickBooksService } from './quickbooks.js';
 
 export function registerRoutes(router: Router): void {
   // --- Rent Roll ---
@@ -164,5 +166,137 @@ export function registerRoutes(router: Router): void {
       'Content-Disposition': `attachment; filename="ledger-${req.params.leaseId}-${Date.now()}.csv"`
     });
     res.end(csv);
+  });
+
+  // ==========================================
+  // --- Chart of Accounts & QuickBooks Sync ---
+  // ==========================================
+
+  // List Chart of Accounts
+  router.get('/api/v1/accounting/chart-of-accounts', (req, res) => {
+    const includeInactive = req.query.include_inactive === 'true';
+    const accounts = ChartOfAccountsRepository.listAccounts(includeInactive);
+    successResponse(res, { accounts });
+  });
+
+  // Create new Account
+  router.post('/api/v1/accounting/chart-of-accounts', (req, res) => {
+    const { account_name, account_type, qb_account_type, account_number, category_mapping, description } = req.body || {};
+    if (!account_name || !account_type || !qb_account_type) {
+      return errorResponse(res, 'VALIDATION_ERROR', 'account_name, account_type, and qb_account_type are required', 400);
+    }
+    const account = ChartOfAccountsRepository.createAccount({
+      account_name,
+      account_type,
+      qb_account_type,
+      account_number,
+      category_mapping,
+      description
+    });
+    successResponse(res, { account }, 201);
+  });
+
+  // Update Account
+  router.put('/api/v1/accounting/chart-of-accounts/:id', (req, res) => {
+    const updated = ChartOfAccountsRepository.updateAccount(req.params.id!, req.body || {});
+    if (!updated) {
+      return errorResponse(res, 'NOT_FOUND', 'Chart of account item not found', 404);
+    }
+    successResponse(res, { account: updated });
+  });
+
+  // Preview QuickBooks Journal Entries before export
+  router.get('/api/v1/accounting/quickbooks/preview', (req, res) => {
+    const transactions = AccountingRepository.listTransactions({
+      property_id: req.query.property_id,
+      transaction_type: req.query.transaction_type,
+      category: req.query.category,
+      start_date: req.query.start_date ? parseInt(req.query.start_date, 10) : undefined,
+      end_date: req.query.end_date ? parseInt(req.query.end_date, 10) : undefined,
+      qb_unexported_only: req.query.unexported_only === 'true'
+    });
+
+    const entries = QuickBooksService.generateJournalEntries(transactions);
+    const totalDebitCents = entries.reduce((sum, e) => sum + e.lines.reduce((lSum, l) => lSum + l.debit_cents, 0), 0);
+    const totalCreditCents = entries.reduce((sum, e) => sum + e.lines.reduce((lSum, l) => lSum + l.credit_cents, 0), 0);
+
+    successResponse(res, {
+      entries,
+      summary: {
+        transactionCount: transactions.length,
+        entryCount: entries.length,
+        totalDebitCents,
+        totalCreditCents,
+        isBalanced: totalDebitCents === totalCreditCents
+      }
+    });
+  });
+
+  // Download QuickBooks Online (QBO) Journal CSV
+  router.get('/api/v1/accounting/export/quickbooks/qbo-journal.csv', (req, res) => {
+    const transactions = AccountingRepository.listTransactions({
+      property_id: req.query.property_id,
+      start_date: req.query.start_date ? parseInt(req.query.start_date, 10) : undefined,
+      end_date: req.query.end_date ? parseInt(req.query.end_date, 10) : undefined,
+      qb_unexported_only: req.query.unexported_only === 'true'
+    });
+
+    const entries = QuickBooksService.generateJournalEntries(transactions);
+    const exportResult = QuickBooksService.exportQboJournalCsv(entries);
+
+    if (req.query.mark_exported === 'true') {
+      QuickBooksService.recordExport('qbo_csv', exportResult);
+    }
+
+    res.writeHead(200, {
+      'Content-Type': exportResult.mimeType,
+      'Content-Disposition': `attachment; filename="${exportResult.filename}"`
+    });
+    res.end(exportResult.content);
+  });
+
+  // Download QuickBooks Desktop IIF File
+  router.get('/api/v1/accounting/export/quickbooks/desktop.iif', (req, res) => {
+    const transactions = AccountingRepository.listTransactions({
+      property_id: req.query.property_id,
+      start_date: req.query.start_date ? parseInt(req.query.start_date, 10) : undefined,
+      end_date: req.query.end_date ? parseInt(req.query.end_date, 10) : undefined,
+      qb_unexported_only: req.query.unexported_only === 'true'
+    });
+
+    const entries = QuickBooksService.generateJournalEntries(transactions);
+    const exportResult = QuickBooksService.exportDesktopIif(entries);
+
+    if (req.query.mark_exported === 'true') {
+      QuickBooksService.recordExport('iif', exportResult);
+    }
+
+    res.writeHead(200, {
+      'Content-Type': exportResult.mimeType,
+      'Content-Disposition': `attachment; filename="${exportResult.filename}"`
+    });
+    res.end(exportResult.content);
+  });
+
+  // Download Web Connect / QBO Banking File
+  router.get('/api/v1/accounting/export/quickbooks/bank-feed.qbo', (req, res) => {
+    const transactions = AccountingRepository.listTransactions({
+      property_id: req.query.property_id,
+      start_date: req.query.start_date ? parseInt(req.query.start_date, 10) : undefined,
+      end_date: req.query.end_date ? parseInt(req.query.end_date, 10) : undefined,
+      qb_unexported_only: req.query.unexported_only === 'true'
+    });
+
+    const exportResult = QuickBooksService.exportOfxWebConnect(transactions);
+
+    if (req.query.mark_exported === 'true') {
+      QuickBooksService.recordExport('ofx', exportResult);
+    }
+
+    res.writeHead(200, {
+      'Content-Type': exportResult.mimeType,
+      'Content-Disposition': `attachment; filename="${exportResult.filename}"`
+    });
+    res.end(exportResult.content);
   });
 }

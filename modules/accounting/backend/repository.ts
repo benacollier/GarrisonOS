@@ -45,6 +45,7 @@ export class AccountingRepository {
     category?: string;
     start_date?: number;
     end_date?: number;
+    qb_unexported_only?: boolean;
   }): TransactionRecord[] {
     const tenantId = RequestContext.getTenantId();
     const db = getDatabase();
@@ -79,6 +80,9 @@ export class AccountingRepository {
     if (filter?.end_date) {
       sql += ' AND transaction_date <= ?';
       params.push(filter.end_date);
+    }
+    if (filter?.qb_unexported_only) {
+      sql += ' AND qb_exported_at IS NULL';
     }
 
     sql += ' ORDER BY transaction_date DESC, created_at DESC';

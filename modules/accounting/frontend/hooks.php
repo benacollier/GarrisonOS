@@ -25,6 +25,22 @@ HookRegistry::registerNavigation([
     'section' => 'financial'
 ]);
 
+HookRegistry::registerNavigation([
+    'label' => 'QuickBooks Sync',
+    'route' => '/accounting/quickbooks',
+    'icon' => 'refresh-cw',
+    'order' => 43,
+    'section' => 'financial'
+]);
+
+HookRegistry::registerNavigation([
+    'label' => 'Chart of Accounts',
+    'route' => '/accounting/chart-of-accounts',
+    'icon' => 'book-open',
+    'order' => 44,
+    'section' => 'financial'
+]);
+
 HookRegistry::registerDashboardCard(function ($api) {
     try {
         $res = $api->get('/api/v1/accounting/rent-roll');

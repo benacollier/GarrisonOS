@@ -73,3 +73,33 @@ $$\text{NOI} = \text{Operating Income (Rent, Fees)} - \text{Operating Expenses (
 * `GET /api/v1/accounting/export/rent-roll.csv`: Stream Rent Roll CSV
 * `GET /api/v1/accounting/export/schedule-e.csv`: Stream IRS Schedule E P&L breakdown CSV
 * `GET /api/v1/accounting/export/ledger/:leaseId.csv`: Stream itemized tenant ledger statement CSV
+* `GET /api/v1/accounting/chart-of-accounts`: List Chart of Accounts
+* `POST /api/v1/accounting/chart-of-accounts`: Create general ledger account
+* `PUT /api/v1/accounting/chart-of-accounts/:id`: Update general ledger account
+* `GET /api/v1/accounting/quickbooks/preview`: Preview balanced double-entry journal entries
+* `GET /api/v1/accounting/export/quickbooks/qbo-journal.csv`: Export QuickBooks Online Journal Entry batch CSV
+* `GET /api/v1/accounting/export/quickbooks/desktop.iif`: Export QuickBooks Desktop IIF format
+* `GET /api/v1/accounting/export/quickbooks/bank-feed.qbo`: Export Web Connect (.QBO) bank feed
+
+---
+
+## 5. QuickBooks Compatibility Architecture
+
+GarrisonOS translates property operations into general ledger double-entry debits and credits:
+
+1. **Chart of Accounts (COA) Standard Mapping**:
+   * **Bank (1010 Operating Checking, 1020 Security Deposit Trust Checking)**: Operating vs escrow cash segregation.
+   * **Accounts Receivable (1100 Tenant Receivables)**: Invoiced rent, utility, and fee charges.
+   * **Current Liabilities (2100 Tenant Security Deposits Held)**: Escrow liabilities.
+   * **Income (4010 Rental Income, 4020 Late Fee Income, etc.)**: Operating revenues.
+   * **Operating Expenses (5010–5140)**: Aligned with IRS Form 1040 Schedule E lines.
+
+2. **Class & Customer Tracking**:
+   * Each journal entry maps the GarrisonOS `property_id` to a QuickBooks **Class** for granular property-level P&L reporting.
+   * Payer/Payee contacts map to QuickBooks **Customer:Job** or **Vendor**.
+
+3. **Universal QuickBooks Formats**:
+   * **QuickBooks Online (QBO) Journal CSV**: Conforms to Intuit's batch journal import structure.
+   * **QuickBooks Desktop (IIF)**: Tab-delimited transaction blocks (`!TRNS`/`!SPL`/`!ENDTRNS`).
+   * **Web Connect (QBO/OFX)**: OFX 2.1 SGML/XML banking import for bank feed reconciliation.
+

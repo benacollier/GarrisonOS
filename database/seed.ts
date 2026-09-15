@@ -1,6 +1,7 @@
 import { DatabaseSync } from 'node:sqlite';
 import { fileURLToPath } from 'node:url';
 import * as path from 'node:path';
+import process from 'node:process';
 import { getDatabase, withTransaction } from './client.js';
 import { runMigrations } from './migrator.js';
 import { generateUUIDv7, hashPassword } from '../core/crypto.js';
@@ -16,6 +17,8 @@ export async function seedDatabase(dbInstance?: DatabaseSync): Promise<void> {
 
   await withTransaction(async (tx) => {
     // 1. Clean existing demo data if present
+    tx.prepare('DELETE FROM quickbooks_export_logs WHERE tenant_id = ?').run(TENANT_ID);
+    tx.prepare('DELETE FROM chart_of_accounts WHERE tenant_id = ?').run(TENANT_ID);
     tx.prepare('DELETE FROM transactions WHERE tenant_id = ?').run(TENANT_ID);
     tx.prepare('DELETE FROM work_orders WHERE tenant_id = ?').run(TENANT_ID);
     tx.prepare('DELETE FROM lease_contacts WHERE tenant_id = ?').run(TENANT_ID);
