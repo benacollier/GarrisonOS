@@ -31,16 +31,15 @@ This document provides a technical critique of the GarrisonOS architecture, runt
 * Strict multi-tenancy enforced through `AsyncLocalStorage` in `core/context.ts`.
 * Inbound requests resolve tenant identity via `X-Tenant-ID` header or verified HMAC token in `api/middleware.ts`.
 * Repositories extract `tenantId` implicitly from `RequestContext.getTenantId()`.
+* **Resolved Context Propagation**: Asynchronous context loss across event loop boundaries has been resolved in `EventBus.publish()`, which synchronously captures the active `RequestContext` (including `tenantId`, `correlationId`, and `userId`) prior to dispatching via `setImmediate()` and executes subscriber callbacks wrapped in `RequestContext.run()`.
 
 ### Identified Risks & Limitations
 
-* **Asynchronous Context Loss in Event Subscribers**: `EventBus.publish()` dispatches events on the next event loop tick via `setImmediate()`. Consequently, the active `AsyncLocalStorage` store is detached from subscriber callbacks. If a subscriber executes repository queries without explicitly re-wrapping the execution in `RequestContext.run()`, the runtime throws an uncaught context error (`No active request context found in execution store`).
 * **Coupled Middleware Public Route Registry**: In `api/middleware.ts`, public endpoints (`/health`, `/ready`, `/api/v1/auth/*`, `/api/v1/system/backup`) are hardcoded directly into the tenant resolution middleware. Modules cannot declare public or webhook endpoints independently without modifying core middleware.
 
 ### Recommendations
 
-1. Enhance `EventBus.subscribe()` to automatically detect tenant-scoped payloads (e.g. payloads implementing `{ tenantId: string }`) and auto-wrap callback execution in `RequestContext.run()`.
-2. Allow route registration to specify metadata flags (e.g., `router.get(path, { isPublic: true }, ...handlers)`) to decouple endpoint access control from global middleware logic.
+1. Allow route registration to specify metadata flags (e.g., `router.get(path, { isPublic: true }, ...handlers)`) to decouple endpoint access control from global middleware logic.
 
 ---
 

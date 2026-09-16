@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Enforce strict token-derived `userId` in `tenantContextMiddleware` and reject mismatched `X-User-ID` headers to prevent identity spoofing.
-- Require administrator role verification for system backup endpoint (`/api/v1/system/backup`).
+- Require owner role verification for system backup endpoint (`/api/v1/system/backup`).
 - Fix `EventBus.publish` to synchronously capture and inherit active `RequestContext` (`tenantId`, `correlationId`, `userId`) when payloads omit explicit context.
 - Make `withTransaction` callbacks strictly synchronous in `database/seed.ts` and `api/server.ts` to prevent premature transaction commits.
 - Encapsulate lease balance calculation, deduction processing, and lease status updates atomically inside a transaction within `AccountingRepository.processDepositDisposition`.
