@@ -515,6 +515,11 @@ GarrisonOS is built on and inspired by foundational open-source standards, tools
 * **[@types/node](https://github.com/DefinitelyTyped/DefinitelyTyped)** *(MIT License)*: Type definitions for the Node.js standard library utilized exclusively during build-time compilation.
 * **[Betterleaks](https://github.com/betterleaks/betterleaks)** *(Apache-2.0 License)*: High-speed repository secret and sensitive credential scanning used across our continuous integration and security pipelines.
 * **[markdownlint](https://github.com/DavidAnson/markdownlint)** *(MIT License)*: Static style and syntax analysis rules powering repository documentation quality and lint standards.
+* **[NVIDIA NIM & Nemotron 3 Super](https://build.nvidia.com/)** *(NVIDIA Community License)*: Hosted microservice API used in development for high-throughput, context-isolated code reconnaissance and token quota preservation.
+* **[Ollama](https://ollama.com/)** *(MIT License)*: Local lightweight inference engine powering offline backup background worker tasks.
+* **[Qwen 2.5 Coder](https://github.com/QwenLM/Qwen2.5-Coder)** *(Apache-2.0 License)*: Open-weights coding model powering local offline worker extraction tasks.
+* **[LLM Worker Tools](https://github.com/thevahidal/llm-worker-tools)** *(MIT License)*: Model Context Protocol (MCP) server offloading repetitive code analysis and scaffolding to background backends.
+* For comprehensive technical attribution and development architecture details, see the [Development Tooling & Attribution Guide](docs/development/tooling-and-attribution.md).
 * **[Conventional Commits](https://www.conventionalcommits.org/)** *(CC BY 3.0)*: Commit message conventions informing our atomic commit message specifications.
 * **[Apache Software Foundation ICLA](https://www.apache.org/licenses/icla.pdf)** *(Apache-2.0 License)*: Standardized Contributor License Agreement structure adapted for our project CLA.
 * **[Contributor Covenant](https://www.contributor-covenant.org)** *(CC BY 4.0)*: The open-source community code of conduct standard powering [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
