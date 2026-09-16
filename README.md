@@ -8,6 +8,7 @@
 [![PHP](https://img.shields.io/badge/PHP-8.2%2B-purple.svg)](https://www.php.net/)
 [![Dependencies](https://img.shields.io/badge/Runtime_Dependencies-0-brightgreen.svg)](#dependencies--runtime-prerequisites)
 [![Multi-Tenancy](https://img.shields.io/badge/Multi--Tenancy-Row--Level_Isolation-orange.svg)](#architectural-principles)
+[![Documentation](https://img.shields.io/badge/Docs-GitHub_Pages-blue.svg)](https://garrisonos.github.io/GarrisonOS/)
 
 ---
 
@@ -26,6 +27,20 @@ GarrisonOS is engineered to provide self-managing landlords, independent propert
 The software addresses day-to-day operational tasks, cash-basis accounting, and structured recordkeeping without the recurring subscription costs, vendor lock-in, or opaque data silos imposed by legacy property management platforms.
 
 Built from first principles around **zero external runtime dependencies**, GarrisonOS operates entirely on the standard libraries of Node.js and native PHP, backed by an embedded SQLite engine operating in Write-Ahead Logging (WAL) mode.
+
+---
+
+## Navigation
+
+| Category | Documents |
+|:---------|:----------|
+| **Roadmap** | [MVP Roadmap](docs/ROADMAP.md) |
+| **Architecture** | [Overview](docs/architecture/overview.md) | [Multi-Tenancy](docs/architecture/multi-tenancy.md) | [Data Model](docs/architecture/data-model.md) | [Bootstrap Spec](docs/architecture/bootstrap-spec.md) | [Technical Debt](docs/architecture/technical-debt.md) |
+| **Domain Modules** | [Overview](docs/modules/overview.md) | [Properties](docs/modules/properties.md) | [Contacts](docs/modules/contacts.md) | [Leases](docs/modules/leases.md) | [Accounting](docs/modules/accounting.md) | [Maintenance](docs/modules/maintenance.md) | [Backup](docs/modules/backup.md) |
+| **API** | [REST API](docs/api/rest-api.md) | [EventBus](docs/api/events.md) |
+| **Development** | [Getting Started](docs/development/getting-started.md) | [Frontend Guide](docs/development/frontend-guide.md) | [Testing](docs/development/testing.md) |
+| **Deployment** | [Self-Hosting](docs/deployment/self-hosting.md) | [Configuration](docs/deployment/configuration.md) | [Backup & Maintenance](docs/deployment/backup-and-maintenance.md) |
+| **Legal** | [CLA](docs/legal/CLA.md) | [License](LICENSE) | [Security](SECURITY.md) | [Code of Conduct](CODE_OF_CONDUCT.md) | [Contributing](CONTRIBUTING.md) |
 
 ---
 
@@ -443,40 +458,6 @@ The test suite validates:
   * **Leases**: Contract lifecycle transitions, multi-party signatories, and financial terms.
   * **Maintenance**: Work order priority triage, vendor assignments, and cross-module expense event triggers.
   * **Backup**: Point-in-time SQLite snapshot integrity (`VACUUM INTO`), tenant-isolated clean-slate/merge restore, and disaster recovery CLI validations.
-
----
-
-## Documentation
-
-Full architectural specifications, module details, API contracts, development guides, deployment instructions, and the product roadmap are available in the [`docs/`](docs/README.md) directory:
-
-* **Roadmap & Planning**:
-  * [MVP Development Roadmap](docs/ROADMAP.md)
-* **Architecture**:
-  * [System Architecture Overview](docs/architecture/overview.md)
-  * [Strict Multi-Tenancy & Isolation](docs/architecture/multi-tenancy.md)
-  * [Data Representation & Identity Standards](docs/architecture/data-model.md)
-  * [Architecture Specification & Blueprint](docs/architecture/bootstrap-spec.md)
-  * [Technical Debt Assessment & Critique](docs/architecture/technical-debt.md)
-* **Domain Modules**:
-  * [Module System Architecture](docs/modules/overview.md)
-  * [Properties & Portfolios](docs/modules/properties.md)
-  * [Contacts Directory](docs/modules/contacts.md)
-  * [Lease Management](docs/modules/leases.md)
-  * [Accounting & IRS Schedule E](docs/modules/accounting.md)
-  * [Maintenance Work Orders](docs/modules/maintenance.md)
-  * [Backup & Portability](docs/modules/backup.md)
-* **API & Events**:
-  * [REST API Reference](docs/api/rest-api.md)
-  * [In-Process EventBus Reference](docs/api/events.md)
-* **Development & QA**:
-  * [Developer Getting Started](docs/development/getting-started.md)
-  * [Frontend Presentation Layer Guide](docs/development/frontend-guide.md)
-  * [Testing & QA Guide](docs/development/testing.md)
-* **Deployment & Operations**:
-  * [Production Self-Hosting Guide](docs/deployment/self-hosting.md)
-  * [Configuration Reference](docs/deployment/configuration.md)
-  * [SQLite WAL Backup & Maintenance](docs/deployment/backup-and-maintenance.md)
 
 ---
 
