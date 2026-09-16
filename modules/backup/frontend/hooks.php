@@ -11,6 +11,9 @@ HookRegistry::registerNavigation([
 
 HookRegistry::registerDashboardCard('/api/v1/backups?limit=1', function ($res) {
     try {
+        if (!is_array($res) || ($res['ok'] ?? false) !== true) {
+            return null;
+        }
         $items = $res['data']['items'] ?? [];
         $latest = !empty($items) ? $items[0] : null;
 

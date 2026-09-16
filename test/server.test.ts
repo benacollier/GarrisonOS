@@ -146,7 +146,8 @@ describe('Batch endpoint', () => {
       { requests: [] },
       { requests: Array.from({ length: 11 }, () => ({ method: 'GET', path: '/health' })) },
       { requests: [{ method: 'POST', path: '/api/v1/properties' }] },
-      { requests: [{ method: 'GET', path: 'https://evil.example' }] }
+      { requests: [{ method: 'GET', path: 'https://evil.example' }] },
+      { requests: [{ method: 'GET', path: '/api/v1/system/backup' }] }
     ]) {
       const result = await handleBatch(body);
       assert.equal(result.statusCode, 400);
@@ -177,7 +178,7 @@ describe('Batch endpoint', () => {
     request.emit('data', Buffer.from(JSON.stringify({
       requests: [
         { method: 'GET', path: '/health' },
-        { method: 'GET', path: '/api/v1/modules' }
+        { method: 'GET', path: '/api/v1/modules?include=manifest' }
       ]
     })));
     request.emit('end');
@@ -187,7 +188,7 @@ describe('Batch endpoint', () => {
     assert.equal(response.statusCode, 200);
     assert.equal(parsed.success, true);
     assert.equal(parsed.data.responses.response_0.path, '/health');
-    assert.equal(parsed.data.responses.response_1.path, '/api/v1/modules');
+    assert.equal(parsed.data.responses.response_1.path, '/api/v1/modules?include=manifest');
     assert.equal(parsed.meta.total, 2);
     assert.equal(seen.length, 2);
     assert.equal(seen[0]!.url, 'http://127.0.0.1:31234/health');
@@ -244,7 +245,7 @@ describe('Batch endpoint', () => {
     });
 
     const result = await handleBatch({
-      requests: [{ method: 'GET', path: '/api/v1/system/backup' }]
+      requests: [{ method: 'GET', path: '/api/v1/missing?format=binary' }]
     });
 
     assert.equal(result.statusCode, 200);

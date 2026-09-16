@@ -11,6 +11,9 @@ HookRegistry::registerNavigation([
 
 HookRegistry::registerDashboardCard('/api/v1/properties/metrics/occupancy', function ($res) {
     try {
+        if (!is_array($res) || ($res['ok'] ?? false) !== true) {
+            return null;
+        }
         $metrics = $res['data']['metrics'] ?? [];
         $occupancyRate = $metrics['occupancyRatePercentage'] ?? 0;
         $totalUnits = $metrics['totalUnits'] ?? 0;

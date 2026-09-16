@@ -161,7 +161,7 @@ class ApiClient {
      * Execute multiple read-only API requests in one round trip.
      *
      * @param array<int, string> $paths
-     * @return array<string, array<string, mixed>>
+     * @return array<string, array<string, mixed>> Responses include an explicit `ok` flag.
      */
     public function batch(array $paths): array {
         if (count($paths) !== count(array_unique($paths))) {
@@ -177,6 +177,11 @@ class ApiClient {
         $result = [];
         foreach ($responses as $item) {
             if (is_array($item) && isset($item['path'])) {
+                $item['ok'] = ($item['success'] ?? false) === true
+                    && isset($item['status'])
+                    && is_int($item['status'])
+                    && $item['status'] >= 200
+                    && $item['status'] < 300;
                 $result[(string)$item['path']] = $item;
             }
         }

@@ -21,6 +21,7 @@ interface RouteEntry {
   paramNames: string[];
   regex: RegExp;
   handlers: Handler[];
+  batchSafe: boolean;
 }
 
 const MAX_BODY_SIZE_BYTES = 1024 * 1024; // 1 MB
@@ -33,7 +34,7 @@ export class Router {
     this.middlewares.push(middleware);
   }
 
-  private register(method: string, pattern: string, ...handlers: Handler[]): void {
+  private register(method: string, pattern: string, handlers: Handler[], batchSafe = true): void {
     const paramNames: string[] = [];
     const normalizedPattern = pattern.startsWith('/') ? pattern : `/${pattern}`;
     
@@ -52,32 +53,42 @@ export class Router {
       pattern: normalizedPattern,
       paramNames,
       regex,
-      handlers
+      handlers,
+      batchSafe
     });
   }
 
   public get(pattern: string, ...handlers: Handler[]): void {
-    this.register('GET', pattern, ...handlers);
+    this.register('GET', pattern, handlers);
+  }
+
+  public getUnsafe(pattern: string, ...handlers: Handler[]): void {
+    this.register('GET', pattern, handlers, false);
   }
 
   public post(pattern: string, ...handlers: Handler[]): void {
-    this.register('POST', pattern, ...handlers);
+    this.register('POST', pattern, handlers);
   }
 
   public put(pattern: string, ...handlers: Handler[]): void {
-    this.register('PUT', pattern, ...handlers);
+    this.register('PUT', pattern, handlers);
   }
 
   public patch(pattern: string, ...handlers: Handler[]): void {
-    this.register('PATCH', pattern, ...handlers);
+    this.register('PATCH', pattern, handlers);
   }
 
   public delete(pattern: string, ...handlers: Handler[]): void {
-    this.register('DELETE', pattern, ...handlers);
+    this.register('DELETE', pattern, handlers);
   }
 
   public options(pattern: string, ...handlers: Handler[]): void {
-    this.register('OPTIONS', pattern, ...handlers);
+    this.register('OPTIONS', pattern, handlers);
+  }
+
+  public isBatchSafeGetPath(pathname: string): boolean {
+    const route = this.routes.find((entry) => entry.method === 'GET' && entry.regex.test(pathname));
+    return route?.batchSafe ?? true;
   }
 
   private async parseBody(req: IncomingMessage): Promise<any> {

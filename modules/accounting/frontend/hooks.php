@@ -59,6 +59,9 @@ HookRegistry::registerNavigation([
 
 HookRegistry::registerDashboardCard('/api/v1/accounting/rent-roll', function ($res) {
     try {
+        if (!is_array($res) || ($res['ok'] ?? false) !== true) {
+            return null;
+        }
         $summary = $res['data']['summary'] ?? [];
         $delinquencyCents = $summary['totalDelinquencyCents'] ?? 0;
         $scheduledCents = $summary['totalScheduledRentCents'] ?? 0;

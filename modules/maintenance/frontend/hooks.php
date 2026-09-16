@@ -11,6 +11,9 @@ HookRegistry::registerNavigation([
 
 HookRegistry::registerDashboardCard('/api/v1/maintenance/metrics', function ($res) {
     try {
+        if (!is_array($res) || ($res['ok'] ?? false) !== true) {
+            return null;
+        }
         $metrics = $res['data']['metrics'] ?? [];
         $openOrders = $metrics['openWorkOrders'] ?? 0;
         $emergencies = $metrics['emergencyWorkOrders'] ?? 0;

@@ -98,15 +98,25 @@ export function createRouter(serverPort: number = PORT): Router {
 
     const validatedRequests: Array<{ path: string; method: 'GET' }> = [];
     for (const item of requests) {
+      let targetUrl: URL;
+      try {
+        targetUrl = new URL(item?.path, 'http://batch.local');
+      } catch {
+        return errorResponse(res, 'VALIDATION_ERROR', 'Batch supports only relative GET requests', 400);
+      }
+      const pathname = targetUrl.pathname;
       if (
         !item ||
         typeof item.path !== 'string' ||
         item.path.length > 512 ||
-        !(item.path === '/health' || item.path === '/ready' || item.path === '/api/v1/modules' || item.path === '/api/v1/system/status') ||
-        item.path === '/api/v1/batch' ||
+        !item.path.startsWith('/') ||
+        targetUrl.origin !== 'http://batch.local' ||
+        !(pathname === '/health' || pathname === '/ready' || pathname.startsWith('/api/v1/')) ||
+        pathname === '/api/v1/batch' ||
+        !router.isBatchSafeGetPath(pathname) ||
         (item.method !== undefined && item.method !== 'GET')
       ) {
-        return errorResponse(res, 'VALIDATION_ERROR', 'Batch supports only GET requests to /api/v1/ endpoints', 400);
+        return errorResponse(res, 'VALIDATION_ERROR', 'Batch supports only safe relative GET requests', 400);
       }
       validatedRequests.push({ path: item.path, method: 'GET' });
     }
@@ -248,7 +258,7 @@ export function createRouter(serverPort: number = PORT): Router {
   });
 
   // System Database Backup Snapshot
-  router.get('/api/v1/system/backup', (_req, res) => {
+  router.getUnsafe('/api/v1/system/backup', (_req, res) => {
     try {
       const db = getDatabase();
       db.exec('PRAGMA wal_checkpoint(TRUNCATE);');
