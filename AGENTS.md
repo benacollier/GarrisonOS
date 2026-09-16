@@ -6,7 +6,7 @@ This document establishes the mandatory engineering standards, architectural con
 
 ## 1. Zero External Runtime Dependencies
 
-* **SQLite/PostgreSQL Compatibility**: All database-related code, schema changes, queries, migrations, and operational behavior **MUST** remain compatible with both SQLite and PostgreSQL, regardless of which database is actively used by the project. Database-specific features **MUST NOT** be introduced unless equivalent behavior is implemented and verified for both systems.
+* **Database Compatibility**: All database-related code, schema changes, queries, migrations, and operational behavior **MUST** use portable SQL. Runtime database support is SQLite-only; no PostgreSQL adapter or verification matrix is provided.
 * **Backend Engine**: Relies solely on the Node.js standard library (`node:http`, `node:sqlite`, `node:crypto`, `node:async_hooks`, `node:events`, `node:fs`, `node:path`, `node:test`, `node:assert`). No npm packages at runtime (no Express, Fastify, Drizzle, Prisma, TypeORM, Zod, uuid, bcrypt, etc.). Only `typescript` and `@types/node` are permitted as `devDependencies`.
 * **Frontend Presentation**: Relies solely on native PHP (with standard extensions: `pdo_sqlite`, `curl`, `session`, `filter`) and semantic HTML5 with vanilla CSS Custom Properties. No Composer dependencies, build pipelines, CSS preprocessors, or frontend JavaScript frameworks.
 

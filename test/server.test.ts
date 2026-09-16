@@ -43,7 +43,7 @@ class MockResponse {
   }
 }
 
-const testSecret = 'garrison-os-development-secret';
+const testSecret = process.env['APP_SECRET'] || 'garrison-os-development-secret';
 const testToken = createToken({
   sub: 'batch-user',
   tid: 'tenant-test',
@@ -206,11 +206,21 @@ describe('Batch endpoint', () => {
     let releaseMissing: (() => void) | undefined;
     const healthReady = new Promise<void>((resolve) => { releaseHealth = resolve; });
     const missingReady = new Promise<void>((resolve) => { releaseMissing = resolve; });
+    let resolveStarted: (() => void) | undefined;
+    let rejectStarted: ((error: Error) => void) | undefined;
+    const startedReady = new Promise<void>((resolve, reject) => {
+      resolveStarted = resolve;
+      rejectStarted = reject;
+    });
+    const startTimeout = setTimeout(() => {
+      rejectStarted?.(new Error('Batch requests did not start concurrently'));
+    }, 1000);
     globalThis.fetch = async (url) => {
       const target = new URL(url);
       const path = target.pathname;
       const isMissing = target.searchParams.has('missing');
       started.push(path);
+      if (started.length === 2) resolveStarted?.();
       await (!isMissing ? healthReady : missingReady);
       return new Response(JSON.stringify({
         success: !isMissing,
@@ -230,16 +240,24 @@ describe('Batch endpoint', () => {
       ]
     });
 
-    while (started.length < 2) {
-      await new Promise((resolve) => setImmediate(resolve));
+    try {
+      await startedReady;
+      assert.deepEqual(started.sort(), ['/api/v1/modules', '/health']);
+      releaseHealth?.();
+      releaseMissing?.();
+      const result = await resultPromise;
+      assert.equal(result.body.data.responses.response_0.status, 200);
+      assert.equal(result.body.data.responses.response_1.status, 404);
+      assert.equal(result.body.data.responses.response_1.error.code, 'NOT_FOUND');
+    } finally {
+      clearTimeout(startTimeout);
+      releaseHealth?.();
+      releaseMissing?.();
+      await Promise.race([
+        resultPromise,
+        new Promise<void>((resolve) => setTimeout(resolve, 1000))
+      ]);
     }
-    assert.deepEqual(started.sort(), ['/api/v1/modules', '/health']);
-    releaseHealth!();
-    releaseMissing!();
-    const result = await resultPromise;
-    assert.equal(result.body.data.responses.response_0.status, 200);
-    assert.equal(result.body.data.responses.response_1.status, 404);
-    assert.equal(result.body.data.responses.response_1.error.code, 'NOT_FOUND');
   });
 
   it('returns non-JSON responses as individual batch errors', async () => {

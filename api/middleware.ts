@@ -104,12 +104,12 @@ export const rateLimitMiddleware: Middleware = async (req, res, next) => {
  * Multi-tenant resolution and AsyncLocalStorage context execution wrapper.
  */
 export const tenantContextMiddleware: Middleware = async (req, res, next) => {
-  const isBatchRoute = req.path === '/api/v1/batch';
+  const isBatchRoute = req.path === '/api/v1/batch' || req.path === '/api/v1/batch/';
+  const isAdministratorRoute = req.path === '/api/v1/system/backup';
   const isPublicRoute = (
     req.path === '/health' ||
     req.path === '/ready' ||
     req.path.startsWith('/api/v1/auth/') ||
-    req.path.startsWith('/api/v1/system/backup') ||
     req.path === '/api/v1/system/status' ||
     req.path === '/api/v1/system/setup' ||
     req.path === '/api/v1/system/restore'
@@ -180,6 +180,23 @@ export const tenantContextMiddleware: Middleware = async (req, res, next) => {
       'The X-Tenant-ID header is required for this operational endpoint',
       400
     );
+  }
+
+  if (isAdministratorRoute) {
+    const db = getDatabase();
+    const administrator = userId
+      ? db.prepare(
+        'SELECT 1 FROM users WHERE id = ? AND tenant_id = ? AND role = ? AND deleted_at IS NULL'
+      ).get(userId, tenantId, 'owner')
+      : undefined;
+    if (!administrator) {
+      return errorResponse(
+        res,
+        'FORBIDDEN',
+        'Administrator authentication is required',
+        403
+      );
+    }
   }
 
   // Wrap downstream execution inside RequestContext
