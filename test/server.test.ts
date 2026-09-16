@@ -1,7 +1,10 @@
-import { describe, it, afterEach } from 'node:test';
+import { describe, it, before, after, afterEach } from 'node:test';
 import * as assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
 import { createRouter, validateEnvironment } from '../api/server.js';
+import { createToken } from '../core/crypto.js';
+import { closeDatabase, getDatabase } from '../database/client.js';
+import { runMigrations } from '../database/migrator.js';
 
 class MockRequest extends EventEmitter {
   public method: string;
@@ -40,11 +43,57 @@ class MockResponse {
   }
 }
 
-async function handleBatch(body: unknown): Promise<{ statusCode: number; body: any }> {
+const testSecret = 'garrison-os-development-secret';
+const testToken = createToken({
+  sub: 'batch-user',
+  tid: 'tenant-test',
+  role: 'owner',
+  exp: Math.floor(Date.now() / 1000) + 3600,
+  tv: 1
+}, testSecret);
+
+before(() => {
+  const db = getDatabase({ inMemory: true });
+  runMigrations(db);
+  const now = Date.now();
+  db.prepare('INSERT INTO tenants (id, name, created_at, updated_at) VALUES (?, ?, ?, ?)').run(
+    'tenant-test',
+    'Batch Test Tenant',
+    now,
+    now
+  );
+  db.prepare(`
+    INSERT INTO users (
+      id, tenant_id, email, password_hash, first_name, last_name, role,
+      token_version, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    'batch-user',
+    'tenant-test',
+    'batch@example.test',
+    '$scrypt$dummy',
+    'Batch',
+    'User',
+    'owner',
+    1,
+    now,
+    now
+  );
+});
+
+after(() => {
+  closeDatabase();
+});
+
+async function handleBatch(
+  body: unknown,
+  headers: Record<string, string> = {}
+): Promise<{ statusCode: number; body: any }> {
   const router = createRouter(31_234);
   const request = new MockRequest('POST', '/api/v1/batch', {
     'content-type': 'application/json',
-    'x-tenant-id': 'tenant-test'
+    authorization: 'Bearer ' + testToken,
+    ...headers
   });
   const response = new MockResponse();
   const promise = router.handle(request as any, response as any);
@@ -58,18 +107,29 @@ describe('Environment validation', () => {
   it('requires APP_SECRET outside development and test', () => {
     assert.throws(
       () => validateEnvironment('production', undefined),
-      /APP_SECRET must be set/
+      /APP_SECRET must contain at least 32 bytes/
     );
     assert.throws(
       () => validateEnvironment('staging', '   '),
-      /APP_SECRET must be set/
+      /APP_SECRET must contain at least 32 bytes/
     );
   });
 
   it('allows explicit secrets and local development defaults', () => {
-    assert.doesNotThrow(() => validateEnvironment('production', 'secure-secret'));
+    assert.doesNotThrow(() => validateEnvironment('production', 'a'.repeat(64)));
     assert.doesNotThrow(() => validateEnvironment('development', undefined));
     assert.doesNotThrow(() => validateEnvironment('test', undefined));
+  });
+
+  it('rejects weak production secrets', () => {
+    assert.throws(
+      () => validateEnvironment('production', 'a'.repeat(63)),
+      /at least 32 bytes encoded as hexadecimal/
+    );
+    assert.throws(
+      () => validateEnvironment('production', 'g'.repeat(64)),
+      /at least 32 bytes encoded as hexadecimal/
+    );
   });
 });
 
@@ -107,7 +167,9 @@ describe('Batch endpoint', () => {
     const router = createRouter(31_234);
     const request = new MockRequest('POST', '/api/v1/batch', {
       'content-type': 'application/json',
-      'x-tenant-id': 'tenant-test',
+      authorization: 'Bearer ' + testToken,
+      'x-tenant-id': 'spoofed-tenant',
+      'x-user-id': 'spoofed-user',
       'x-request-id': 'request-test'
     });
     const response = new MockResponse();
@@ -130,35 +192,73 @@ describe('Batch endpoint', () => {
     assert.equal(seen.length, 2);
     assert.equal(seen[0]!.url, 'http://127.0.0.1:31234/health');
     const forwardedHeaders = new Headers(seen[0]!.init?.headers);
-    assert.equal(forwardedHeaders.get('x-tenant-id'), 'tenant-test');
+    assert.equal(forwardedHeaders.get('authorization'), 'Bearer ' + testToken);
+    assert.equal(forwardedHeaders.get('x-tenant-id'), null);
+    assert.equal(forwardedHeaders.get('x-user-id'), null);
   });
 
   it('executes requests concurrently and preserves mixed response statuses', async () => {
     const started: string[] = [];
+    let releaseHealth: (() => void) | undefined;
+    let releaseMissing: (() => void) | undefined;
+    const healthReady = new Promise<void>((resolve) => { releaseHealth = resolve; });
+    const missingReady = new Promise<void>((resolve) => { releaseMissing = resolve; });
     globalThis.fetch = async (url) => {
       const path = new URL(url).pathname;
       started.push(path);
-      await new Promise((resolve) => setTimeout(resolve, path === '/health' ? 25 : 5));
+      await (path === '/health' ? healthReady : missingReady);
       return new Response(JSON.stringify({
         success: path === '/health',
         ...(path === '/health'
           ? { data: { status: 'ok' } }
           : { error: { code: 'NOT_FOUND', message: 'Missing' } })
-      }), { status: path === '/health' ? 200 : 404 });
+      }), {
+        status: path === '/health' ? 200 : 404,
+        headers: { 'content-type': 'application/json' }
+      });
     };
 
-    const start = Date.now();
-    const result = await handleBatch({
+    const resultPromise = handleBatch({
       requests: [
         { method: 'GET', path: '/health' },
         { method: 'GET', path: '/api/v1/missing' }
       ]
     });
 
-    assert.ok(Date.now() - start < 45);
+    while (started.length < 2) {
+      await new Promise((resolve) => setImmediate(resolve));
+    }
     assert.deepEqual(started.sort(), ['/api/v1/missing', '/health']);
+    releaseHealth!();
+    releaseMissing!();
+    const result = await resultPromise;
     assert.equal(result.body.data.responses.response_0.status, 200);
     assert.equal(result.body.data.responses.response_1.status, 404);
     assert.equal(result.body.data.responses.response_1.error.code, 'NOT_FOUND');
+  });
+
+  it('returns non-JSON responses as individual batch errors', async () => {
+    globalThis.fetch = async () => new Response('binary', {
+      status: 200,
+      headers: { 'content-type': 'application/x-sqlite3' }
+    });
+
+    const result = await handleBatch({
+      requests: [{ method: 'GET', path: '/api/v1/system/backup' }]
+    });
+
+    assert.equal(result.statusCode, 200);
+    assert.equal(result.body.data.responses.response_0.status, 200);
+    assert.equal(result.body.data.responses.response_0.error.code, 'NON_JSON_RESPONSE');
+  });
+
+  it('requires a verified bearer token and ignores identity headers', async () => {
+    const result = await handleBatch(
+      { requests: [{ method: 'GET', path: '/health' }] },
+      { authorization: '' }
+    );
+
+    assert.equal(result.statusCode, 401);
+    assert.equal(result.body.error.code, 'UNAUTHORIZED');
   });
 });

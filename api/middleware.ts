@@ -40,7 +40,7 @@ export function resolveCorsOrigin(origin: string | undefined, allowedOrigins: Re
 }
 
 /**
- * Security headers and CORS middleware
+ * Security headers and CORS middleware.
  */
 export const securityHeadersMiddleware: Middleware = async (req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
@@ -59,7 +59,7 @@ export const securityHeadersMiddleware: Middleware = async (req, res, next) => {
 };
 
 /**
- * Correlation ID tracking middleware
+ * Correlation ID tracking middleware.
  */
 export const correlationMiddleware: Middleware = async (req, res, next) => {
   const headerId = req.headers['x-request-id'];
@@ -70,7 +70,7 @@ export const correlationMiddleware: Middleware = async (req, res, next) => {
 };
 
 /**
- * In-memory sliding-window rate limiter for sensitive authentication routes
+ * In-memory sliding-window rate limiter for sensitive authentication routes.
  */
 export const rateLimitMiddleware: Middleware = async (req, res, next) => {
   if (req.path.startsWith('/api/v1/auth/') || req.path === '/api/v1/system/setup' || req.path === '/api/v1/system/restore') {
@@ -101,9 +101,10 @@ export const rateLimitMiddleware: Middleware = async (req, res, next) => {
 };
 
 /**
- * Multi-tenant resolution & AsyncLocalStorage context execution wrapper
+ * Multi-tenant resolution and AsyncLocalStorage context execution wrapper.
  */
 export const tenantContextMiddleware: Middleware = async (req, res, next) => {
+  const isBatchRoute = req.path === '/api/v1/batch';
   const isPublicRoute = (
     req.path === '/health' ||
     req.path === '/ready' ||
@@ -114,8 +115,9 @@ export const tenantContextMiddleware: Middleware = async (req, res, next) => {
     req.path === '/api/v1/system/restore'
   );
 
-  let tenantId = (req.headers['x-tenant-id'] as string) || '';
-  let userId = (req.headers['x-user-id'] as string) || undefined;
+  let tenantId = isBatchRoute ? '' : ((req.headers['x-tenant-id'] as string) || '');
+  let userId = isBatchRoute ? undefined : ((req.headers['x-user-id'] as string) || undefined);
+  let batchAuthenticated = false;
 
   // Extract Bearer token if present
   const authHeader = req.headers['authorization'];
@@ -133,8 +135,14 @@ export const tenantContextMiddleware: Middleware = async (req, res, next) => {
     }
 
     if (payload) {
-      if (!tenantId) tenantId = payload.tid;
-      if (!userId) userId = payload.sub;
+      if (isBatchRoute) {
+        tenantId = typeof payload.tid === 'string' ? payload.tid : '';
+        userId = typeof payload.sub === 'string' ? payload.sub : undefined;
+        batchAuthenticated = tenantId.length > 0 && typeof userId === 'string' && userId.length > 0;
+      } else {
+        if (!tenantId) tenantId = payload.tid;
+        if (!userId) userId = payload.sub;
+      }
     } else if (authHeader && !isPublicRoute) {
       return errorResponse(
         res,
@@ -143,6 +151,15 @@ export const tenantContextMiddleware: Middleware = async (req, res, next) => {
         401
       );
     }
+  }
+
+  if (isBatchRoute && !batchAuthenticated) {
+    return errorResponse(
+      res,
+      'UNAUTHORIZED',
+      'A valid bearer token is required for batch requests',
+      401
+    );
   }
 
   req.tenantId = tenantId;

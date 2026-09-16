@@ -116,15 +116,13 @@ This document provides a technical critique of the GarrisonOS architecture, runt
 
 ### Identified Risks & Limitations
 
-* **Stateless Token Invalidation**: Session tokens are verified cryptographically via HMAC-SHA256 with a 24-hour expiration. Because tokens are stateless and lack a database version or revocation check, tokens remain valid for their full lifespan even if a user is deleted, their role is modified, or their password is changed.
-* **Global CORS Policy**: CORS now uses the configured `CORS_ALLOWED_ORIGINS` allowlist and does not emit wildcard origins.
+* **Legacy Token Invalidation**: New session tokens include a `token_version` claim and database-backed verification rejects mismatched versions or deleted users. Legacy tokens without a `tv` claim remain accepted for compatibility and cannot be revoked through the version check.
 * **Default Secret Fallbacks**: Non-development server startup now requires an explicit `APP_SECRET`.
 
 ### Recommendations
 
-1. Add a `token_version` integer column to the `users` table and include it in token claims to support instant session revocation upon password or role updates.
+1. Decide when to remove support for legacy tokens without `tv`; after a documented compatibility window, reject them so every token is revocable through `token_version`.
 2. Keep deployment checks and environment documentation aligned with the explicit `APP_SECRET` startup requirement.
-3. Restrict CORS origins to configured application hosts.
 
 ---
 
@@ -135,6 +133,6 @@ This document provides a technical critique of the GarrisonOS architecture, runt
 | **High** | **Context & Events** | Context loss in async event handlers | Auto-propagate `RequestContext` in `EventBus.subscribe()` |
 | **High** | **Database Migrator** | Alphabetical migration execution | Topological sort migrations by `dependencies` in `module.json` |
 | **Medium** | **HTTP Router** | Linear regex matching order sensitivity | Introduce static-first segment precedence in route dispatcher |
-| **Medium** | **Security** | Inability to revoke stateless HMAC tokens | Add `token_version` claim check against `users` table |
+| **Medium** | **Security** | Legacy HMAC tokens without `tv` cannot be revoked | Define and document a compatibility window before rejecting legacy tokens |
 | **Medium** | **Frontend API** | Sequential cURL overhead on composite pages | Provide composite/batch API endpoint for dashboard hydration |
 | **Low** | **Accounting** | Statutory trust reconciliation reporting | Add dedicated escrow/trust statutory compliance reports |

@@ -27,14 +27,30 @@ const PORT = parseInt(process.env['PORT'] || '3000', 10);
 const HOST = process.env['HOST'] || '127.0.0.1';
 
 /**
- * Validate that deployments outside local development have an explicit secret.
+ * Validate that deployments outside local development use a strong HMAC secret.
+ *
+ * @param nodeEnv Runtime environment name.
+ * @param appSecret Candidate HMAC secret.
+ * @throws Error when a non-development environment has an invalid secret.
  */
 export function validateEnvironment(nodeEnv: string, appSecret: string | undefined): void {
-  if (nodeEnv !== 'development' && nodeEnv !== 'test' && !appSecret?.trim()) {
-    throw new Error('APP_SECRET must be set before starting the server outside development and test environments');
+  if (
+    nodeEnv !== 'development' &&
+    nodeEnv !== 'test' &&
+    !/^(?:[a-f0-9]{2}){32,}$/i.test(appSecret?.trim() ?? '')
+  ) {
+    throw new Error(
+      'APP_SECRET must contain at least 32 bytes encoded as hexadecimal before starting the server outside development and test environments'
+    );
   }
 }
 
+/**
+ * Create the API router and register core routes and middleware.
+ *
+ * @param serverPort Loopback port used by internal batch requests.
+ * @returns A configured API router.
+ */
 export function createRouter(serverPort: number = PORT): Router {
   const router = new Router();
 
@@ -99,16 +115,54 @@ export function createRouter(serverPort: number = PORT): Router {
       Accept: 'application/json',
       'X-Request-ID': req.correlationId || generateUUIDv7()
     };
-    for (const headerName of ['authorization', 'x-tenant-id', 'x-user-id']) {
+    for (const headerName of ['authorization']) {
       const value = req.headers[headerName];
       if (typeof value === 'string') headers[headerName] = value;
     }
 
     try {
       const responseEntries = await Promise.all(validatedRequests.map(async ({ path, method }) => {
-        const response = await fetch(`http://127.0.0.1:${serverPort}${path}`, { method, headers });
-        const envelope = await response.json() as Record<string, unknown>;
-        return { path, status: response.status, ...envelope };
+        try {
+          const response = await fetch(`http://127.0.0.1:${serverPort}${path}`, { method, headers });
+          const contentType = response.headers.get('content-type') || '';
+          if (!contentType.toLowerCase().includes('application/json')) {
+            return {
+              path,
+              status: response.status,
+              success: false,
+              error: {
+                code: 'NON_JSON_RESPONSE',
+                message: 'Batch requests support JSON responses only',
+                contentType: contentType || 'unknown'
+              }
+            };
+          }
+
+          try {
+            const envelope = await response.json() as Record<string, unknown>;
+            return { path, status: response.status, ...envelope };
+          } catch {
+            return {
+              path,
+              status: 502,
+              success: false,
+              error: {
+                code: 'INVALID_BATCH_RESPONSE',
+                message: 'The endpoint returned an invalid JSON response'
+              }
+            };
+          }
+        } catch {
+          return {
+            path,
+            status: 502,
+            success: false,
+            error: {
+              code: 'BATCH_ITEM_FAILED',
+              message: 'Unable to complete this batch request'
+            }
+          };
+        }
       }));
       const responses: Record<string, Record<string, unknown>> = {};
       responseEntries.forEach((entry, index) => {
@@ -119,8 +173,8 @@ export function createRouter(serverPort: number = PORT): Router {
         page: 1,
         limit: responseEntries.length
       });
-    } catch (error) {
-      errorResponse(res, 'BATCH_FAILED', `Unable to complete batch request: ${String(error)}`, 502);
+    } catch {
+      errorResponse(res, 'BATCH_FAILED', 'Unable to complete batch request', 502);
     }
   });
 
@@ -441,6 +495,13 @@ export function createRouter(serverPort: number = PORT): Router {
   return router;
 }
 
+/**
+ * Start the loopback API server after validating runtime configuration.
+ *
+ * @param port TCP port for the API engine.
+ * @param host Binding address, restricted to loopback by default.
+ * @returns The HTTP server and configured router.
+ */
 export async function startServer(
   port: number = PORT,
   host: string = HOST

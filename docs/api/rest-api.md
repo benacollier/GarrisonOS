@@ -8,7 +8,7 @@ The GarrisonOS REST API is exposed by the headless Node.js backend (`api/server.
 
 | Header | Required | Description |
 | :--- | :--- | :--- |
-| `X-Tenant-ID` | **Yes\*** | UUIDv7 of the active tenant context (\*except public endpoints) |
+| `X-Tenant-ID` | **Yes\*** | UUIDv7 of the active tenant context (\*except public endpoints; ignored for authenticated batch identity) |
 | `Authorization` | Optional | `Bearer <signed_hmac_token>` for authenticated endpoints |
 | `X-Request-ID` | Optional | Client correlation ID (generated automatically if omitted) |
 | `Content-Type` | Optional | `application/json` for state-modifying requests |
@@ -71,7 +71,7 @@ All JSON responses conform to standardized envelopes:
 | `GET` | `/health` | Public | Liveness check returning status and uptime |
 | `GET` | `/ready` | Public | Readiness check verifying SQLite database connectivity |
 | `POST` | `/api/v1/auth/login` | Public (Rate Limited) | Authenticate user credentials and return signed HMAC token |
-| `POST` | `/api/v1/batch` | Authenticated | Execute up to 10 authenticated `GET` requests concurrently |
+| `POST` | `/api/v1/batch` | Authenticated | Execute up to 10 authenticated `GET` requests concurrently. Tenant and user identity come only from the verified bearer token; each response is indexed as `response_N`. Non-JSON responses return `NON_JSON_RESPONSE` for that item without failing the complete batch. |
 | `GET` | `/api/v1/system/backup` | Admin | Trigger WAL checkpoint and create database snapshot |
 
 ---
