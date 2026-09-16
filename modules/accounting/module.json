@@ -1,7 +1,7 @@
 {
   "id": "accounting",
   "name": "Accounting & Ledger",
-  "description": "Cash-basis ledger, billing cycles, IRS Schedule E reporting, and rent collection.",
+  "description": "Cash-basis ledger, double-entry general ledger, statutory trust accounting, IRS Schedule E reporting, and rent collection.",
   "navigation": [
     {
       "label": "Accounting",

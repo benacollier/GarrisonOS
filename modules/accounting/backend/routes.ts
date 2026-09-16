@@ -59,6 +59,28 @@ export function registerRoutes(router: Router): void {
     }
   });
 
+  // --- Statutory Trust Three-Way Reconciliation ---
+  router.getBatchSafe('/api/v1/accounting/reconciliation/three-way', (req, res) => {
+    const asOf = req.query.as_of ? parseInt(req.query.as_of, 10) : undefined;
+    const reconciliation = AccountingRepository.getThreeWayReconciliation(asOf);
+    successResponse(res, reconciliation);
+  });
+
+  // --- IRS Form 1099-NEC Vendor Expense Report ---
+  router.getBatchSafe('/api/v1/accounting/reports/1099-nec', (req, res) => {
+    const year = req.query.year ? parseInt(req.query.year, 10) : new Date().getUTCFullYear();
+    const report = AccountingRepository.getVendor1099Report(year);
+    successResponse(res, report);
+  });
+
+  // --- Statutory Move-Out Disposition Timeline ---
+  router.getBatchSafe('/api/v1/accounting/disposition/timeline', (req, res) => {
+    const moveOutDate = req.query.move_out_date ? parseInt(req.query.move_out_date, 10) : Date.now();
+    const state = req.query.state || 'US';
+    const timeline = AccountingRepository.getStatutoryDispositionTimeline(moveOutDate, state);
+    successResponse(res, timeline);
+  });
+
   // --- Transactions CRUD ---
   router.getBatchSafe('/api/v1/accounting/transactions', (req, res) => {
     const transactions = AccountingRepository.listTransactions({

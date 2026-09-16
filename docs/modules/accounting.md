@@ -97,7 +97,12 @@ $$\text{NOI} = \text{Operating Income (Rent, Fees)} - \text{Operating Expenses (
 * `POST /api/v1/accounting/generate-rent-charges`: Trigger automated recurring monthly billing run
 * `POST /api/v1/accounting/deposit-disposition`: Finalize deposit trust payout and damage deductions
 
-### 4.3. Exports & External Compatibility
+### 4.3. Statutory Compliance & Reconciliation
+* `GET /api/v1/accounting/reconciliation/three-way`: Statutory Three-Way Bank Reconciliation report proving parity across Bank Balance, GL Trust Cash (`1020`), and Active Lease Deposit Liabilities (`2100`)
+* `GET /api/v1/accounting/reports/1099-nec`: Annual IRS Form 1099-NEC vendor expense summary report with statutory $600 threshold flagging (`?year=YYYY`)
+* `GET /api/v1/accounting/disposition/timeline`: Statutory move-out deposit deduction deadline and countdown schedule (`?move_out_date=...&state=...`)
+
+### 4.4. Exports & External Compatibility
 * `GET /api/v1/accounting/export/rent-roll.csv`: Stream Rent Roll CSV
 * `GET /api/v1/accounting/export/schedule-e.csv`: Stream IRS Schedule E P&L breakdown CSV
 * `GET /api/v1/accounting/export/ledger/:leaseId.csv`: Stream itemized tenant ledger statement CSV
@@ -130,3 +135,24 @@ GarrisonOS exports directly from persistent General Ledger entries into standard
    * **QuickBooks Online (QBO) Journal CSV**: Conforms to Intuit's batch journal import structure.
    * **QuickBooks Desktop (IIF)**: Tab-delimited transaction blocks (`!TRNS`/`!SPL`/`!ENDTRNS`).
    * **Web Connect (QBO/OFX)**: OFX 2.1 SGML/XML banking import for bank feed reconciliation.
+
+---
+
+## 6. Statutory Trust Accounting & Regulatory Compliance
+
+To satisfy real estate commission licensing mandates across all 50 US states, GarrisonOS enforces strict separation of fiduciary funds and automated audit proofs:
+
+### 6.1. Non-Commingling Invariant
+Tenant security deposits are the legal property of the tenant held in trust. The accounting engine rejects any journal entry that attempts to deposit tenant security funds into `1010 Operating Checking` or pay operating expenses from `1020 Security Deposit Trust Checking` without an offsetting liability settlement.
+
+### 6.2. Three-Way Bank Reconciliation
+State real estate licensing laws require monthly verification proving three-way balance parity:
+$$\text{Bank Statement Balance} \equiv \text{GL Trust Account Balance (1020)} \equiv \sum \text{Active Lease Deposit Liabilities}$$
+
+The `/api/v1/accounting/reconciliation/three-way` endpoint audits this equation and outputs an itemized lease breakdown with discrepancy tracking.
+
+### 6.3. Vendor Tax Compliance (IRS Form 1099-NEC)
+Property managers must report annual non-employee compensation of $600 or more paid to unincorporated contractors and repair vendors. GarrisonOS aggregates all payments linked to vendor contacts across both single-entry transactions and double-entry journal lines, generating an annual summary flagging qualifying vendors for IRS Form 1099-NEC filing.
+
+### 6.4. Statutory Move-Out Deduction Timelines
+State laws establish strict statutory windows within which an itemized statement of deductions and remaining deposit refund must be delivered to a vacated tenant (e.g., California Civil Code § 1950.5 mandates 21 days; New York General Obligations Law § 7-103 mandates 14 days; Texas Property Code § 92.104 mandates 30 days). GarrisonOS computes real-time countdown alerts and flags overdue dispositions.
