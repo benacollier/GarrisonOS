@@ -6,6 +6,7 @@ This document establishes the mandatory engineering standards, architectural con
 
 ## 1. Zero External Runtime Dependencies
 
+* **Database Compatibility**: All database-related code, schema changes, queries, migrations, and operational behavior **MUST** use portable SQL. Runtime database support is SQLite-only; no PostgreSQL adapter or verification matrix is provided.
 * **Backend Engine**: Relies solely on the Node.js standard library (`node:http`, `node:sqlite`, `node:crypto`, `node:async_hooks`, `node:events`, `node:fs`, `node:path`, `node:test`, `node:assert`). No npm packages at runtime (no Express, Fastify, Drizzle, Prisma, TypeORM, Zod, uuid, bcrypt, etc.). Only `typescript` and `@types/node` are permitted as `devDependencies`.
 * **Frontend Presentation**: Relies solely on native PHP (with standard extensions: `pdo_sqlite`, `curl`, `session`, `filter`) and semantic HTML5 with vanilla CSS Custom Properties. No Composer dependencies, build pipelines, CSS preprocessors, or frontend JavaScript frameworks.
 
@@ -14,6 +15,8 @@ This document establishes the mandatory engineering standards, architectural con
 ## 2. Code Quality & Clean Attribution
 
 * Maintain clean, idiomatic, human-grade engineering standards.
+* **Design with contracts.** Use contracts to document and verify that code does no more and no less than it claims to do.
+* **No agent or AI attribution:** Agents MUST NOT reference themselves or identify AI/LLM involvement anywhere in the repository, including as co-authors, contributors, reviewers, authors, or any other capacity. Repository contents MUST contain no LLM indicators, generated-by notices, model names, agent identities, or equivalent provenance markers.
 * No conversational explanations, boilerplate disclaimers, or generic placeholder comments (e.g. `// TODO: Implement your logic here`).
 * **100% Docstring Coverage**: Every exported function, class, method, module, and public API surface must include complete docstrings or equivalent API documentation comments (for example TSDoc/JSDoc for TypeScript and PHPDoc for PHP). Undocumented public symbols are non-compliant and must be corrected before merge.
 * **Markdown Linting**: Always markdown lint edits containing markdown.

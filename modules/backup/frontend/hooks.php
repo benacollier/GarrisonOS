@@ -9,9 +9,11 @@ HookRegistry::registerNavigation([
     'section' => 'system'
 ]);
 
-HookRegistry::registerDashboardCard(function ($api) {
+HookRegistry::registerDashboardCard('/api/v1/backups?limit=1', function ($res) {
     try {
-        $res = $api->get('/api/v1/backups?limit=1');
+        if (!is_array($res) || ($res['ok'] ?? false) !== true) {
+            return null;
+        }
         $items = $res['data']['items'] ?? [];
         $latest = !empty($items) ? $items[0] : null;
 
@@ -40,4 +42,3 @@ HookRegistry::registerDashboardCard(function ($api) {
         return null;
     }
 });
-

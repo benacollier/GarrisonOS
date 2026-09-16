@@ -123,7 +123,7 @@ try {
                             </td>
                             <td style="text-align: right;">
                                 <?php if (empty($entry['reversed_by_entry_id']) && $entry['source_type'] !== 'reversal'): ?>
-                                    <form method="POST" action="/accounting/general-ledger" style="display: inline;" onsubmit="return confirm('Reverse Entry #<?= $entry['entry_number'] ?>? An exact opposite journal entry will be posted.');">
+                                    <form method="POST" action="/accounting/general-ledger" style="display: inline;" onsubmit="return confirm(<?= htmlspecialchars(json_encode('Reverse Entry #' . (string)$entry['entry_number'] . '? An exact opposite journal entry will be posted.', JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?>);">
                                         <?= CSRF::field() ?>
                                         <input type="hidden" name="action" value="reverse_entry">
                                         <input type="hidden" name="entry_id" value="<?= htmlspecialchars($entry['id'], ENT_QUOTES, 'UTF-8') ?>">

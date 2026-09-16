@@ -15,12 +15,43 @@ import { eventBus } from '../core/events.js';
 import { loadModules, getLoadedModules } from '../core/module-loader.js';
 import { verifyPassword, hashPassword, createToken, generateUUIDv7 } from '../core/crypto.js';
 import { RequestContext } from '../core/context.js';
+import { getApplicationVersion } from '../core/version.js';
 
-const APP_SECRET = process.env['APP_SECRET'] || 'garrison-os-default-secret-key-change-in-production';
+const NODE_ENV = process.env['NODE_ENV'] || 'development';
+const APP_SECRET = process.env['APP_SECRET'] || (
+  NODE_ENV === 'development' || NODE_ENV === 'test'
+    ? 'garrison-os-development-secret'
+    : ''
+);
 const PORT = parseInt(process.env['PORT'] || '3000', 10);
 const HOST = process.env['HOST'] || '127.0.0.1';
 
-export function createRouter(): Router {
+/**
+ * Validate that deployments outside local development use a strong HMAC secret.
+ *
+ * @param nodeEnv Runtime environment name.
+ * @param appSecret Candidate HMAC secret.
+ * @throws Error when a non-development environment has an invalid secret.
+ */
+export function validateEnvironment(nodeEnv: string, appSecret: string | undefined): void {
+  if (
+    nodeEnv !== 'development' &&
+    nodeEnv !== 'test' &&
+    !/^(?:[a-f0-9]{2}){32,}$/i.test(appSecret?.trim() ?? '')
+  ) {
+    throw new Error(
+      'APP_SECRET must contain at least 32 bytes encoded as hexadecimal before starting the server outside development and test environments'
+    );
+  }
+}
+
+/**
+ * Create the API router and register core routes and middleware.
+ *
+ * @param serverPort Loopback port used by internal batch requests.
+ * @returns A configured API router.
+ */
+export function createRouter(serverPort: number = PORT): Router {
   const router = new Router();
 
   // Attach middleware stack
@@ -30,15 +61,15 @@ export function createRouter(): Router {
   router.use(tenantContextMiddleware);
 
   // Health and readiness checks
-  router.get('/health', (_req, res) => {
+  router.getBatchSafe('/health', (_req, res) => {
     successResponse(res, {
       status: 'ok',
-      version: '1.0.0',
+      version: getApplicationVersion(),
       timestamp: Date.now()
     });
   });
 
-  router.get('/ready', (_req, res) => {
+  router.getBatchSafe('/ready', (_req, res) => {
     try {
       const db = getDatabase();
       db.prepare('SELECT 1').get();
@@ -53,9 +84,108 @@ export function createRouter(): Router {
   });
 
   // Loaded modules introspection
-  router.get('/api/v1/modules', (_req, res) => {
+  router.getBatchSafe('/api/v1/modules', (_req, res) => {
     const modules = getLoadedModules().map((m) => m.manifest);
     successResponse(res, { modules });
+  });
+
+  // Execute a bounded set of read-only API requests concurrently.
+  router.post('/api/v1/batch', async (req, res) => {
+    const requests = req.body?.requests;
+    if (!Array.isArray(requests) || requests.length === 0 || requests.length > 10) {
+      return errorResponse(res, 'VALIDATION_ERROR', 'Batch requests must contain between 1 and 10 items', 400);
+    }
+
+    const validatedRequests: Array<{ path: string; method: 'GET' }> = [];
+    for (const item of requests) {
+      let targetUrl: URL;
+      try {
+        targetUrl = new URL(item?.path, 'http://batch.local');
+      } catch {
+        return errorResponse(res, 'VALIDATION_ERROR', 'Batch supports only relative GET requests', 400);
+      }
+      const pathname = targetUrl.pathname;
+      if (
+        !item ||
+        typeof item.path !== 'string' ||
+        item.path.length > 512 ||
+        !item.path.startsWith('/') ||
+        targetUrl.origin !== 'http://batch.local' ||
+        !(pathname === '/health' || pathname === '/ready' || pathname.startsWith('/api/v1/')) ||
+        pathname === '/api/v1/batch' ||
+        !router.isBatchSafeGetPath(pathname) ||
+        (item.method !== undefined && item.method !== 'GET')
+      ) {
+        return errorResponse(res, 'VALIDATION_ERROR', 'Batch supports only safe relative GET requests', 400);
+      }
+      validatedRequests.push({ path: item.path, method: 'GET' });
+    }
+
+    const headers: Record<string, string> = {
+      Accept: 'application/json',
+      'X-Request-ID': req.correlationId || generateUUIDv7()
+    };
+    for (const headerName of ['authorization']) {
+      const value = req.headers[headerName];
+      if (typeof value === 'string') headers[headerName] = value;
+    }
+
+    try {
+      const responseEntries = await Promise.all(validatedRequests.map(async ({ path, method }) => {
+        try {
+          const response = await fetch(`http://127.0.0.1:${serverPort}${path}`, { method, headers });
+          const contentType = response.headers.get('content-type') || '';
+          if (!contentType.toLowerCase().includes('application/json')) {
+            return {
+              path,
+              status: response.status,
+              success: false,
+              error: {
+                code: 'NON_JSON_RESPONSE',
+                message: 'Batch requests support JSON responses only',
+                contentType: contentType || 'unknown'
+              }
+            };
+          }
+
+          try {
+            const envelope = await response.json() as Record<string, unknown>;
+            return { path, status: response.status, ...envelope };
+          } catch {
+            return {
+              path,
+              status: 502,
+              success: false,
+              error: {
+                code: 'INVALID_BATCH_RESPONSE',
+                message: 'The endpoint returned an invalid JSON response'
+              }
+            };
+          }
+        } catch {
+          return {
+            path,
+            status: 502,
+            success: false,
+            error: {
+              code: 'BATCH_ITEM_FAILED',
+              message: 'Unable to complete this batch request'
+            }
+          };
+        }
+      }));
+      const responses: Record<string, Record<string, unknown>> = {};
+      responseEntries.forEach((entry, index) => {
+        responses[`response_${index}`] = entry;
+      });
+      successResponse(res, { responses }, 200, {
+        total: responseEntries.length,
+        page: 1,
+        limit: responseEntries.length
+      });
+    } catch {
+      errorResponse(res, 'BATCH_FAILED', 'Unable to complete batch request', 502);
+    }
   });
 
   // Authentication: Operator Login
@@ -128,7 +258,7 @@ export function createRouter(): Router {
   });
 
   // System Database Backup Snapshot
-  router.get('/api/v1/system/backup', (_req, res) => {
+  router.getUnsafe('/api/v1/system/backup', (_req, res) => {
     try {
       const db = getDatabase();
       db.exec('PRAGMA wal_checkpoint(TRUNCATE);');
@@ -375,11 +505,20 @@ export function createRouter(): Router {
   return router;
 }
 
+/**
+ * Start the loopback API server after validating runtime configuration.
+ *
+ * @param port TCP port for the API engine.
+ * @param host Binding address, restricted to loopback by default.
+ * @returns The HTTP server and configured router.
+ */
 export async function startServer(
   port: number = PORT,
   host: string = HOST
 ): Promise<{ server: HttpServer; router: Router }> {
-  const router = createRouter();
+  validateEnvironment(NODE_ENV, process.env['APP_SECRET']);
+
+  const router = createRouter(port);
 
   // Load all functional modules dynamically
   await loadModules(router, eventBus);
@@ -417,4 +556,3 @@ if (isDirectExecution) {
   process.on('SIGINT', cleanup);
   process.on('SIGTERM', cleanup);
 }
-

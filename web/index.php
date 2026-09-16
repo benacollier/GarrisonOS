@@ -32,6 +32,7 @@ require_once __DIR__ . '/lib/csrf.php';
 require_once __DIR__ . '/lib/auth.php';
 require_once __DIR__ . '/lib/api.php';
 require_once __DIR__ . '/lib/hooks.php';
+require_once __DIR__ . '/lib/version.php';
 
 $api = new ApiClient();
 HookRegistry::loadModuleHooks(__DIR__ . '/..');

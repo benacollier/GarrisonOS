@@ -7,7 +7,7 @@ import { eventBus } from '../../../core/events.js';
 
 export function registerRoutes(router: Router): void {
   // List backups
-  router.get('/api/v1/backups', (req, res) => {
+  router.getBatchSafe('/api/v1/backups', (req, res) => {
     try {
       const url = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`);
       const limit = parseInt(url.searchParams.get('limit') || '50', 10);

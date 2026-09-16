@@ -27,13 +27,14 @@ modules/[module_name]/
 
 ## 2. Module Manifest (`module.json`)
 
-The manifest declares the module identity, version, UI slots, and dependencies:
+The manifest declares the module identity, UI slots, and dependencies. The application
+version is sourced from the repository root `VERSION` file and injected by the module
+loader:
 
 ```json
 {
   "id": "accounting",
   "name": "Accounting & Financials",
-  "version": "1.0.0",
   "description": "Cash-basis ledger, billing cycles, IRS Schedule E, and balance tracking.",
   "navigation": [
     {

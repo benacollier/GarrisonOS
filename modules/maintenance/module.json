@@ -1,7 +1,6 @@
 {
   "id": "maintenance",
   "name": "Maintenance & Repairs",
-  "version": "1.0.0",
   "description": "Work orders, repair requests, vendor dispatches, and maintenance cost tracking.",
   "navigation": [
     {
@@ -18,4 +17,3 @@
   ],
   "dependencies": ["properties", "contacts"]
 }
-

@@ -8,7 +8,7 @@ import { JournalService } from './journal.js';
 
 export function registerRoutes(router: Router): void {
   // --- Rent Roll ---
-  router.get('/api/v1/accounting/rent-roll', (_req, res) => {
+  router.getBatchSafe('/api/v1/accounting/rent-roll', (_req, res) => {
     const rentRoll = AccountingRepository.getRentRoll();
     const totalScheduledRentCents = rentRoll.reduce((sum, r) => sum + r.monthly_rent_cents, 0);
     const totalDelinquencyCents = rentRoll.reduce((sum, r) => sum + Math.max(0, r.balance_cents), 0);
@@ -60,7 +60,7 @@ export function registerRoutes(router: Router): void {
   });
 
   // --- Transactions CRUD ---
-  router.get('/api/v1/accounting/transactions', (req, res) => {
+  router.getBatchSafe('/api/v1/accounting/transactions', (req, res) => {
     const transactions = AccountingRepository.listTransactions({
       lease_id: req.query.lease_id,
       property_id: req.query.property_id,

@@ -16,6 +16,7 @@ GarrisonOS is configured through standard environment variables loaded from `.en
 | `SQLITE_PATH` | `./garrison.sqlite` | File system path for the primary SQLite database. |
 | `STORAGE_PATH` | `./storage/uploads` | File system path for uploaded tenant attachments and receipts. |
 | `APP_SECRET` | *(Required in production)* | 32+ byte hex string (64 hex characters) used for HMAC-SHA256 session signatures and authentication tokens. |
+| `CORS_ALLOWED_ORIGINS` | *(Development web host; empty otherwise)* | Comma-separated browser origins permitted by the API, such as `https://app.example.com,https://admin.example.com`. |
 | `PHP_SESSION_NAME` | `garrison_session` | Cookie name for the PHP session identifier. |
 
 ---

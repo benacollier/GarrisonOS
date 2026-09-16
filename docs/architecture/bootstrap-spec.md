@@ -129,7 +129,9 @@ garrison-os/
 
 ## 3. Drop-in Module Standard Specification
 
-Every functional module under `modules/[module_name]/` must adhere strictly to the following contract:
+Every functional module under `modules/[module_name]/` must adhere strictly to the following contract.
+The application version is sourced from the repository root `VERSION` file and injected into
+loaded module metadata:
 
 ### 3.1. Module Manifest (`module.json`)
 
@@ -137,7 +139,6 @@ Every functional module under `modules/[module_name]/` must adhere strictly to t
 {
   "id": "properties",
   "name": "Properties & Portfolios",
-  "version": "1.0.0",
   "description": "Management of portfolios, physical properties, and rentable units.",
   "navigation": [
     {

@@ -30,7 +30,6 @@ $navItems = HookRegistry::getNavigation();
         <?php endforeach; ?>
     </nav>
     <div class="sidebar-footer">
-        <small>GarrisonOS v1.0.0 (Open Source)</small>
+        <small>GarrisonOS v<?= htmlspecialchars(application_version(), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?> (Open Source)</small>
     </div>
 </aside>
-

@@ -156,5 +156,35 @@ class ApiClient {
     public function delete(string $path): array {
         return $this->request('DELETE', $path);
     }
-}
 
+    /**
+     * Execute multiple read-only API requests in one round trip.
+     *
+     * @param array<int, string> $paths
+     * @return array<string, array<string, mixed>> Responses include an explicit `ok` flag.
+     */
+    public function batch(array $paths): array {
+        if (count($paths) !== count(array_unique($paths))) {
+            throw new InvalidArgumentException('Batch paths must be unique');
+        }
+        $response = $this->post('/api/v1/batch', [
+            'requests' => array_map(
+                static fn (string $path): array => ['method' => 'GET', 'path' => $path],
+                $paths
+            )
+        ]);
+        $responses = $response['data']['responses'] ?? [];
+        $result = [];
+        foreach ($responses as $item) {
+            if (is_array($item) && isset($item['path'])) {
+                $item['ok'] = ($item['success'] ?? false) === true
+                    && isset($item['status'])
+                    && is_int($item['status'])
+                    && $item['status'] >= 200
+                    && $item['status'] < 300;
+                $result[(string)$item['path']] = $item;
+            }
+        }
+        return $result;
+    }
+}

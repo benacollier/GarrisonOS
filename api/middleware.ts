@@ -5,7 +5,22 @@ import { generateUUIDv7, verifyToken, verifyTokenWithDatabase } from '../core/cr
 import { RequestContext } from '../core/context.js';
 import { getDatabase } from '../database/client.js';
 
-const APP_SECRET = process.env['APP_SECRET'] || 'garrison-os-default-secret-key-change-in-production';
+const NODE_ENV = process.env['NODE_ENV'] || 'development';
+const APP_SECRET = process.env['APP_SECRET'] || (
+  NODE_ENV === 'development' || NODE_ENV === 'test'
+    ? 'garrison-os-development-secret'
+    : ''
+);
+const CORS_ALLOWED_ORIGINS = new Set(
+  (process.env['CORS_ALLOWED_ORIGINS'] || process.env['ALLOWED_ORIGINS'] || (
+    NODE_ENV === 'development'
+      ? `http://${process.env['WEB_HOST'] || 'localhost'}:${process.env['WEB_PORT'] || '8080'}`
+      : ''
+  ))
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter((origin) => origin.length > 0)
+);
 
 // Sliding-window rate limiter state
 interface RateLimitRecord {
@@ -17,20 +32,34 @@ const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000; // 15 minutes
 const RATE_LIMIT_MAX_ATTEMPTS = 10;
 
 /**
- * Security headers and CORS middleware
+ * Resolve the response origin without ever reflecting an unconfigured origin.
  */
-export const securityHeadersMiddleware: Middleware = async (_req, res, next) => {
+export function resolveCorsOrigin(origin: string | undefined, allowedOrigins: ReadonlySet<string>): string | undefined {
+  if (origin && allowedOrigins.has(origin)) return origin;
+  return allowedOrigins.values().next().value;
+}
+
+/**
+ * Security headers and CORS middleware.
+ */
+export const securityHeadersMiddleware: Middleware = async (req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'DENY');
   res.setHeader('Content-Security-Policy', "default-src 'self'");
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  const origin = req.headers.origin;
+  const allowedOrigin = resolveCorsOrigin(typeof origin === 'string' ? origin : undefined, CORS_ALLOWED_ORIGINS);
+  if (allowedOrigin) {
+    res.setHeader('Access-Control-Allow-Origin', allowedOrigin);
+    res.setHeader('Vary', 'Origin');
+  }
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Tenant-ID, X-Request-ID, X-User-ID');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
   await next();
 };
 
 /**
- * Correlation ID tracking middleware
+ * Correlation ID tracking middleware.
  */
 export const correlationMiddleware: Middleware = async (req, res, next) => {
   const headerId = req.headers['x-request-id'];
@@ -41,7 +70,7 @@ export const correlationMiddleware: Middleware = async (req, res, next) => {
 };
 
 /**
- * In-memory sliding-window rate limiter for sensitive authentication routes
+ * In-memory sliding-window rate limiter for sensitive authentication routes.
  */
 export const rateLimitMiddleware: Middleware = async (req, res, next) => {
   if (req.path.startsWith('/api/v1/auth/') || req.path === '/api/v1/system/setup' || req.path === '/api/v1/system/restore') {
@@ -72,21 +101,23 @@ export const rateLimitMiddleware: Middleware = async (req, res, next) => {
 };
 
 /**
- * Multi-tenant resolution & AsyncLocalStorage context execution wrapper
+ * Multi-tenant resolution and AsyncLocalStorage context execution wrapper.
  */
 export const tenantContextMiddleware: Middleware = async (req, res, next) => {
+  const isBatchRoute = req.path === '/api/v1/batch' || req.path === '/api/v1/batch/';
+  const isAdministratorRoute = req.path === '/api/v1/system/backup';
   const isPublicRoute = (
     req.path === '/health' ||
     req.path === '/ready' ||
     req.path.startsWith('/api/v1/auth/') ||
-    req.path.startsWith('/api/v1/system/backup') ||
     req.path === '/api/v1/system/status' ||
     req.path === '/api/v1/system/setup' ||
     req.path === '/api/v1/system/restore'
   );
 
-  let tenantId = (req.headers['x-tenant-id'] as string) || '';
-  let userId = (req.headers['x-user-id'] as string) || undefined;
+  let tenantId = isBatchRoute ? '' : ((req.headers['x-tenant-id'] as string) || '');
+  let userId = isBatchRoute ? undefined : ((req.headers['x-user-id'] as string) || undefined);
+  let batchAuthenticated = false;
 
   // Extract Bearer token if present
   const authHeader = req.headers['authorization'];
@@ -104,8 +135,22 @@ export const tenantContextMiddleware: Middleware = async (req, res, next) => {
     }
 
     if (payload) {
-      if (!tenantId) tenantId = payload.tid;
-      if (!userId) userId = payload.sub;
+      if (isBatchRoute) {
+        tenantId = typeof payload.tid === 'string' ? payload.tid : '';
+        userId = typeof payload.sub === 'string' ? payload.sub : undefined;
+        batchAuthenticated = tenantId.length > 0 && typeof userId === 'string' && userId.length > 0;
+      } else {
+        if (!isPublicRoute && tenantId && payload.tid !== tenantId) {
+          return errorResponse(
+            res,
+            'UNAUTHORIZED',
+            'Tenant identity does not match the authentication token',
+            401
+          );
+        }
+        if (!tenantId) tenantId = payload.tid;
+        if (!userId) userId = payload.sub;
+      }
     } else if (authHeader && !isPublicRoute) {
       return errorResponse(
         res,
@@ -114,6 +159,15 @@ export const tenantContextMiddleware: Middleware = async (req, res, next) => {
         401
       );
     }
+  }
+
+  if (isBatchRoute && !batchAuthenticated) {
+    return errorResponse(
+      res,
+      'UNAUTHORIZED',
+      'A valid bearer token is required for batch requests',
+      401
+    );
   }
 
   req.tenantId = tenantId;
@@ -128,6 +182,23 @@ export const tenantContextMiddleware: Middleware = async (req, res, next) => {
     );
   }
 
+  if (isAdministratorRoute) {
+    const db = getDatabase();
+    const administrator = userId
+      ? db.prepare(
+        'SELECT 1 FROM users WHERE id = ? AND tenant_id = ? AND role = ? AND deleted_at IS NULL'
+      ).get(userId, tenantId, 'owner')
+      : undefined;
+    if (!administrator) {
+      return errorResponse(
+        res,
+        'FORBIDDEN',
+        'Administrator authentication is required',
+        403
+      );
+    }
+  }
+
   // Wrap downstream execution inside RequestContext
   await RequestContext.run(
     {
@@ -140,4 +211,3 @@ export const tenantContextMiddleware: Middleware = async (req, res, next) => {
     }
   );
 };
-

@@ -9,9 +9,11 @@ HookRegistry::registerNavigation([
     'section' => 'portfolio'
 ]);
 
-HookRegistry::registerDashboardCard(function ($api) {
+HookRegistry::registerDashboardCard('/api/v1/properties/metrics/occupancy', function ($res) {
     try {
-        $res = $api->get('/api/v1/properties/metrics/occupancy');
+        if (!is_array($res) || ($res['ok'] ?? false) !== true) {
+            return null;
+        }
         $metrics = $res['data']['metrics'] ?? [];
         $occupancyRate = $metrics['occupancyRatePercentage'] ?? 0;
         $totalUnits = $metrics['totalUnits'] ?? 0;
@@ -28,4 +30,3 @@ HookRegistry::registerDashboardCard(function ($api) {
         return null;
     }
 });
-

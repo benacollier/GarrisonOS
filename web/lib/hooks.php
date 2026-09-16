@@ -16,17 +16,23 @@ class HookRegistry {
         return $nav;
     }
 
-    public static function registerDashboardCard(callable $callback): void {
-        self::$dashboardCards[] = $callback;
+    public static function registerDashboardCard(string $path, callable $callback): void {
+        self::$dashboardCards[] = ['path' => $path, 'callback' => $callback];
     }
 
     public static function getDashboardCards(ApiClient $api): array {
         $cards = [];
-        foreach (self::$dashboardCards as $callback) {
+        $paths = array_map(static fn (array $card): string => $card['path'], self::$dashboardCards);
+        try {
+            $responses = $api->batch($paths);
+        } catch (Exception $e) {
+            return $cards;
+        }
+        foreach (self::$dashboardCards as $card) {
             try {
-                $card = $callback($api);
-                if ($card && is_array($card)) {
-                    $cards[] = $card;
+                $dashboardCard = ($card['callback'])($responses[$card['path']] ?? null);
+                if ($dashboardCard && is_array($dashboardCard)) {
+                    $cards[] = $dashboardCard;
                 }
             } catch (Exception $e) {
                 // Ignore individual card failures
@@ -52,4 +58,3 @@ class HookRegistry {
         }
     }
 }
-

@@ -4,6 +4,7 @@ import { pathToFileURL } from 'node:url';
 import { Router } from '../api/router.js';
 import { EventBus } from './events.js';
 import { runMigrations } from '../database/migrator.js';
+import { getApplicationVersion } from './version.js';
 
 export interface ModuleNavigationItem {
   label: string;
@@ -96,7 +97,10 @@ export async function loadModules(
       }
     }
 
-    loadedModulesRegistry.push({ manifest, moduleDir: modDir });
+    loadedModulesRegistry.push({
+      manifest: { ...manifest, version: getApplicationVersion() },
+      moduleDir: modDir
+    });
   }
 
   return loadedModulesRegistry;
@@ -105,4 +109,3 @@ export async function loadModules(
 export function getLoadedModules(): LoadedModule[] {
   return [...loadedModulesRegistry];
 }
-

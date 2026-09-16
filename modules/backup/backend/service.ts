@@ -6,6 +6,7 @@ import { pipeline } from 'node:stream/promises';
 import { getDatabase, closeDatabase, withTransaction } from '../../../database/client.js';
 import { runMigrations } from '../../../database/migrator.js';
 import { RequestContext } from '../../../core/context.js';
+import { getApplicationVersion } from '../../../core/version.js';
 import { BackupRecord, BackupRepository } from './repository.js';
 
 export interface RestoreTenantOptions {
@@ -141,7 +142,7 @@ export class BackupService {
         _export_metadata: [{
           tenant_id: tenantId,
           exported_at: timestamp,
-          version: '1.0.0'
+          version: getApplicationVersion()
         }]
       };
 

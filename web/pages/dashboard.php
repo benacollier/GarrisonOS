@@ -6,10 +6,14 @@ $recentTransactions = [];
 $openWorkOrders = [];
 
 try {
-    $txRes = $api->get('/api/v1/accounting/transactions?limit=5');
+    $batch = $api->batch([
+        '/api/v1/accounting/transactions?limit=5',
+        '/api/v1/maintenance/work-orders?status=open'
+    ]);
+    $txRes = $batch['/api/v1/accounting/transactions?limit=5'] ?? [];
     $recentTransactions = array_slice($txRes['data']['transactions'] ?? [], 0, 5);
 
-    $woRes = $api->get('/api/v1/maintenance/work-orders?status=open');
+    $woRes = $batch['/api/v1/maintenance/work-orders?status=open'] ?? [];
     $openWorkOrders = array_slice($woRes['data']['workOrders'] ?? [], 0, 5);
 } catch (Exception $e) {
     // Graceful error display
@@ -133,4 +137,3 @@ try {
         </div>
     </div>
 </div>
-
