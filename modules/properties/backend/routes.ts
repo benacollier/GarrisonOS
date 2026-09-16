@@ -43,7 +43,7 @@ export function registerRoutes(router: Router): void {
   });
 
   // --- Occupancy Metrics ---
-  router.get('/api/v1/properties/metrics/occupancy', (_req, res) => {
+  router.getBatchSafe('/api/v1/properties/metrics/occupancy', (_req, res) => {
     const metrics = PropertiesRepository.getOccupancyMetrics();
     successResponse(res, { metrics });
   });

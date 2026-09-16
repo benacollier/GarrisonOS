@@ -147,7 +147,9 @@ describe('Batch endpoint', () => {
       { requests: Array.from({ length: 11 }, () => ({ method: 'GET', path: '/health' })) },
       { requests: [{ method: 'POST', path: '/api/v1/properties' }] },
       { requests: [{ method: 'GET', path: 'https://evil.example' }] },
-      { requests: [{ method: 'GET', path: '/api/v1/system/backup' }] }
+      { requests: [{ method: 'GET', path: '/api/v1/system/backup' }] },
+      { requests: [{ method: 'GET', path: '/api/v1/system/status' }] },
+      { requests: [{ method: 'GET', path: '/api/v1/unregistered' }] }
     ]) {
       const result = await handleBatch(body);
       assert.equal(result.statusCode, 400);
@@ -205,16 +207,18 @@ describe('Batch endpoint', () => {
     const healthReady = new Promise<void>((resolve) => { releaseHealth = resolve; });
     const missingReady = new Promise<void>((resolve) => { releaseMissing = resolve; });
     globalThis.fetch = async (url) => {
-      const path = new URL(url).pathname;
+      const target = new URL(url);
+      const path = target.pathname;
+      const isMissing = target.searchParams.has('missing');
       started.push(path);
-      await (path === '/health' ? healthReady : missingReady);
+      await (!isMissing ? healthReady : missingReady);
       return new Response(JSON.stringify({
-        success: path === '/health',
-        ...(path === '/health'
+        success: !isMissing,
+        ...(!isMissing
           ? { data: { status: 'ok' } }
           : { error: { code: 'NOT_FOUND', message: 'Missing' } })
       }), {
-        status: path === '/health' ? 200 : 404,
+        status: isMissing ? 404 : 200,
         headers: { 'content-type': 'application/json' }
       });
     };
@@ -222,14 +226,14 @@ describe('Batch endpoint', () => {
     const resultPromise = handleBatch({
       requests: [
         { method: 'GET', path: '/health' },
-        { method: 'GET', path: '/api/v1/missing' }
+        { method: 'GET', path: '/api/v1/modules?missing=true' }
       ]
     });
 
     while (started.length < 2) {
       await new Promise((resolve) => setImmediate(resolve));
     }
-    assert.deepEqual(started.sort(), ['/api/v1/missing', '/health']);
+    assert.deepEqual(started.sort(), ['/api/v1/modules', '/health']);
     releaseHealth!();
     releaseMissing!();
     const result = await resultPromise;
@@ -245,7 +249,7 @@ describe('Batch endpoint', () => {
     });
 
     const result = await handleBatch({
-      requests: [{ method: 'GET', path: '/api/v1/missing?format=binary' }]
+      requests: [{ method: 'GET', path: '/api/v1/modules?format=binary' }]
     });
 
     assert.equal(result.statusCode, 200);
@@ -261,5 +265,19 @@ describe('Batch endpoint', () => {
 
     assert.equal(result.statusCode, 401);
     assert.equal(result.body.error.code, 'UNAUTHORIZED');
+  });
+
+  it('rejects tenant headers that disagree with the verified token', async () => {
+    const router = createRouter(31_234);
+    const request = new MockRequest('GET', '/api/v1/modules', {
+      authorization: 'Bearer ' + testToken,
+      'x-tenant-id': 'spoofed-tenant'
+    });
+    const response = new MockResponse();
+
+    await router.handle(request as any, response as any);
+
+    assert.equal(response.statusCode, 401);
+    assert.equal(JSON.parse(response.body).error.code, 'UNAUTHORIZED');
   });
 });

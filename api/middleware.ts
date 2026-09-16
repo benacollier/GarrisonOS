@@ -140,6 +140,14 @@ export const tenantContextMiddleware: Middleware = async (req, res, next) => {
         userId = typeof payload.sub === 'string' ? payload.sub : undefined;
         batchAuthenticated = tenantId.length > 0 && typeof userId === 'string' && userId.length > 0;
       } else {
+        if (!isPublicRoute && tenantId && payload.tid !== tenantId) {
+          return errorResponse(
+            res,
+            'UNAUTHORIZED',
+            'Tenant identity does not match the authentication token',
+            401
+          );
+        }
         if (!tenantId) tenantId = payload.tid;
         if (!userId) userId = payload.sub;
       }

@@ -34,7 +34,7 @@ export class Router {
     this.middlewares.push(middleware);
   }
 
-  private register(method: string, pattern: string, handlers: Handler[], batchSafe = true): void {
+  private register(method: string, pattern: string, handlers: Handler[], batchSafe = false): void {
     const paramNames: string[] = [];
     const normalizedPattern = pattern.startsWith('/') ? pattern : `/${pattern}`;
     
@@ -60,6 +60,10 @@ export class Router {
 
   public get(pattern: string, ...handlers: Handler[]): void {
     this.register('GET', pattern, handlers);
+  }
+
+  public getBatchSafe(pattern: string, ...handlers: Handler[]): void {
+    this.register('GET', pattern, handlers, true);
   }
 
   public getUnsafe(pattern: string, ...handlers: Handler[]): void {
@@ -88,7 +92,7 @@ export class Router {
 
   public isBatchSafeGetPath(pathname: string): boolean {
     const route = this.routes.find((entry) => entry.method === 'GET' && entry.regex.test(pathname));
-    return route?.batchSafe ?? true;
+    return route?.batchSafe ?? false;
   }
 
   private async parseBody(req: IncomingMessage): Promise<any> {

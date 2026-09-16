@@ -5,12 +5,12 @@ import { eventBus } from '../../../core/events.js';
 import { RequestContext } from '../../../core/context.js';
 
 export function registerRoutes(router: Router): void {
-  router.get('/api/v1/maintenance/metrics', (_req, res) => {
+  router.getBatchSafe('/api/v1/maintenance/metrics', (_req, res) => {
     const metrics = MaintenanceRepository.getMaintenanceMetrics();
     successResponse(res, { metrics });
   });
 
-  router.get('/api/v1/maintenance/work-orders', (req, res) => {
+  router.getBatchSafe('/api/v1/maintenance/work-orders', (req, res) => {
     const workOrders = MaintenanceRepository.listWorkOrders({
       status: req.query.status,
       priority: req.query.priority,

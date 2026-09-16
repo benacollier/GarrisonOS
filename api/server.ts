@@ -61,7 +61,7 @@ export function createRouter(serverPort: number = PORT): Router {
   router.use(tenantContextMiddleware);
 
   // Health and readiness checks
-  router.get('/health', (_req, res) => {
+  router.getBatchSafe('/health', (_req, res) => {
     successResponse(res, {
       status: 'ok',
       version: getApplicationVersion(),
@@ -69,7 +69,7 @@ export function createRouter(serverPort: number = PORT): Router {
     });
   });
 
-  router.get('/ready', (_req, res) => {
+  router.getBatchSafe('/ready', (_req, res) => {
     try {
       const db = getDatabase();
       db.prepare('SELECT 1').get();
@@ -84,7 +84,7 @@ export function createRouter(serverPort: number = PORT): Router {
   });
 
   // Loaded modules introspection
-  router.get('/api/v1/modules', (_req, res) => {
+  router.getBatchSafe('/api/v1/modules', (_req, res) => {
     const modules = getLoadedModules().map((m) => m.manifest);
     successResponse(res, { modules });
   });
