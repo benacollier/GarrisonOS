@@ -80,7 +80,7 @@ This document provides a technical critique of the GarrisonOS architecture, runt
 ### Recommendations
 
 1. Provide a standard multi-container `docker-compose.yml` and unified production containerfile.
-2. Implement a batch/composite query endpoint (e.g., `POST /api/v1/batch` or `GET /api/v1/dashboard/summary`) allowing the PHP presentation layer to hydrate multiple UI slots in a single HTTP round-trip.
+2. Continue extending the batch endpoint (`POST /api/v1/batch`) as new dashboard data requirements emerge.
 
 ---
 
@@ -117,13 +117,13 @@ This document provides a technical critique of the GarrisonOS architecture, runt
 ### Identified Risks & Limitations
 
 * **Stateless Token Invalidation**: Session tokens are verified cryptographically via HMAC-SHA256 with a 24-hour expiration. Because tokens are stateless and lack a database version or revocation check, tokens remain valid for their full lifespan even if a user is deleted, their role is modified, or their password is changed.
-* **Global CORS Policy**: `Access-Control-Allow-Origin: *` is returned globally. While API communication primarily occurs over loopback from PHP, restricting allowed origins to the configured host prevents unauthorized browser-based cross-origin calls.
-* **Default Secret Fallbacks**: `APP_SECRET` falls back to a default development string if unset in environment variables.
+* **Global CORS Policy**: CORS now uses the configured `CORS_ALLOWED_ORIGINS` allowlist and does not emit wildcard origins.
+* **Default Secret Fallbacks**: Non-development server startup now requires an explicit `APP_SECRET`.
 
 ### Recommendations
 
 1. Add a `token_version` integer column to the `users` table and include it in token claims to support instant session revocation upon password or role updates.
-2. Enforce explicit environment validation on startup to block server boot if `APP_SECRET` is unset in non-development environments.
+2. Keep deployment checks and environment documentation aligned with the explicit `APP_SECRET` startup requirement.
 3. Restrict CORS origins to configured application hosts.
 
 ---

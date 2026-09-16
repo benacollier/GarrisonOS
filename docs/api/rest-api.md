@@ -12,6 +12,7 @@ The GarrisonOS REST API is exposed by the headless Node.js backend (`api/server.
 | `Authorization` | Optional | `Bearer <signed_hmac_token>` for authenticated endpoints |
 | `X-Request-ID` | Optional | Client correlation ID (generated automatically if omitted) |
 | `Content-Type` | Optional | `application/json` for state-modifying requests |
+| `Origin` | Optional | Must match an origin in `CORS_ALLOWED_ORIGINS` for browser cross-origin access |
 
 ---
 
@@ -70,6 +71,7 @@ All JSON responses conform to standardized envelopes:
 | `GET` | `/health` | Public | Liveness check returning status and uptime |
 | `GET` | `/ready` | Public | Readiness check verifying SQLite database connectivity |
 | `POST` | `/api/v1/auth/login` | Public (Rate Limited) | Authenticate user credentials and return signed HMAC token |
+| `POST` | `/api/v1/batch` | Authenticated | Execute up to 10 authenticated `GET` requests concurrently |
 | `GET` | `/api/v1/system/backup` | Admin | Trigger WAL checkpoint and create database snapshot |
 
 ---
