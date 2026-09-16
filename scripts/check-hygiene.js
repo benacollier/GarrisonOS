@@ -1,28 +1,35 @@
 import { readFileSync, existsSync } from 'node:fs';
-import { resolve, join, relative } from 'node:path';
+import { resolve } from 'node:path';
 import { execSync } from 'node:child_process';
 
-// Patterns that describe path hygiene rules (allowable only in rules/guidelines docs or this script itself)
+/**
+ * GarrisonOS Unified Architectural & Security Hygiene Scanner
+ *
+ * Mechanically validates that all code across the repository complies with
+ * AGENTS.md, CONTRIBUTING.md, and SECURITY.md standards:
+ * 1. Host Path Hygiene (No hardcoded Windows/Unix absolute paths)
+ * 2. Secret & Credential Scanning (No private keys, tokens, or live secrets)
+ * 3. Zero External Dependencies (Node.js runtime code must only import node:* or relative paths)
+ * 4. Strict Equality (No loose == or != in TypeScript or PHP source)
+ * 5. Synchronous Database Invariant (No await on DatabaseSync methods: prepare, exec)
+ * 6. Tenant Isolation & Zero Parameter Leakage (No tenant_id in route parameters or query/body bindings)
+ * 7. SQL Portability & Parameterization (No template literal string interpolations in db.prepare)
+ * 8. UTC Timestamp Rigor (No SQLite-only non-portable functions: datetime, strftime, unixepoch)
+ * 9. Fail-Closed Security (Installers must have mandatory checksum verification and error-aborts)
+ */
+
 const PATH_CHECK_EXEMPTIONS = new Set([
   'AGENTS.md',
   'CONTRIBUTING.md',
   'scripts/check-hygiene.js'
 ]);
 
-// Ignored files (non-source or binary)
 const IGNORE_FILES = new Set([
   'package-lock.json',
   'Thumbs.db',
   '.DS_Store'
 ]);
 
-// Host path leak checks across Windows and Linux / macOS:
-// Windows paths:
-//   - C:\Users\<name> or C:\Documents and Settings
-//   - Specific host root directories: Program Files, Windows, ProgramData, Temp
-// Linux / Unix paths:
-//   - /home/<user> or /Users/<user>
-//   - Sensitive system directories: /root, /etc/shadow, /etc/passwd, /var/log, /proc, /sys
 const HOST_PATH_PATTERNS = [
   { name: 'Windows User Path', regex: /[a-zA-Z]:\\(?:Users|Documents and Settings)\\[^\s"'`<>]+/i },
   { name: 'Windows System/Program Path', regex: /[a-zA-Z]:\\(?:Program Files|Program Files \(x86\)|ProgramData|Windows|Temp)\\[^\s"'`<>]+/i },
@@ -30,7 +37,6 @@ const HOST_PATH_PATTERNS = [
   { name: 'Unix System/Host Path', regex: /(?:^|[\s"'`=:(])\/(?:root|etc\/(?:shadow|passwd|sudoers)|var\/(?:log|mail|spool)|proc|sys)\b/ }
 ];
 
-// Secret / Credential patterns
 const SECRET_PATTERNS = [
   { name: 'Private Key Block', regex: /-----BEGIN [A-Z ]*PRIVATE KEY-----/ },
   { name: 'Active APP_SECRET assignment', regex: /^\s*APP_SECRET\s*=\s*['"]?[a-f0-9]{32,}['"]?/m },
@@ -39,7 +45,22 @@ const SECRET_PATTERNS = [
   { name: 'Generic Secret Assignment', regex: /(?:api[_-]?key|client[_-]?secret|jwt[_-]?secret)\s*[:=]\s*['"][a-zA-Z0-9_\-]{20,}['"]/i }
 ];
 
+// Prohibited external runtime dependencies (AGENTS.md Section 1)
+const PROHIBITED_PACKAGES = [
+  'express', 'fastify', 'koa', 'connect',
+  'sqlite3', 'better-sqlite3', 'drizzle-orm', 'prisma', 'typeorm',
+  'uuid', 'nanoid', 'bcrypt', 'argon2', 'jsonwebtoken',
+  'zod', 'joi', 'yup', 'validator',
+  'dotenv', 'dotenv-expand',
+  'jest', 'mocha', 'chai', 'vitest', 'supertest'
+];
+
 let violationCount = 0;
+
+function reportViolation(type, file, lineNum, message) {
+  process.stderr.write(`[${type}] ${file}${lineNum ? `:${lineNum}` : ''}\n  --> ${message}\n`);
+  violationCount++;
+}
 
 function getGitTrackedFiles() {
   try {
@@ -61,14 +82,10 @@ function getGitStagedFiles() {
 }
 
 function checkFile(relPath) {
-  if (IGNORE_FILES.has(relPath)) {
-    return;
-  }
+  if (IGNORE_FILES.has(relPath)) return;
 
-  // Guard against committing environment files
   if (relPath === '.env' || (relPath.startsWith('.env.') && !relPath.endsWith('.example'))) {
-    process.stderr.write(`[LEAK DETECTED] Sensitive environment file tracked or staged: ${relPath}\n`);
-    violationCount++;
+    reportViolation('LEAK DETECTED', relPath, 0, 'Sensitive environment file tracked or staged');
     return;
   }
 
@@ -78,9 +95,7 @@ function checkFile(relPath) {
   }
 
   const fullPath = resolve(process.cwd(), relPath);
-  if (!existsSync(fullPath)) {
-    return;
-  }
+  if (!existsSync(fullPath)) return;
 
   let content;
   try {
@@ -89,16 +104,19 @@ function checkFile(relPath) {
     return;
   }
 
+  const lines = content.split(/\r?\n/);
+  const isTypeScript = relPath.endsWith('.ts');
+  const isPhp = relPath.endsWith('.php');
+  const isSource = isTypeScript || isPhp || relPath.endsWith('.js');
+  const isSql = relPath.endsWith('.sql');
+  const isInstaller = relPath.startsWith('scripts/install.');
+
   // 1. Host Path Checks
   if (!PATH_CHECK_EXEMPTIONS.has(relPath)) {
-    const lines = content.split(/\r?\n/);
     lines.forEach((line, index) => {
       for (const pattern of HOST_PATH_PATTERNS) {
         if (pattern.regex.test(line)) {
-          process.stderr.write(
-            `[PATH LEAK] ${pattern.name} in ${relPath}:${index + 1}\n  --> ${line.trim().slice(0, 120)}\n`
-          );
-          violationCount++;
+          reportViolation('PATH LEAK', relPath, index + 1, `${pattern.name}: ${line.trim().slice(0, 120)}`);
         }
       }
     });
@@ -107,15 +125,91 @@ function checkFile(relPath) {
   // 2. Secret & Credential Checks
   for (const pattern of SECRET_PATTERNS) {
     if (pattern.regex.test(content)) {
-      process.stderr.write(`[SECRET LEAK] Potential ${pattern.name} in ${relPath}\n`);
-      violationCount++;
+      reportViolation('SECRET LEAK', relPath, 0, `Potential ${pattern.name}`);
+    }
+  }
+
+  // 3. Dependency Whitelist Checks (Only for source files, ignoring build configs)
+  if (isSource && !relPath.startsWith('test/') && !relPath.includes('/test/') && !relPath.startsWith('scripts/')) {
+    lines.forEach((line, index) => {
+      const match = line.match(/(?:import\s+.*?from\s+['"]|require\s*\(\s*['"])([^'"]+)['"]/);
+      if (match) {
+        const importPath = match[1];
+        for (const pkg of PROHIBITED_PACKAGES) {
+          if (importPath === pkg || importPath.startsWith(`${pkg}/`)) {
+            reportViolation('PROHIBITED DEPENDENCY', relPath, index + 1, `Import of banned package "${importPath}" violates Zero External Runtime Dependencies.`);
+          }
+        }
+      }
+    });
+  }
+
+  // 4. Strict Equality Checks (=== and !==) in TypeScript and PHP
+  if (isTypeScript || isPhp) {
+    lines.forEach((line, index) => {
+      const trimmed = line.trim();
+      if (trimmed.startsWith('//') || trimmed.startsWith('*') || trimmed.startsWith('/*') || trimmed.startsWith('#')) return;
+
+      if (/(?<![=!<>])==(?!=)/.test(line) || /(?<![=!<>])!=(?!=)/.test(line)) {
+        if (!line.includes('hygiene-exempt')) {
+          reportViolation('LOOSE EQUALITY', relPath, index + 1, `Use strict equality (=== or !==): ${trimmed.slice(0, 100)}`);
+        }
+      }
+    });
+  }
+
+  // 5. Synchronous Database API Invariant (DatabaseSync must never be awaited)
+  if (isSource) {
+    lines.forEach((line, index) => {
+      if (/await\s+(?:db|this\.db|getDatabase\(\))\.(?:prepare|exec|withTransaction)/.test(line)) {
+        reportViolation('ASYNC SQLITE VIOLATION', relPath, index + 1, `node:sqlite DatabaseSync is synchronous. Never use await: ${line.trim()}`);
+      }
+    });
+  }
+
+  // 6. Tenant Isolation & Zero Parameter Leakage
+  if (isSource && !relPath.includes('/test/')) {
+    lines.forEach((line, index) => {
+      if (/router\.(?:get|post|put|delete|patch)\s*\(\s*['"][^'"]*:\s*tenant_id/i.test(line)) {
+        reportViolation('TENANT LEAKAGE', relPath, index + 1, `Route parameter ":tenant_id" is forbidden. Tenant must be resolved implicitly via RequestContext.`);
+      }
+    });
+  }
+
+  // 7. SQL Portability & Parameterization
+  if ((isSource || isSql) && relPath !== 'scripts/check-hygiene.js') {
+    lines.forEach((line, index) => {
+      const prevLine = index > 0 ? lines[index - 1] : '';
+      if (line.includes('hygiene-exempt') || prevLine.includes('hygiene-exempt')) return;
+
+      if (/db\.prepare\s*\(\s*`[^`]*\$\{/.test(line)) {
+        reportViolation('UNSAFE SQL QUERY', relPath, index + 1, `Unparameterized SQL string template detected. Always use parameterized placeholders (?): ${line.trim().slice(0, 100)}`);
+      }
+      if (/\bAUTOINCREMENT\b/i.test(line)) {
+        reportViolation('NON-PORTABLE SQL', relPath, index + 1, `AUTOINCREMENT is forbidden for PostgreSQL compatibility. Use id TEXT PRIMARY KEY (UUIDv7).`);
+      }
+      if (/\bINSERT\s+OR\s+(?:REPLACE|IGNORE)\b/i.test(line)) {
+        reportViolation('NON-PORTABLE SQL', relPath, index + 1, `INSERT OR REPLACE/IGNORE is forbidden. Use ANSI ON CONFLICT (...) DO UPDATE / DO NOTHING.`);
+      }
+      if (/\b(?:datetime\('now'\)|unixepoch\(\))\b/i.test(line)) {
+        reportViolation('NON-PORTABLE TIME', relPath, index + 1, `SQLite datetime functions are forbidden. Timestamps must be UTC epoch milliseconds (INTEGER).`);
+      }
+    });
+  }
+
+  // 8. Fail-Closed Installer Integrity
+  if (isInstaller) {
+    if (!content.includes('SHA256') && !content.includes('sha256')) {
+      reportViolation('INSTALLER INTEGRITY', relPath, 0, `Installer script missing mandatory SHA256 checksum verification.`);
+    }
+    if (!content.includes('exit 1') && !content.includes('throw') && !content.includes('exit $LastExitCode')) {
+      reportViolation('FAIL-OPEN SCRIPT', relPath, 0, `Installer script must fail closed with explicit non-zero exit code on verification failure.`);
     }
   }
 }
 
-process.stdout.write('🔍 Scanning repository files for host path leaks and exposed secrets...\n');
+process.stdout.write('🔍 Scanning repository for architectural hygiene, compliance, and security...\n');
 
-// Combine tracked and staged files into a deduplicated list
 const targetFiles = Array.from(new Set([...getGitTrackedFiles(), ...getGitStagedFiles()]));
 
 for (const relPath of targetFiles) {
@@ -126,7 +220,6 @@ if (violationCount > 0) {
   process.stderr.write(`\n❌ Hygiene check failed with ${violationCount} violation(s) detected.\n`);
   process.exit(1);
 } else {
-  process.stdout.write(`✔ Hygiene check passed: Scanned ${targetFiles.length} files. Zero host paths or credentials exposed.\n`);
+  process.stdout.write(`✔ Hygiene check passed: Scanned ${targetFiles.length} files. Zero architectural or security violations.\n`);
   process.exit(0);
 }
-

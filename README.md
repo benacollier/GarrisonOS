@@ -33,14 +33,14 @@ Built from first principles around **zero external runtime dependencies**, Garri
 ## Navigation
 
 | Category | Documents |
-|:---------|:----------|
+| :--------- | :---------- |
 | **Roadmap** | [MVP Roadmap](docs/ROADMAP.md) |
-| **Architecture** | [Overview](docs/architecture/overview.md) | [Multi-Tenancy](docs/architecture/multi-tenancy.md) | [Data Model](docs/architecture/data-model.md) | [Bootstrap Spec](docs/architecture/bootstrap-spec.md) | [Technical Debt](docs/architecture/technical-debt.md) |
-| **Domain Modules** | [Overview](docs/modules/overview.md) | [Properties](docs/modules/properties.md) | [Contacts](docs/modules/contacts.md) | [Leases](docs/modules/leases.md) | [Accounting](docs/modules/accounting.md) | [Maintenance](docs/modules/maintenance.md) | [Backup](docs/modules/backup.md) |
-| **API** | [REST API](docs/api/rest-api.md) | [EventBus](docs/api/events.md) |
-| **Development** | [Getting Started](docs/development/getting-started.md) | [Frontend Guide](docs/development/frontend-guide.md) | [Testing](docs/development/testing.md) |
-| **Deployment** | [Self-Hosting](docs/deployment/self-hosting.md) | [Configuration](docs/deployment/configuration.md) | [Backup & Maintenance](docs/deployment/backup-and-maintenance.md) |
-| **Legal** | [CLA](docs/legal/CLA.md) | [License](LICENSE) | [Security](SECURITY.md) | [Code of Conduct](CODE_OF_CONDUCT.md) | [Contributing](CONTRIBUTING.md) |
+| **Architecture** | [Overview](docs/architecture/overview.md) • [Multi-Tenancy](docs/architecture/multi-tenancy.md) • [Data Model](docs/architecture/data-model.md) • [Bootstrap Spec](docs/architecture/bootstrap-spec.md) • [Technical Debt](docs/architecture/technical-debt.md) |
+| **Domain Modules** | [Overview](docs/modules/overview.md) • [Properties](docs/modules/properties.md) • [Contacts](docs/modules/contacts.md) • [Leases](docs/modules/leases.md) • [Accounting](docs/modules/accounting.md) • [Maintenance](docs/modules/maintenance.md) • [Backup](docs/modules/backup.md) |
+| **API** | [REST API](docs/api/rest-api.md) • [EventBus](docs/api/events.md) |
+| **Development** | [Getting Started](docs/development/getting-started.md) • [Frontend Guide](docs/development/frontend-guide.md) • [Testing](docs/development/testing.md) |
+| **Deployment** | [Self-Hosting](docs/deployment/self-hosting.md) • [Configuration](docs/deployment/configuration.md) • [Backup & Maintenance](docs/deployment/backup-and-maintenance.md) |
+| **Legal** | [CLA](docs/legal/CLA.md) • [License](LICENSE) • [Security](SECURITY.md) • [Code of Conduct](CODE_OF_CONDUCT.md) • [Contributing](CONTRIBUTING.md) |
 
 ---
 

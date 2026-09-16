@@ -29,19 +29,23 @@ GarrisonOS runs exclusively on native runtimes. Do not import, install, or refer
 ## 2. Persistence, SQLite & PostgreSQL Forward Compatibility
 
 ### Engine & Database API
+
 * **Runtime Database**: Embedded SQLite via Node.js built-in `node:sqlite.DatabaseSync`.
 * **Synchronous API Guardrail**: `node:sqlite.DatabaseSync` is **synchronous**. Never write `await db.prepare(...)`, `await db.exec(...)`, or promise-based queries.
 * Database connections must enforce operational PRAGMAs (see `database/client.ts`):
+
   ```sql
   PRAGMA foreign_keys = ON;
   PRAGMA journal_mode = WAL;
   PRAGMA busy_timeout = 5000;
   PRAGMA synchronous = NORMAL;
   ```
+
 * Multi-step state mutations must execute within explicit transaction boundaries via `withTransaction(fn)` or `BEGIN IMMEDIATE`.
 * **Parameterized Queries**: Raw SQL string concatenation and template literal variable interpolation are strictly prohibited. Every query must use parameterized placeholders (`?`).
 
 ### MANDATORY: PostgreSQL Forward Compatibility & Portable SQL
+
 While GarrisonOS runs on an embedded SQLite engine for zero-dependency local execution, **all database schemas, migrations, queries, and DDL MUST be strictly forward-compatible with PostgreSQL**. The system is architected to allow dropping in a native PostgreSQL driver in the future without modifying domain queries or migration history.
 
 Automated agents and contributors must observe these cross-dialect portability rules:
@@ -58,10 +62,12 @@ Automated agents and contributors must observe these cross-dialect portability r
 | **Partial Indexes** | ANSI partial index syntax: `WHERE deleted_at IS NULL` | Non-standard index expressions |
 
 ### Row-Level Multi-Tenancy
+
 * Every operational database table must contain a `tenant_id TEXT NOT NULL REFERENCES tenants(id)`.
 * Compound indexes supporting queries must lead with `tenant_id` (e.g., `CREATE INDEX idx_orders_tenant_created ON orders(tenant_id, created_at);`).
 * **Zero Parameter Leakage**: Business logic, repositories, and routes must **NEVER** accept `tenant_id` from client request bodies, query parameters, or URL route parameters.
 * Always extract tenant context implicitly from `RequestContext.getTenantId()` (see `core/context.ts`):
+
   ```typescript
   // CORRECT:
   const tenantId = RequestContext.getTenantId();
@@ -73,12 +79,14 @@ Automated agents and contributors must observe these cross-dialect portability r
   ```
 
 ### Data Representation Standards
+
 * **Primary Keys**: RFC 9562 UUIDv7 strings generated natively via `node:crypto.randomBytes`. Always import `generateUUIDv7` from `core/crypto.ts`.
 * **Financial Amounts**: Stored strictly as **INTEGER cents** (e.g., $1,250.00 is stored as `125000`). Floating-point currency math is prohibited. Ledger transactions are append-only and immutable.
 * **Timestamps**: Stored strictly as **INTEGER milliseconds** (UTC epoch ms via `Date.now()`).
 * **Soft Deletes**: Standardized `deleted_at INTEGER` column on all operational tables (`NULL` when active, epoch ms when deleted). All operational queries must filter `WHERE deleted_at IS NULL` by default.
 
 ### Schema Migrations
+
 * Migrations reside in `modules/<module_name>/backend/migrations/` (or `database/migrations/` for core) and are named sequentially: `0001_<description>.sql`, `0002_<description>.sql`.
 * All schema evolution must be **additive and backward-compatible** (new tables or nullable columns only). Renaming, removing, or altering the types of existing columns is prohibited without a documented backward-compatible migration path.
 
@@ -87,6 +95,7 @@ Automated agents and contributors must observe these cross-dialect portability r
 ## 3. Modular Architecture & REST API Contracts
 
 ### Module Isolation
+
 * Domain features live inside self-contained modules under `modules/<module_name>/` with dedicated `backend/`, `frontend/`, and `test/` subdirectories.
 * Every module must provide a `module.json` manifest defining its metadata, routes, permissions, and dependencies.
 * **Zero Cross-Module Direct Imports**: Modules must never import directly from another module's internal implementation files.
@@ -94,6 +103,7 @@ Automated agents and contributors must observe these cross-dialect portability r
 * **Handler Resilience**: All `EventBus` listeners must wrap their execution in `try/catch` blocks to ensure background failures do not crash the process or interrupt the request flow.
 
 ### Standardized REST API Envelopes
+
 All API endpoints must return structured JSON envelopes conforming to `api/response.ts`:
 
 ```typescript
@@ -134,6 +144,7 @@ All API endpoints must return structured JSON envelopes conforming to `api/respo
 ## 4. Security & PHP Presentation
 
 ### Cryptography & Engine Isolation
+
 * **Password Hashing**: Native `node:crypto.scrypt` with a random 16-byte salt, formatted as `$scrypt$N=16384,r=8,p=1$salt$hash`. Verification must use `node:crypto.timingSafeEqual` (use `hashPassword` and `verifyPassword` from `core/crypto.ts`).
 * **Auth Tokens**: Signed HMAC-SHA256 tokens using native `node:crypto` (use `createToken` and `verifyToken` from `core/crypto.ts`).
 * **Network & Loopback Binding**: The Node.js engine must bind strictly to `127.0.0.1` (loopback). Direct untrusted external network exposure is forbidden.
@@ -141,10 +152,13 @@ All API endpoints must return structured JSON envelopes conforming to `api/respo
 * **File Uploads & Media Storage**: Uploaded files must be stored outside the web root (`STORAGE_PATH`), validate explicit allowed MIME/extension whitelists, enforce byte size limits, and validate resolved paths against directory traversal attacks via `path.resolve()`.
 
 ### Safe PHP Presentation
+
 * **XSS Prevention**: All dynamic values rendered in PHP templates must be strictly escaped:
+
   ```php
   <?= htmlspecialchars((string)$value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?>
   ```
+
 * **CSRF Protection**: All state-modifying requests (POST, PUT, DELETE) from the presentation layer must validate a cryptographic CSRF token stored in the PHP session.
 * **Strict CSP**: Inline dynamic scripts and unvalidated DOM injections (`innerHTML`, `eval()`) are forbidden.
 
@@ -153,9 +167,12 @@ All API endpoints must return structured JSON envelopes conforming to `api/respo
 ## 5. Contributor Workflow, Testing & Attribution
 
 ### Windows Terminal Execution Guardrail
+
 When running terminal commands on Windows host environments:
+
 * **NEVER** invoke bare `npm` or `npx` (causes `PSSecurityException` on `npm.ps1`).
 * **ALWAYS** execute `npm.cmd`, `npx.cmd`, or `node <script>`:
+
   ```powershell
   # CORRECT:
   node scripts/test.js
@@ -168,20 +185,26 @@ When running terminal commands on Windows host environments:
   ```
 
 ### Targeted Test Execution
+
 * **No Proactive Runs**: Do not proactively execute builds or test suites when modifying documentation (`*.md`), IDE settings, CI workflows, or static assets.
 * **Single Module Changes**: Run only that module's test suite:
+
   ```powershell
   node scripts/test.js <module_name>
   # or: npm.cmd run test:module <module_name>
   ```
+
 * **Core Subsystem Changes**: When modifying `core/`, `api/`, or `database/`, execute core tests:
+
   ```powershell
   node scripts/test.js core
   ```
+
 * **Full Regression**: Execute full regression (`node scripts/test.js` or `npm.cmd test`) only before submitting a pull request or when modifying root compilation configurations.
 * **Co-located Tests**: Every new module or capability must include automated tests co-located under `modules/<module_name>/test/` achieving full coverage of its public APIs.
 
 ### Attribution, Commits & Documentation Hygiene
+
 * **No Agent or AI Attribution**: Contributors and automated agents must **NEVER** reference themselves or identify AI/LLM involvement anywhere in the repository (no "Generated by", no agent names, no LLM co-authors or provenance comments).
 * **100% Docstring Coverage**: Every exported function, interface, class, method, module, and PHP public API must include complete docstrings (TSDoc/PHPDoc).
 * **Conventional Commits**: Commit messages must follow the Conventional Commits specification with concise 50–72 character summaries:
@@ -199,14 +222,18 @@ When running terminal commands on Windows host environments:
 All contributors and automated agents must proactively anticipate, calculate, and mitigate the blast radius of every change. Changes must never introduce unverified assumptions into downstream callers or leave ingress attack vectors unshielded.
 
 ### 6.1 Downstream Blast Radius Mapping
+
 Before modifying or introducing any service method, repository function, or public API:
+
 * **Trace Callers & Dependents**: Use grep/ripgrep across `api/`, `core/`, `database/`, and `modules/` to identify all direct and indirect consumers of modified types, methods, or database tables.
 * **Context Assumption Audit**: When reading `RequestContext.getTenantId()`, verify that every route leading to this execution is protected by authentication and tenant-membership verification. Never assume an endpoint is internal or pre-authenticated without explicit route-level guards.
 * **Downstream Regression Testing**: When modifying core utilities (`core/context.ts`, `core/crypto.ts`, `database/client.ts`, `api/response.ts`), run all dependent module test suites (`node scripts/test.js <module_name>`), not just unit tests for the modified file.
 
 ### 6.2 Ingress Route Security & Zero-Trust Parameter Parsing
+
 * **Mandatory Route Authentication**: All operational API routes must require an authenticated session and verified tenant membership. Unauthenticated public endpoints must be strictly limited to public system handshakes (`/health`, `/ready`, `/api/v1/auth/*`, `/api/v1/system/setup`, `/api/v1/system/restore`).
 * **Strict Numeric Query Parsing**: Never pass raw `parseInt(req.query.param, 10)` into repository methods or SQL queries. All numeric query parameters must be validated with `Number.isInteger()` or `Number.isFinite()`, bounded to valid ranges, and return HTTP 400 `VALIDATION_ERROR` on failure:
+
   ```typescript
   // CORRECT:
   const rawAsOf = req.query['as_of'];
@@ -222,9 +249,11 @@ Before modifying or introducing any service method, repository function, or publ
   // FORBIDDEN (Propagates NaN into SQL or produces corrupt reports):
   // const asOf = req.query.as_of ? parseInt(req.query.as_of, 10) : undefined;
   ```
+
 * **No NaN Propagation**: Numerical arguments must never evaluate to `NaN` when executing repository logic or SQL queries.
 
 ### 6.3 Fail-Closed Security & Infrastructure Invariants
+
 * **Zero Fail-Open Logic**: Any security check (cryptographic checksum, HMAC token verification, signature comparison, permission check) **MUST FAIL CLOSED**.
 * **Installer & Script Integrity**:
   * Checksum and signature verification in shell/PowerShell installers (`scripts/install.sh`, `scripts/install.ps1`) must be mandatory.
@@ -233,15 +262,29 @@ Before modifying or introducing any service method, repository function, or publ
   * Archive asset filenames must match their corresponding entry in `SHA256SUMS` exactly; never verify GitHub's dynamic `tarball_url` against release binary checksums.
 
 ### 6.4 Financial & Accounting Audit Invariants
+
 * **Temporal Cutoff Rigor**: Any report or reconciliation taking an `asOf` cutoff timestamp must strictly filter all joins, subledgers, transactions, and lease states to `<= asOf`. Combining historical general ledger balances with unbounded current-state subledgers is strictly prohibited.
 * **Reversal Exclusion**: All financial aggregations, tax reports (e.g., Form 1099-NEC), and ledger inquiries must explicitly exclude reversed entries (`WHERE reversed_by_entry_id IS NULL` and `WHERE reversed_at IS NULL`).
 * **Empirical Audit Truth**: Never declare "three-way bank reconciliation" or "statutory compliance" in APIs, responses, or documentation unless the implementation ingests and verifies against empirical external data (e.g. bank statements) and validates specific statutory jurisdictions rather than generic unverified fallbacks.
 
 ### 6.5 Pre-Commit Security Blast Radius Checklist
+
 Before submitting any pull request or committing changes, contributors and agents must verify:
+
 1. `npm.cmd run build` — TypeScript compiles with 0 errors.
 2. `node scripts/check-hygiene.js` — Scanned files reveal 0 host path leaks or exposed secrets.
 3. `node scripts/check-security.js` — Route parameters, fail-closed scripts, and security invariants verified.
 4. `node scripts/test.js` — All unit and integration test suites pass with 100% success rate.
 
+---
 
+## 7. Agent Tool & Context Hygiene Directives
+
+To safeguard token quotas and maintain fast execution:
+
+1. **Tool Slicing Mandate**: Agents must use `StartLine` and `EndLine` on `view_file` to read only the pertinent 50–120 lines. Dumping entire files larger than 100 lines into context is prohibited.
+2. **Mechanical Verification First**: Run `npm.cmd run check:hygiene` and `npm.cmd test` rather than reading raw files to inspect whole-repo compliance.
+3. **Multi-Tier Context Offloading**: For multi-file reconnaissance, agents must invoke `llm_worker_read`:
+   * **Tier 1 (Cloud Primary)**: Direct NVIDIA NIM Nemotron 3 Super (9s latency, 42 tok/s, 0 Gemini tokens, 0 local VRAM).
+   * **Tier 2 (Offline Backup)**: Local Ollama Qwen 2.5 Coder 14B (single-shot for inputs $\le 24\text{k}$ tokens, 0 Gemini tokens).
+   * **Tier 3 (Final Fallback)**: Gemini 3.8 Flash (Low) direct inspection, strictly governed by targeted line-range slicing.

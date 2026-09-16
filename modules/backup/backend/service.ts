@@ -135,7 +135,7 @@ export class BackupService {
         SELECT DISTINCT m.name as table_name
         FROM sqlite_master m
         JOIN pragma_table_info(m.name) p
-        WHERE m.type = 'table' AND p.name = 'tenant_id' AND m.name != 'backups'
+        WHERE m.type = 'table' AND p.name = 'tenant_id' AND m.name <> 'backups'
       `).all() as { table_name: string }[];
 
       const exportData: Record<string, any[]> = {
@@ -147,6 +147,7 @@ export class BackupService {
       };
 
       for (const { table_name } of tables) {
+        // hygiene-exempt: dynamic table identifier from sqlite_master whitelist
         const rows = db.prepare(`SELECT * FROM "${table_name}" WHERE tenant_id = ?`).all(tenantId);
         exportData[table_name] = rows;
       }
@@ -294,7 +295,7 @@ export class BackupService {
         SELECT DISTINCT m.name as table_name
         FROM sqlite_master m
         JOIN pragma_table_info(m.name) p
-        WHERE m.type = 'table' AND p.name = 'tenant_id' AND m.name != 'backups'
+        WHERE m.type = 'table' AND p.name = 'tenant_id' AND m.name <> 'backups'
       `).all() as { table_name: string }[];
 
       const validTableNames = new Set(dbTables.map((t) => t.table_name));
@@ -326,8 +327,11 @@ export class BackupService {
           const colNames = cols.map((c) => `"${c}"`).join(', ');
           const values = cols.map((c) => sanitizedRow[c]);
 
-          // Use INSERT OR REPLACE to support both merge and clean_slate cleanly
-          const insertSql = `INSERT OR REPLACE INTO "${tableName}" (${colNames}) VALUES (${placeholders})`;
+          // Use ANSI-compliant ON CONFLICT (id) DO UPDATE to support both merge and clean_slate cleanly
+          const updateSet = cols.filter(c => c !== 'id').map(c => `"${c}" = excluded."${c}"`).join(', ');
+          const insertSql = updateSet.length > 0
+            ? `INSERT INTO "${tableName}" (${colNames}) VALUES (${placeholders}) ON CONFLICT (id) DO UPDATE SET ${updateSet}`
+            : `INSERT INTO "${tableName}" (${colNames}) VALUES (${placeholders}) ON CONFLICT (id) DO NOTHING`;
           tx.prepare(insertSql).run(...values);
           insertedCount++;
         }

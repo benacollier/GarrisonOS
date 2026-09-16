@@ -1,0 +1,22 @@
+# Gemini and Agent Workspace Ignore Rules
+# Excludes bulky build artifacts, databases, and media from agent whole-directory scans
+# Guaranteed: All source code (*.ts, *.js, *.php, *.sql, *.json, *.md) remains fully visible
+
+dist/
+coverage/
+*.lcov
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+*.db
+*.db-wal
+*.db-shm
+docs/assets/*.png
+docs/assets/*.jpg
+storage/uploads/*
+!storage/uploads/.gitkeep
+storage/backups/*
+!storage/backups/.gitkeep
+Thumbs.db
+.DS_Store
+

@@ -10,10 +10,10 @@
 
 ## Quick Reference Summary
 
-**Overall Project Health Score: B+ (78/100)**
+### Overall Project Health Score: B+ (78/100)
 
 | Category | Score | Status |
-|----------|-------|--------|
+| ---------- | ------- | -------- |
 | Architecture & Design | 92% | Exceptional |
 | Core Implementation | 85% | Strong |
 | Module Completeness | 65% | Needs Work |
@@ -39,6 +39,7 @@ GarrisonOS is a **zero-dependency property management system** built on native N
 ### P0 - Critical (Must Fix Before Any Production Use)
 
 #### 1. EventBus Context Loss
+
 - **File**: `core/events.ts:51`
 - **Issue**: `setImmediate()` in `publish()` detaches `AsyncLocalStorage` context
 - **Impact**: Event subscribers performing database operations will fail with "No active request context found"
@@ -46,6 +47,7 @@ GarrisonOS is a **zero-dependency property management system** built on native N
 - **Solution**: Auto-wrap subscriber callbacks with `RequestContext.run()` using tenantId from payload
 
 #### 2. Migration Ordering Violates FK Dependencies
+
 - **File**: `database/migrator.ts`
 - **Issue**: Migrations sorted alphabetically, but `accounting` and `leases` depend on `properties` and `contacts`
 - **Impact**: Foreign key constraint violations during schema initialization
@@ -53,6 +55,7 @@ GarrisonOS is a **zero-dependency property management system** built on native N
 - **Solution**: Implement topological sort using `dependencies` array from `module.json`
 
 #### 3. Stateless Token Revocation
+
 - **File**: Authentication system
 - **Issue**: HMAC-SHA256 tokens remain valid for 24 hours after password/role changes
 - **Impact**: Security vulnerability - users retain access after permission revocation
@@ -62,6 +65,7 @@ GarrisonOS is a **zero-dependency property management system** built on native N
 ### P1 - High Priority (Next Sprint)
 
 #### 4. Global CORS Wildcard
+
 - **File**: API middleware
 - **Issue**: `Access-Control-Allow-Origin: *` allows any origin
 - **Impact**: Potential cross-origin attacks
@@ -69,6 +73,7 @@ GarrisonOS is a **zero-dependency property management system** built on native N
 - **Solution**: Restrict to configured application hosts
 
 #### 5. Default Secret Fallback
+
 - **File**: Environment configuration
 - **Issue**: `APP_SECRET` falls back to development default if unset
 - **Impact**: Production security risk if environment misconfigured
@@ -76,6 +81,7 @@ GarrisonOS is a **zero-dependency property management system** built on native N
 - **Solution**: Block server boot if `APP_SECRET` unset in non-dev environments
 
 #### 6. Sequential Loopback Latency
+
 - **File**: `web/lib/hooks.php`
 - **Issue**: Dashboard makes multiple sequential cURL requests to backend
 - **Impact**: Poor TTFB performance
@@ -87,7 +93,7 @@ GarrisonOS is a **zero-dependency property management system** built on native N
 ## MVP Phase Completion Status
 
 | Phase | Name | Completion | Grade | Status |
-|-------|------|------------|-------|--------|
+| ------- | ------ | ------------ | ------- | -------- |
 | 1 | Core Engine & Multi-Tenant Foundation | 85% | B | Mostly Complete |
 | 2 | Base Entity & Inventory Management | 70% | C | Needs Work |
 | 3 | Core Property Operations | 65% | C- | Needs Work |
@@ -101,7 +107,7 @@ GarrisonOS is a **zero-dependency property management system** built on native N
 ## Module Health Summary
 
 | Module | Score | Grade | Strengths | Weaknesses |
-|--------|-------|-------|-----------|-----------|
+| -------- | ------- | ------- | ----------- | ----------- |
 | **Accounting** | 90% | A- | Double-entry, trial balance, waterfall | QuickBooks validation |
 | **Backup** | 88% | B+ | Snapshots, export/import, SHA-256 | Missing scheduled backups |
 | **Contacts** | 84% | B | Multi-role, specializations | UI relationship management |
@@ -116,6 +122,7 @@ GarrisonOS is a **zero-dependency property management system** built on native N
 ## Architectural Highlights
 
 ### Exceptional (100% Compliance)
+
 - ✅ **Zero External Runtime Dependencies**: Only Node.js built-ins (`node:http`, `node:sqlite`, `node:crypto`, etc.)
 - ✅ **RFC 9562 UUIDv7**: Native implementation with monotonic timestamp ordering
 - ✅ **Integer-Cents Financial Precision**: All currency stored as INTEGER, no floating-point
@@ -125,6 +132,7 @@ GarrisonOS is a **zero-dependency property management system** built on native N
 - ✅ **Operational PRAGMAs**: Foreign keys, WAL mode, busy timeout enforced
 
 ### Strong (90%+ Compliance)
+
 - ✅ **EventBus Design**: Type-safe, async/ sync publish, error handling
 - ✅ **Context System**: Clean `AsyncLocalStorage` implementation with tenant/user/correlation IDs
 - ✅ **Database Layer**: WAL mode, transaction support, atomic operations
@@ -138,7 +146,7 @@ GarrisonOS is a **zero-dependency property management system** built on native N
 ### AGENTS.md Guardrails Compliance: 93%
 
 | Guardrail | Compliance |
-|-----------|------------|
+| ----------- | ------------ |
 | Zero External Runtime Dependencies | ✅ 100% |
 | Portable Path Hygiene | ✅ 100% |
 | RFC 9562 UUIDv7 | ✅ 100% |
@@ -155,7 +163,7 @@ GarrisonOS is a **zero-dependency property management system** built on native N
 ### Security Score: 87%
 
 | Area | Score |
-|------|-------|
+| ------ | ------- |
 | Authentication & Authorization | 92% |
 | Data Isolation | 85% |
 | Input/Output Security | 89% |
@@ -164,7 +172,7 @@ GarrisonOS is a **zero-dependency property management system** built on native N
 ### Test Coverage
 
 | Area | Coverage |
-|------|----------|
+| ------ | ---------- |
 | Core Subsystems | 100% |
 | Module Domain Logic | ~85% |
 | Cross-Module Integration | ~50% |
@@ -181,7 +189,7 @@ GarrisonOS is a **zero-dependency property management system** built on native N
 ### Week 1-2: Foundation Hardening (Sprint 1)
 
 | Priority | Task | Effort | Impact |
-|----------|------|--------|--------|
+| ---------- | ------ | -------- | -------- |
 | 1 | Fix EventBus context propagation | 4h | Critical |
 | 2 | Implement topological migration sorting | 8h | Critical |
 | 3 | Add token revocation system | 6h | Critical |
@@ -193,7 +201,7 @@ GarrisonOS is a **zero-dependency property management system** built on native N
 ### Week 3-4: Production Readiness (Sprint 2)
 
 | Priority | Task | Effort | Impact |
-|----------|------|--------|--------|
+| ---------- | ------ | -------- | -------- |
 | 6 | Production packaging (systemd, supervisord) | 8h | High |
 | 7 | Automated backup scheduling | 6h | Medium |
 | 8 | Complete authentication integration | 8h | High |
@@ -207,7 +215,7 @@ GarrisonOS is a **zero-dependency property management system** built on native N
 ## Risk Matrix
 
 | Risk | Likelihood | Impact | Severity | Mitigation |
-|------|------------|--------|----------|------------|
+| ------ | ------------ | -------- | ---------- | ------------ |
 | EventBus context loss | Medium | Critical | High | Fix Week 1 |
 | FK migration violations | Medium | Critical | High | Fix Week 1 |
 | Stateless token vulnerability | Medium | Critical | High | Fix Week 1 |
@@ -219,6 +227,7 @@ GarrisonOS is a **zero-dependency property management system** built on native N
 ## File Inventory
 
 ### Core (6 files)
+
 - `core/context.ts` - AsyncLocalStorage context propagation
 - `core/crypto.ts` - UUIDv7, scrypt hashing, HMAC tokens
 - `core/events.ts` - In-process EventBus with type-safe payloads
@@ -227,6 +236,7 @@ GarrisonOS is a **zero-dependency property management system** built on native N
 - `core/index.ts` - Core exports
 
 ### API Layer (5 files)
+
 - `api/router.ts` - Regex-based HTTP router
 - `api/middleware.ts` - Tenant resolution, auth, rate limiting
 - `api/response.ts` - Standardized JSON response envelopes
@@ -234,12 +244,14 @@ GarrisonOS is a **zero-dependency property management system** built on native N
 - `api/index.ts` - API exports
 
 ### Database (4 files + migrations)
+
 - `database/client.ts` - SQLite client with WAL mode
 - `database/migrator.ts` - Migration runner (needs topological sort)
 - `database/seed.ts` - Demo portfolio seeder (20 units)
 - `database/migrations/0001_core_schema.sql` - Core schema
 
 ### Modules (6 modules)
+
 - **properties** - Portfolios, properties, units
 - **contacts** - Tenants, owners, vendors, emergency contacts
 - **leases** - Lease contracts, signatories, lifecycle
@@ -250,10 +262,12 @@ GarrisonOS is a **zero-dependency property management system** built on native N
 Each module contains: `module.json`, `backend/routes.ts`, `backend/repository.ts`, `backend/service.ts`, `frontend/pages/*`, `test/*.test.ts`, `migrations/*.sql`
 
 ### Tests (18 files)
+
 - Core: 6 test files (context, crypto, helpers, isolation, modules, router, setup)
 - Modules: 12 test files (2 per module average)
 
 ### Web/PHP (Presentation Layer)
+
 - `web/index.php` - Front controller with CSRF validation
 - `web/lib/*.php` - API client, hooks, auth, CSRF helpers
 - `web/pages/*.php` - Page controllers
@@ -261,6 +275,7 @@ Each module contains: `module.json`, `backend/routes.ts`, `backend/repository.ts
 - `web/public/*.css` - Vanilla CSS with custom properties
 
 ### Scripts (5 files)
+
 - `scripts/setup.js` - Preflight validation and environment setup
 - `scripts/serve.js` - Development runner (Node + PHP)
 - `scripts/test.js` - Test runner harness
@@ -272,6 +287,7 @@ Each module contains: `module.json`, `backend/routes.ts`, `backend/repository.ts
 ## Command Reference
 
 ### Development
+
 ```bash
 npm install              # Install dev dependencies
 npm run setup           # Preflight validation and setup
@@ -281,6 +297,7 @@ npm run dev             # Development mode with auto-reload
 ```
 
 ### Testing
+
 ```bash
 npm test                       # Full test suite
 npm run test:core             # Core tests only
@@ -289,6 +306,7 @@ node scripts/test.js          # Direct test runner
 ```
 
 ### Database
+
 ```bash
 npm run migrate         # Run migrations
 npm run seed            # Seed demo portfolio
@@ -296,6 +314,7 @@ node scripts/restore.js <path>  # Restore from snapshot
 ```
 
 ### Verification
+
 ```bash
 npm run check:hygiene   # Secret scanning
 ```
@@ -316,6 +335,7 @@ npm run check:hygiene   # Secret scanning
 ## Critical Observations
 
 ### What's Working Well
+
 - Core engine is solid and production-ready
 - Financial ledger implementation is exceptional
 - Module architecture is clean and maintainable
@@ -323,6 +343,7 @@ npm run check:hygiene   # Secret scanning
 - Security fundamentals are strong
 
 ### What Needs Attention
+
 - **Event-driven workflows are broken** (context loss in EventBus)
 - **Migration ordering is unreliable** (alphabetical vs dependency-based)
 - **Token security has gaps** (stateless revocation missing)
@@ -350,18 +371,21 @@ npm run check:hygiene   # Secret scanning
 ## Recommendations by Stakeholder
 
 ### For Project Maintainers
+
 1. **Prioritize the 3 P0 issues** - They block any production use
 2. **Establish regular sprint cadence** - 2-week sprints with clear deliverables
 3. **Implement code review checklist** - Ensure all AGENTS.md guardrails are verified
 4. **Set up CI for main branch** - Automated testing on PRs
 
 ### For Contributors
+
 1. **Start with P1 issues** - Good first contributions
 2. **Follow AGENTS.md strictly** - Zero exceptions
 3. **Write tests with all code** - 100% test coverage requirement
 4. **Use conventional commits** - Maintain clean git history
 
 ### For Future Users
+
 1. **Wait for MVP announcement** - Not production-ready yet
 2. **Review security posture** - Before self-hosting
 3. **Plan for Node.js 22+ and PHP 8.2+** - Runtime requirements
