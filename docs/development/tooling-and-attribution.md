@@ -62,7 +62,7 @@ To minimize primary model context consumption and safeguard API quotas (e.g. Gem
   4. **Tenant Isolation**: Flags `:tenant_id` appearing in API route paths or client request bodies/queries.
   5. **SQL Portability**: Enforces parameterized queries (`?`), PostgreSQL compatibility (rejects `AUTOINCREMENT`, `INSERT OR REPLACE/IGNORE`), and UTC timestamps (rejects SQLite `datetime` functions).
   6. **Fail-Closed Security**: Validates cryptographic SHA256 checksum verification and non-zero exit codes in installer scripts.
-  7. **Host Path & Credential Hygiene**: Scans for host-specific filesystem paths (`C:\Users\...`, `/home/...`) and exposed secrets.
+  7. **Host Path & Credential Hygiene**: Scans for host-specific absolute filesystem paths and exposed credentials or secrets.
 
 ---
 
