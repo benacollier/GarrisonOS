@@ -1,6 +1,7 @@
 import { test, describe, it } from 'node:test';
 import * as assert from 'node:assert/strict';
 import { RequestContext } from '../core/context.js';
+import { eventBus, EventBus, BaseEventPayload } from '../core/events.js';
 
 describe('RequestContext & Multi-Tenant Store Subsystem', () => {
   it('propagates tenant context synchronously', () => {
@@ -32,6 +33,33 @@ describe('RequestContext & Multi-Tenant Store Subsystem', () => {
     ]);
 
     assert.deepEqual(results, ['tenant-A', 'tenant-B', 'tenant-C', 'tenant-D']);
+  });
+
+  it('propagates tenant context through EventBus async publish', async () => {
+    let receivedTenantId: string | undefined;
+    let receivedCorrelationId: string | undefined;
+
+    const testEventBus = new EventBus();
+    
+    testEventBus.subscribe('test.event', (payload: BaseEventPayload & { data: string }) => {
+      receivedTenantId = RequestContext.tryGet()?.tenantId;
+      receivedCorrelationId = RequestContext.tryGet()?.correlationId;
+    });
+
+    await RequestContext.run(
+      { tenantId: 'tenant-event-test', correlationId: 'corr-123', userId: undefined },
+      async () => {
+        testEventBus.publish('test.event', {
+          tenantId: 'tenant-event-test',
+          data: 'test-data'
+        });
+      }
+    );
+
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    assert.equal(receivedTenantId, 'tenant-event-test', 'Tenant ID should be propagated through EventBus');
+    assert.ok(receivedCorrelationId, 'Correlation ID should be propagated through EventBus');
   });
 });
 
