@@ -35,13 +35,17 @@ This document outlines the high-level roadmap to MVP for **GarrisonOS**, structu
 
 ---
 
-## Phase 4: Financial Ledger & Accounting Subsystem
+## Phase 4: Financial Ledger & Statutory Trust Accounting
 >
-> *Enforcing financial accuracy, auditability, and regulatory compliance.*
+> *Enforcing financial accuracy, auditability, and statutory regulatory compliance.*
 
-* Immutable, append-only double-entry/cash ledger with strict integer-cents tracking.
-* Standardized Chart of Accounts (Schedule E and QuickBooks compatibility mapping).
-* Automated transaction generation from operational events (rent charges, maintenance expenses, vendor payouts).
+* Immutable, append-only double-entry/cash ledger with strict integer-cents tracking (`journal_entries` and `journal_lines`).
+* Statutory trust accounting fund segregation (`1010 Operating Checking` vs. `1020 Trust Checking` and `2100 Tenant Security Deposits Held Liability`).
+* Automated Three-Way Bank Reconciliation verification schedules (Bank Balance = GL Trust Balance = Active Lease Liabilities).
+* Standardized Chart of Accounts (IRS Schedule E expense lines and QuickBooks compatibility mapping).
+* Automated transaction generation from operational events (rent charges, maintenance expenses, move-out deposit dispositions).
+* Statutory move-out disposition timelines (jurisdiction-aware countdown alerts for CA, NY, TX, etc.).
+* Vendor tax compliance (Tax ID tracking, W-9 verification, and annual IRS Form 1099-NEC aggregation reports).
 
 ---
 
@@ -51,7 +55,7 @@ This document outlines the high-level roadmap to MVP for **GarrisonOS**, structu
 
 * PHP-FPM presentation architecture, layout shells, and CSS custom properties design system.
 * Operator dashboards, search, and CRUD views for properties, contacts, leases, and work orders.
-* Financial reporting interfaces (income statements, rent roll, ledger balance views).
+* Financial reporting interfaces (income statements, rent roll, ledger balance views, and 3-way trust reconciliation schedules).
 * Form validation, CSRF protections, and session handling.
 
 ---
@@ -71,5 +75,17 @@ This document outlines the high-level roadmap to MVP for **GarrisonOS**, structu
 > *Final release criteria, security verification, and turn-key deployment readiness.*
 
 * End-to-end integration and tenant isolation regression test suites.
-* Security review (input sanitization, CSP/XSS defense, timing-safe auth checks).
+* Security review (input sanitization, CSP/XSS defense, timing-safe auth checks, and token spoofing prevention).
+* Secure release packaging (Method 2: pre-packaged release archives with cryptographic SHA-256 checksum verification).
 * Production packaging (Systemd / Supervisord configs, reverse proxy templates, and single-command local setup scripts).
+
+---
+
+## Post-MVP Phase: Scalability, Native PostgreSQL & Ecosystem Expansion
+>
+> *Extending platform capacity, database drivers, and advanced real estate capabilities.*
+
+* **Native PostgreSQL Driver**: Drop-in PostgreSQL database engine integration leveraging strict ANSI/PostgreSQL DDL standards established in `AGENTS.md`.
+* **Commercial Real Estate (CRE)**: Common Area Maintenance (CAM) reconciliations, Triple Net (NNN) expense pools, and CPI lease escalation schedules.
+* **Integrated Payment Gateways**: Automated ACH debit/credit rails and live bank feed interoperability (OFX/QBO/Plaid).
+* **Multi-Instance Clustering**: Scalable multi-tenant node clusters with centralized connection pooling.

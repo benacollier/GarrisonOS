@@ -556,4 +556,411 @@ export class AccountingRepository {
       };
     }, db);
   }
+
+  /**
+   * Generates a statutory Three-Way Bank Reconciliation report for trust accounts.
+   * Proves parity between Bank Statement Balance, GL Trust Cash (Account 1020),
+   * Tenant Security Deposits Held (Account 2100), and individual active lease deposit subledgers.
+   *
+   * @param asOfDateMs Optional cutoff epoch timestamp in milliseconds (defaults to current time).
+   * @param bankStatementBalanceCents Optional empirical bank statement balance in cents for full 3-way reconciliation.
+   * @param tx Optional database transaction connection.
+   * @returns ThreeWayReconciliationResult proving trust parity across bank, books, and subledgers.
+   */
+  public static getThreeWayReconciliation(
+    asOfDateMs?: number,
+    bankStatementBalanceCents?: number,
+    tx?: any
+  ): ThreeWayReconciliationResult {
+    const tenantId = RequestContext.getTenantId();
+    const db = tx || getDatabase();
+    const asOf = asOfDateMs || Date.now();
+
+    // 1. Calculate GL Trust Cash from Account 1020
+    const trustAccount = db.prepare(`
+      SELECT id FROM chart_of_accounts
+      WHERE tenant_id = ? AND (account_number = '1020' OR category_mapping = 'trust_bank') AND deleted_at IS NULL
+      LIMIT 1
+    `).get(tenantId) as { id: string } | undefined;
+
+    let glTrustCashCents = 0;
+    if (trustAccount) {
+      const glRow = db.prepare(`
+        SELECT COALESCE(SUM(jl.debit_cents - jl.credit_cents), 0) AS balance_cents
+        FROM journal_lines jl
+        JOIN journal_entries je ON jl.journal_entry_id = je.id
+        WHERE jl.tenant_id = ? AND jl.account_id = ? AND je.date_ms <= ? AND je.deleted_at IS NULL
+      `).get(tenantId, trustAccount.id, asOf) as { balance_cents: number };
+      glTrustCashCents = glRow ? Number(glRow.balance_cents) : 0;
+    }
+
+    // 2. Calculate Tenant Deposits Liability from Account 2100
+    const liabilityAccount = db.prepare(`
+      SELECT id FROM chart_of_accounts
+      WHERE tenant_id = ? AND (account_number = '2100' OR category_mapping = 'security_deposit') AND deleted_at IS NULL
+      LIMIT 1
+    `).get(tenantId) as { id: string } | undefined;
+
+    let tenantDepositsLiabilityCents = 0;
+    if (liabilityAccount) {
+      const liabRow = db.prepare(`
+        SELECT COALESCE(SUM(jl.credit_cents - jl.debit_cents), 0) AS balance_cents
+        FROM journal_lines jl
+        JOIN journal_entries je ON jl.journal_entry_id = je.id
+        WHERE jl.tenant_id = ? AND jl.account_id = ? AND je.date_ms <= ? AND je.deleted_at IS NULL
+      `).get(tenantId, liabilityAccount.id, asOf) as { balance_cents: number };
+      tenantDepositsLiabilityCents = liabRow ? Number(liabRow.balance_cents) : 0;
+    }
+
+    // If no journal entries exist, fall back to single-entry transactions
+    if (glTrustCashCents === 0 && tenantDepositsLiabilityCents === 0) {
+      const txRow = db.prepare(`
+        SELECT
+          COALESCE(SUM(CASE WHEN transaction_type = 'deposit_inflow' THEN amount_cents ELSE 0 END), 0) -
+          COALESCE(SUM(CASE WHEN transaction_type IN ('deposit_return', 'deposit_deduction') THEN amount_cents ELSE 0 END), 0) AS net_trust
+        FROM transactions
+        WHERE tenant_id = ? AND transaction_date <= ? AND deleted_at IS NULL
+      `).get(tenantId, asOf) as { net_trust: number };
+      const netTrust = txRow ? Number(txRow.net_trust) : 0;
+      glTrustCashCents = netTrust;
+      tenantDepositsLiabilityCents = netTrust;
+    }
+
+    // 3. Query individual active lease deposit subledgers as of cutoff date
+    const leaseRows = db.prepare(`
+      SELECT
+        l.id AS lease_id,
+        l.deposit_held_cents AS current_deposit_held_cents,
+        p.name AS property_name,
+        u.unit_number,
+        (
+          SELECT c.first_name || ' ' || c.last_name
+          FROM lease_contacts lc
+          JOIN contacts c ON lc.contact_id = c.id
+          WHERE lc.lease_id = l.id AND lc.role = 'primary_tenant' AND lc.deleted_at IS NULL AND c.deleted_at IS NULL
+          LIMIT 1
+        ) AS primary_tenant_name,
+        (
+          SELECT
+            COALESCE(SUM(CASE WHEN t.transaction_type = 'deposit_inflow' THEN t.amount_cents ELSE 0 END), 0) -
+            COALESCE(SUM(CASE WHEN t.transaction_type IN ('deposit_return', 'deposit_deduction') THEN t.amount_cents ELSE 0 END), 0)
+          FROM transactions t
+          WHERE t.lease_id = l.id
+            AND t.tenant_id = l.tenant_id
+            AND t.transaction_date <= ?
+            AND t.deleted_at IS NULL
+        ) AS tx_deposit_held_cents,
+        (
+          SELECT COUNT(*)
+          FROM transactions t
+          WHERE t.lease_id = l.id
+            AND t.tenant_id = l.tenant_id
+            AND t.transaction_type IN ('deposit_inflow', 'deposit_return', 'deposit_deduction')
+            AND t.deleted_at IS NULL
+        ) AS has_deposit_txs
+      FROM leases l
+      LEFT JOIN units u ON l.unit_id = u.id AND u.tenant_id = l.tenant_id
+      LEFT JOIN properties p ON u.property_id = p.id AND p.tenant_id = l.tenant_id
+      WHERE l.tenant_id = ?
+        AND l.deleted_at IS NULL
+        AND l.status IN ('active', 'pending')
+        AND l.start_date <= ?
+      ORDER BY p.name ASC, u.unit_number ASC
+    `).all(asOf, tenantId, asOf) as Array<{
+      lease_id: string;
+      current_deposit_held_cents: number;
+      property_name: string | null;
+      unit_number: string | null;
+      primary_tenant_name: string | null;
+      tx_deposit_held_cents: number;
+      has_deposit_txs: number;
+    }>;
+
+    const activeLeaseItems: ReconciliationLeaseItem[] = leaseRows
+      .map((r) => {
+        const deposit = r.has_deposit_txs > 0 ? Number(r.tx_deposit_held_cents) : Number(r.current_deposit_held_cents);
+        return {
+          lease_id: r.lease_id,
+          property_name: r.property_name || null,
+          unit_number: r.unit_number || null,
+          primary_tenant_name: r.primary_tenant_name || null,
+          deposit_held_cents: deposit
+        };
+      })
+      .filter((item) => item.deposit_held_cents > 0);
+
+    const leaseDepositsTotalCents = activeLeaseItems.reduce((sum, r) => sum + r.deposit_held_cents, 0);
+    const booksInBalance = glTrustCashCents === tenantDepositsLiabilityCents &&
+      tenantDepositsLiabilityCents === leaseDepositsTotalCents;
+    const bankInBalance = bankStatementBalanceCents !== undefined
+      ? bankStatementBalanceCents === glTrustCashCents
+      : true;
+    const inBalance = booksInBalance && bankInBalance;
+    const diffCents = bankStatementBalanceCents !== undefined
+      ? bankStatementBalanceCents - leaseDepositsTotalCents
+      : glTrustCashCents - leaseDepositsTotalCents;
+
+    return {
+      as_of_date_ms: asOf,
+      ...(bankStatementBalanceCents !== undefined ? { bank_statement_balance_cents: bankStatementBalanceCents } : {}),
+      gl_trust_cash_cents: glTrustCashCents,
+      tenant_deposits_liability_cents: tenantDepositsLiabilityCents,
+      lease_deposits_total_cents: leaseDepositsTotalCents,
+      in_balance: inBalance,
+      reconciliation_difference_cents: diffCents,
+      leases: activeLeaseItems
+    };
+  }
+
+  /**
+   * Generates an IRS Form 1099-NEC vendor expense summary report for a given tax year.
+   * Aggregates all operating and maintenance expense payments to vendors and flags those
+   * meeting or exceeding the statutory $600.00 (60,000 cents) threshold.
+   *
+   * @param taxYear Calendar tax year (e.g. 2026).
+   * @param tx Optional database transaction connection.
+   * @returns Vendor1099ReportResult containing qualifying vendor records and totals.
+   */
+  public static getVendor1099Report(
+    taxYear: number,
+    tx?: any
+  ): Vendor1099ReportResult {
+    const tenantId = RequestContext.getTenantId();
+    const db = tx || getDatabase();
+    const yearStart = Date.UTC(taxYear, 0, 1, 0, 0, 0, 0);
+    const yearEnd = Date.UTC(taxYear, 11, 31, 23, 59, 59, 999);
+    const THRESHOLD_CENTS = taxYear >= 2026 ? 200000 : 60000; // $2,000.00 for 2026+, $600.00 for pre-2026
+
+    // Collect payments by vendor contact
+    const vendorMap = new Map<string, number>();
+
+    // 1. Check journal_lines where account is Expense/COGS and contact_id is set (excluding reversed entries)
+    const journalVendorRows = db.prepare(`
+      SELECT jl.contact_id, SUM(jl.debit_cents) AS total_cents
+      FROM journal_lines jl
+      JOIN journal_entries je ON jl.journal_entry_id = je.id
+      JOIN chart_of_accounts coa ON jl.account_id = coa.id
+      WHERE jl.tenant_id = ?
+        AND jl.contact_id IS NOT NULL
+        AND coa.account_type IN ('Expense', 'CostOfGoodsSold')
+        AND je.date_ms >= ? AND je.date_ms <= ?
+        AND je.reversed_by_entry_id IS NULL
+        AND je.deleted_at IS NULL
+      GROUP BY jl.contact_id
+    `).all(tenantId, yearStart, yearEnd) as Array<{ contact_id: string; total_cents: number }>;
+
+    for (const r of journalVendorRows) {
+      if (r.contact_id) {
+        const current = vendorMap.get(r.contact_id) || 0;
+        vendorMap.set(r.contact_id, current + Number(r.total_cents));
+      }
+    }
+
+    // 2. Also check single-entry transactions where payee_contact_id is set and category is expense
+    // Exclude transactions already converted to journal entries to avoid double counting
+    const txVendorRows = db.prepare(`
+      SELECT payee_contact_id AS contact_id, SUM(amount_cents) AS total_cents
+      FROM transactions
+      WHERE tenant_id = ?
+        AND payee_contact_id IS NOT NULL
+        AND transaction_type = 'expense'
+        AND journal_entry_id IS NULL
+        AND transaction_date >= ? AND transaction_date <= ?
+        AND deleted_at IS NULL
+      GROUP BY payee_contact_id
+    `).all(tenantId, yearStart, yearEnd) as Array<{ contact_id: string; total_cents: number }>;
+
+    for (const r of txVendorRows) {
+      if (r.contact_id) {
+        const current = vendorMap.get(r.contact_id) || 0;
+        vendorMap.set(r.contact_id, current + Number(r.total_cents));
+      }
+    }
+
+    // 3. Fetch contact profiles for all discovered vendors or contacts marked as 'vendor'
+    const allVendors = db.prepare(`
+      SELECT id, first_name, last_name, company_name, tax_id_last4, email, phone
+      FROM contacts
+      WHERE tenant_id = ? AND contact_type = 'vendor' AND deleted_at IS NULL
+    `).all(tenantId) as Array<{
+      id: string;
+      first_name: string;
+      last_name: string;
+      company_name: string | null;
+      tax_id_last4: string | null;
+      email: string | null;
+      phone: string | null;
+    }>;
+
+    const vendorRecords: Vendor1099Record[] = [];
+    const processedIds = new Set<string>();
+
+    for (const v of allVendors) {
+      processedIds.add(v.id);
+      const total = vendorMap.get(v.id) || 0;
+      const vendorName = v.company_name || `${v.first_name} ${v.last_name}`.trim();
+      vendorRecords.push({
+        vendor_id: v.id,
+        vendor_name: vendorName,
+        company_name: v.company_name,
+        tax_id_last4: v.tax_id_last4,
+        email: v.email,
+        phone: v.phone,
+        total_payments_cents: total,
+        threshold_met: total >= THRESHOLD_CENTS
+      });
+    }
+
+    // Include any contacts not explicitly marked as 'vendor' but having payments
+    for (const [contactId, total] of vendorMap.entries()) {
+      if (!processedIds.has(contactId)) {
+        const contact = db.prepare(`
+          SELECT id, first_name, last_name, company_name, tax_id_last4, email, phone
+          FROM contacts
+          WHERE id = ? AND tenant_id = ? AND deleted_at IS NULL
+        `).get(contactId, tenantId) as any;
+        if (contact) {
+          const vendorName = contact.company_name || `${contact.first_name} ${contact.last_name}`.trim();
+          vendorRecords.push({
+            vendor_id: contact.id,
+            vendor_name: vendorName,
+            company_name: contact.company_name,
+            tax_id_last4: contact.tax_id_last4,
+            email: contact.email,
+            phone: contact.phone,
+            total_payments_cents: total,
+            threshold_met: total >= THRESHOLD_CENTS
+          });
+        }
+      }
+    }
+
+    vendorRecords.sort((a, b) => b.total_payments_cents - a.total_payments_cents);
+
+    const qualifying = vendorRecords.filter((v) => v.threshold_met);
+    const totalQualifyingCents = qualifying.reduce((sum, v) => sum + v.total_payments_cents, 0);
+
+    return {
+      tax_year: taxYear,
+      threshold_cents: THRESHOLD_CENTS,
+      total_vendors_count: vendorRecords.length,
+      qualifying_vendors_count: qualifying.length,
+      total_qualifying_payments_cents: totalQualifyingCents,
+      vendors: vendorRecords
+    };
+  }
+
+  /**
+   * Computes statutory deduction deadline and remaining timeline for tenant deposit disposition.
+   * Based on jurisdiction state statutory periods (e.g. CA 21 days, NY 14 days, TX 30 days).
+   *
+   * @param moveOutDateMs Epoch timestamp of tenant move-out date.
+   * @param stateCode US state postal abbreviation (defaults to 'US' standard 30-day window).
+   * @returns StatutoryDispositionTimelineResult with computed deadlines and overdue status.
+   */
+  public static getStatutoryDispositionTimeline(
+    moveOutDateMs: number,
+    stateCode: string = 'US'
+  ): StatutoryDispositionTimelineResult {
+    const STATE_LIMITS: Record<string, number> = {
+      NY: 14,
+      AZ: 14,
+      FL: 15,
+      CA: 21,
+      WA: 21,
+      CO: 30,
+      TX: 30,
+      IL: 30,
+      MA: 30,
+      NJ: 30,
+      PA: 30
+    };
+
+    const upperState = (stateCode || 'US').trim().toUpperCase();
+    const limitDays = upperState === 'US' ? 30 : STATE_LIMITS[upperState];
+    if (limitDays === undefined) {
+      throw new Error(
+        `Unsupported jurisdiction '${stateCode}'. Statutory deposit disposition timeline is only maintained for supported states (${Object.keys(STATE_LIMITS).join(', ')}) or generic 'US'.`
+      );
+    }
+    const MS_PER_DAY = 24 * 60 * 60 * 1000;
+    const deadlineMs = moveOutDateMs + limitDays * MS_PER_DAY;
+    const now = Date.now();
+    const daysRemaining = Math.ceil((deadlineMs - now) / MS_PER_DAY);
+    const isPastDue = now > deadlineMs;
+
+    return {
+      move_out_date_ms: moveOutDateMs,
+      state_code: upperState,
+      statutory_limit_days: limitDays,
+      deadline_date_ms: deadlineMs,
+      days_remaining: daysRemaining,
+      is_past_due: isPastDue
+    };
+  }
+}
+
+/**
+ * Itemized lease deposit detail for three-way reconciliation.
+ */
+export interface ReconciliationLeaseItem {
+  lease_id: string;
+  property_name: string | null;
+  unit_number: string | null;
+  primary_tenant_name: string | null;
+  deposit_held_cents: number;
+}
+
+/**
+ * Result envelope for statutory three-way bank reconciliation.
+ * Proves equality between bank statement balance, GL trust account balance,
+ * and individual tenant deposit liabilities held on active leases.
+ */
+export interface ThreeWayReconciliationResult {
+  as_of_date_ms: number;
+  bank_statement_balance_cents?: number;
+  gl_trust_cash_cents: number;
+  tenant_deposits_liability_cents: number;
+  lease_deposits_total_cents: number;
+  in_balance: boolean;
+  reconciliation_difference_cents: number;
+  leases: ReconciliationLeaseItem[];
+}
+
+/**
+ * Vendor record for annual IRS Form 1099-NEC aggregation.
+ */
+export interface Vendor1099Record {
+  vendor_id: string;
+  vendor_name: string;
+  company_name: string | null;
+  tax_id_last4: string | null;
+  email: string | null;
+  phone: string | null;
+  total_payments_cents: number;
+  threshold_met: boolean;
+}
+
+/**
+ * Result envelope for annual IRS Form 1099-NEC vendor reporting.
+ */
+export interface Vendor1099ReportResult {
+  tax_year: number;
+  threshold_cents: number;
+  total_vendors_count: number;
+  qualifying_vendors_count: number;
+  total_qualifying_payments_cents: number;
+  vendors: Vendor1099Record[];
+}
+
+/**
+ * Result envelope for statutory move-out deposit disposition timelines.
+ */
+export interface StatutoryDispositionTimelineResult {
+  move_out_date_ms: number;
+  state_code: string;
+  statutory_limit_days: number;
+  deadline_date_ms: number;
+  days_remaining: number;
+  is_past_due: boolean;
 }

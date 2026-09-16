@@ -1,10 +1,11 @@
 # ==============================================================================
-# GarrisonOS Windows PowerShell Automated Installer
+# GarrisonOS Windows PowerShell Automated Installer (Method 2: Verified Release Archive)
 # ==============================================================================
 # Usage:
-#   irm https://raw.githubusercontent.com/garrisonos/GarrisonOS/main/scripts/install.ps1 | iex
-# Or with parameters:
+#   .\scripts\install.ps1 [parameters]
+# Examples:
 #   .\scripts\install.ps1 -Port 8080 -Seed
+#   .\scripts\install.ps1 -InstallDir C:\garrison-os -Port 8080 -Seed
 # ==============================================================================
 
 [CmdletBinding()]
@@ -109,13 +110,58 @@ if (-not $isExistingRepo) {
         Write-Host "  Downloading $($release.name) ($($release.tag_name))..." -ForegroundColor Gray
         Invoke-WebRequest -Uri $downloadUrl -OutFile $tempZip -Headers $headers
 
+        # Cryptographic SHA-256 integrity verification
+        $checksumAsset = $release.assets | Where-Object { $_.name -like "*sha256*" -or $_.name -like "*checksum*" } | Select-Object -First 1
+        if (-not $checksumAsset) {
+            Remove-Item -Path $tempZip -Force -ErrorAction SilentlyContinue
+            throw "Release does not contain an integrity checksum asset (SHA256SUMS). Aborting installation for security."
+        }
+
+        Write-Host "  Verifying cryptographic SHA-256 checksum from $($checksumAsset.name)..." -ForegroundColor Gray
+        $tempChecksum = Join-Path $env:TEMP "garrison-checksum-$($release.tag_name).txt"
+        Invoke-WebRequest -Uri $checksumAsset.browser_download_url -OutFile $tempChecksum -Headers $headers
+        $checksumLines = Get-Content $tempChecksum | Where-Object { $_ -match '[a-fA-F0-9]{64}' }
+
+        $targetFilename = if ($zipAsset) { $zipAsset.name } else { "garrisonos.zip" }
+        $matchingLines = $checksumLines | Where-Object { $_ -like "*$targetFilename*" }
+
+        if (-not $matchingLines -or $matchingLines.Count -ne 1) {
+            if ($checksumLines.Count -eq 1) {
+                $expectedHash = (($checksumLines[0] -split '\s+')[0]).Trim().ToLower()
+            } else {
+                Remove-Item -Path $tempZip -Force -ErrorAction SilentlyContinue
+                Remove-Item -Path $tempChecksum -Force -ErrorAction SilentlyContinue
+                throw "Could not uniquely resolve expected SHA-256 checksum for '$targetFilename' in $($checksumAsset.name)."
+            }
+        } else {
+            $expectedHash = (($matchingLines[0] -split '\s+')[0]).Trim().ToLower()
+        }
+
+        if (-not $expectedHash -or $expectedHash.Length -ne 64) {
+            Remove-Item -Path $tempZip -Force -ErrorAction SilentlyContinue
+            Remove-Item -Path $tempChecksum -Force -ErrorAction SilentlyContinue
+            throw "Invalid SHA-256 digest format in release checksum asset."
+        }
+
+        $actualHash = (Get-FileHash -Path $tempZip -Algorithm SHA256).Hash.ToLower()
+        if ($actualHash -ne $expectedHash) {
+            Remove-Item -Path $tempZip -Force -ErrorAction SilentlyContinue
+            Remove-Item -Path $tempChecksum -Force -ErrorAction SilentlyContinue
+            Write-Host "[!] Checksum verification failed!" -ForegroundColor Red
+            Write-Host "    Expected: $expectedHash" -ForegroundColor Red
+            Write-Host "    Actual:   $actualHash" -ForegroundColor Red
+            exit 1
+        }
+        Write-Host "  [+] Cryptographic SHA-256 checksum verified ($actualHash)" -ForegroundColor Green
+        Remove-Item -Path $tempChecksum -Force -ErrorAction SilentlyContinue
+
         Write-Host "  Extracting to $targetPath..." -ForegroundColor Gray
         Expand-Archive -Path $tempZip -DestinationPath $targetPath -Force
         Remove-Item -Path $tempZip -Force
-        Write-Host "  ✔ Release files extracted" -ForegroundColor Green
+        Write-Host "  [+] Release files extracted" -ForegroundColor Green
     } catch {
-        Write-Host "❌ Failed to download release from GitHub: $_" -ForegroundColor Red
-        Write-Host "   You can manually clone the repository with: git clone https://github.com/garrisonos/GarrisonOS.git" -ForegroundColor Yellow
+        Write-Host "[!] Failed to download release from GitHub: $_" -ForegroundColor Red
+        Write-Host "    You can manually clone the repository with: git clone https://github.com/garrisonos/GarrisonOS.git" -ForegroundColor Yellow
         exit 1
     }
 } else {

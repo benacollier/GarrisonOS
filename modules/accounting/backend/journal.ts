@@ -137,7 +137,8 @@ export class JournalService {
       // must preserve tenant validation while allowing soft-deleted references to remain readable.
       const deletedFilter = historicalReferenceMode ? '' : ' AND deleted_at IS NULL';
       const checkAccount = conn.prepare(`
-        SELECT 1 FROM chart_of_accounts
+        SELECT id, account_number, account_name, account_type, category_mapping
+        FROM chart_of_accounts
         WHERE id = ? AND tenant_id = ?${deletedFilter}
       `);
       const checkProperty = conn.prepare(`
@@ -153,10 +154,14 @@ export class JournalService {
         WHERE id = ? AND tenant_id = ?${deletedFilter}
       `);
 
+      const lineAccounts: Array<{ line: CreateJournalLineInput; account: any }> = [];
       for (const line of input.lines) {
-        if (!checkAccount.get(line.account_id, tenantId)) {
+        const acc = checkAccount.get(line.account_id, tenantId) as any;
+        if (!acc) {
           throw new Error(`Account '${line.account_id}' does not exist or does not belong to the current tenant.`);
         }
+        lineAccounts.push({ line, account: acc });
+
         if (line.property_id && !checkProperty.get(line.property_id, tenantId)) {
           throw new Error(`Property '${line.property_id}' does not exist or does not belong to the current tenant.`);
         }
@@ -165,6 +170,45 @@ export class JournalService {
         }
         if (line.contact_id && !checkContact.get(line.contact_id, tenantId)) {
           throw new Error(`Contact '${line.contact_id}' does not exist or does not belong to the current tenant.`);
+        }
+      }
+
+      // Statutory Trust Accounting Non-Commingling Invariant:
+      // Fiduciary funds held in Security Deposit Trust Checking (Account 1020 / category_mapping 'trust_bank')
+      // must never be commingled with operating accounts (Income, Expense, CostOfGoodsSold, or operating_bank)
+      // without an exactly matching and offsetting tenant deposit liability movement (Account 2100 / category_mapping 'security_deposit').
+      let netTrustMovement = 0;
+      let netLiabilityMovement = 0;
+      let hasTrustBankLines = false;
+      let hasOperatingLines = false;
+
+      for (const { line, account } of lineAccounts) {
+        const isTrustBank = account.account_number === '1020' || account.category_mapping === 'trust_bank';
+        const isDepositLiability = account.account_number === '2100' || account.category_mapping === 'security_deposit';
+        const isOperating = (
+          account.account_type === 'Income' ||
+          account.account_type === 'Expense' ||
+          account.account_type === 'CostOfGoodsSold' ||
+          account.category_mapping === 'operating_bank'
+        );
+
+        if (isTrustBank) {
+          hasTrustBankLines = true;
+          netTrustMovement += (line.debit_cents - line.credit_cents);
+        }
+        if (isDepositLiability) {
+          netLiabilityMovement += (line.credit_cents - line.debit_cents);
+        }
+        if (isOperating) {
+          hasOperatingLines = true;
+        }
+      }
+
+      if (hasTrustBankLines && hasOperatingLines) {
+        if (netTrustMovement !== netLiabilityMovement || netTrustMovement !== 0) {
+          throw new Error(
+            'Trust accounting violation: Security Deposit Trust funds (Account 1020) cannot be directly commingled with operating income or operating expenses. Deposits must balance against Tenant Security Deposits Held (Account 2100).'
+          );
         }
       }
 

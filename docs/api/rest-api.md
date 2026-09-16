@@ -121,6 +121,9 @@ All JSON responses conform to standardized envelopes:
 * `GET /api/v1/accounting/quickbooks/preview`: Preview balanced double-entry journal entries
 * `GET /api/v1/accounting/export/quickbooks/qbo-journal.csv`: Export QuickBooks Online Journal Entry batch CSV
 * `GET /api/v1/accounting/export/quickbooks/desktop.iif`: Export QuickBooks Desktop IIF format
+* `GET /api/v1/accounting/reconciliation/three-way`: Statutory Three-Way Bank Reconciliation report
+* `GET /api/v1/accounting/reports/1099-nec`: Annual IRS Form 1099-NEC vendor expense summary report
+* `GET /api/v1/accounting/disposition/timeline`: Statutory move-out deposit deduction deadline schedule
 * `GET /api/v1/accounting/export/quickbooks/bank-feed.qbo`: Export Web Connect (.QBO) bank feed
 
 ### Maintenance

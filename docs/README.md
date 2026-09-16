@@ -24,7 +24,7 @@ docs/
 │   ├── properties.md      # Portfolios, properties, and rentable unit inventory
 │   ├── contacts.md        # Directory of tenants, owners, vendors, and emergency contacts
 │   ├── leases.md          # Lease agreements, terms, signatories, and lifecycle transitions
-│   ├── accounting.md      # Cash ledger, Schedule E, Chart of Accounts, and QuickBooks compatibility
+│   ├── accounting.md      # Double-entry GL, statutory trust accounting, 3-way reconciliation, Schedule E, and QuickBooks
 │   ├── maintenance.md     # Work order triage, vendor dispatch, and expense conversion
 │   └── backup.md          # Point-in-time snapshots, tenant portability, and disaster recovery
 │

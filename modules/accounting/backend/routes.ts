@@ -1,4 +1,5 @@
-import { Router } from '../../../api/router.js';
+import { ServerResponse } from 'node:http';
+import { Router, ApiRequest } from '../../../api/router.js';
 import { successResponse, errorResponse } from '../../../api/response.js';
 import { AccountingRepository } from './repository.js';
 import { generateMonthlyRentCharges } from './billing.js';
@@ -6,6 +7,100 @@ import { ChartOfAccountsRepository } from './chart_of_accounts.js';
 import { QuickBooksService } from './quickbooks.js';
 import { JournalService } from './journal.js';
 
+/**
+ * Strict integer query parameter parser that validates bounds and rejects NaN.
+ *
+ * @param req Incoming API request.
+ * @param res HTTP response.
+ * @param paramName Query parameter name.
+ * @param options Parsing and validation options.
+ * @returns Object with parsed value and error flag.
+ */
+function parseIntegerParam(
+  req: ApiRequest,
+  res: ServerResponse,
+  paramName: string,
+  options: {
+    required?: boolean;
+    defaultValue?: number;
+    min?: number;
+    max?: number;
+  } = {}
+): { value?: number; hasError: boolean } {
+  const raw = req.query[paramName];
+  if (raw === undefined || raw === '') {
+    if (options.required) {
+      errorResponse(res, 'VALIDATION_ERROR', `Query parameter "${paramName}" is required`, 400);
+      return { hasError: true };
+    }
+    return { value: options.defaultValue, hasError: false };
+  }
+
+  // Strict integer check (digits with optional leading sign)
+  if (!/^-?\d+$/.test(raw)) {
+    errorResponse(
+      res,
+      'VALIDATION_ERROR',
+      `Query parameter "${paramName}" must be a valid integer`,
+      400
+    );
+    return { hasError: true };
+  }
+
+  const parsed = Number(raw);
+  if (!Number.isSafeInteger(parsed)) {
+    errorResponse(
+      res,
+      'VALIDATION_ERROR',
+      `Query parameter "${paramName}" must be a safe integer`,
+      400
+    );
+    return { hasError: true };
+  }
+
+  if (options.min !== undefined && parsed < options.min) {
+    errorResponse(
+      res,
+      'VALIDATION_ERROR',
+      `Query parameter "${paramName}" cannot be less than ${options.min}`,
+      400
+    );
+    return { hasError: true };
+  }
+
+  if (options.max !== undefined && parsed > options.max) {
+    errorResponse(
+      res,
+      'VALIDATION_ERROR',
+      `Query parameter "${paramName}" cannot be greater than ${options.max}`,
+      400
+    );
+    return { hasError: true };
+  }
+
+  return { value: parsed, hasError: false };
+}
+
+/**
+ * Ensures caller is authenticated with a valid user session.
+ *
+ * @param req Incoming API request.
+ * @param res HTTP response.
+ * @returns True if caller is authenticated; false if response was written.
+ */
+function requireAuth(req: ApiRequest, res: ServerResponse): boolean {
+  if (!req.userId) {
+    errorResponse(res, 'UNAUTHORIZED', 'Authentication is required for this endpoint', 401);
+    return false;
+  }
+  return true;
+}
+
+/**
+ * Registers all accounting module HTTP routes with the application router.
+ *
+ * @param router Application router instance.
+ */
 export function registerRoutes(router: Router): void {
   // --- Rent Roll ---
   router.getBatchSafe('/api/v1/accounting/rent-roll', (_req, res) => {
@@ -25,10 +120,15 @@ export function registerRoutes(router: Router): void {
 
   // --- Schedule E Report ---
   router.get('/api/v1/accounting/schedule-e', (req, res) => {
-    const year = req.query.year ? parseInt(req.query.year, 10) : new Date().getUTCFullYear();
+    const yearRes = parseIntegerParam(req, res, 'year', {
+      defaultValue: new Date().getUTCFullYear(),
+      min: 1900,
+      max: 2100
+    });
+    if (yearRes.hasError) return;
     const propertyId = req.query.property_id || undefined;
-    const report = AccountingRepository.getScheduleEReport({ year, property_id: propertyId });
-    successResponse(res, { year, property_id: propertyId, report });
+    const report = AccountingRepository.getScheduleEReport({ year: yearRes.value!, property_id: propertyId });
+    successResponse(res, { year: yearRes.value, property_id: propertyId, report });
   });
 
   // --- Lease Balance & Ledger ---
@@ -59,16 +159,62 @@ export function registerRoutes(router: Router): void {
     }
   });
 
+  // --- Statutory Trust Three-Way Reconciliation ---
+  router.getBatchSafe('/api/v1/accounting/reconciliation/three-way', (req, res) => {
+    if (!requireAuth(req, res)) return;
+    const asOfRes = parseIntegerParam(req, res, 'as_of', { min: 1 });
+    if (asOfRes.hasError) return;
+    const bankRes = parseIntegerParam(req, res, 'bank_balance', { min: 0 });
+    if (bankRes.hasError) return;
+    const reconciliation = AccountingRepository.getThreeWayReconciliation(asOfRes.value, bankRes.value);
+    successResponse(res, reconciliation);
+  });
+
+  // --- IRS Form 1099-NEC Vendor Expense Report ---
+  router.getBatchSafe('/api/v1/accounting/reports/1099-nec', (req, res) => {
+    if (!requireAuth(req, res)) return;
+    const yearRes = parseIntegerParam(req, res, 'year', {
+      defaultValue: new Date().getUTCFullYear(),
+      min: 1900,
+      max: 2100
+    });
+    if (yearRes.hasError) return;
+    const report = AccountingRepository.getVendor1099Report(yearRes.value!);
+    successResponse(res, report);
+  });
+
+  // --- Statutory Move-Out Disposition Timeline ---
+  router.getBatchSafe('/api/v1/accounting/disposition/timeline', (req, res) => {
+    if (!requireAuth(req, res)) return;
+    const moveOutRes = parseIntegerParam(req, res, 'move_out_date', {
+      defaultValue: Date.now(),
+      min: 1
+    });
+    if (moveOutRes.hasError) return;
+    const state = req.query.state || 'US';
+    try {
+      const timeline = AccountingRepository.getStatutoryDispositionTimeline(moveOutRes.value!, state);
+      successResponse(res, timeline);
+    } catch (err: any) {
+      errorResponse(res, 'VALIDATION_ERROR', err.message, 400);
+    }
+  });
+
   // --- Transactions CRUD ---
   router.getBatchSafe('/api/v1/accounting/transactions', (req, res) => {
+    const startRes = parseIntegerParam(req, res, 'start_date', { min: 1 });
+    if (startRes.hasError) return;
+    const endRes = parseIntegerParam(req, res, 'end_date', { min: 1 });
+    if (endRes.hasError) return;
+
     const transactions = AccountingRepository.listTransactions({
       lease_id: req.query.lease_id,
       property_id: req.query.property_id,
       unit_id: req.query.unit_id,
       transaction_type: req.query.transaction_type,
       category: req.query.category,
-      start_date: req.query.start_date ? parseInt(req.query.start_date, 10) : undefined,
-      end_date: req.query.end_date ? parseInt(req.query.end_date, 10) : undefined
+      start_date: startRes.value,
+      end_date: endRes.value
     });
     successResponse(res, { transactions });
   });
@@ -121,26 +267,31 @@ export function registerRoutes(router: Router): void {
 
   // Trial Balance Report
   router.get('/api/v1/accounting/trial-balance', (req, res) => {
-    const asOfDate = req.query.as_of_date ? parseInt(req.query.as_of_date, 10) : undefined;
+    const asOfRes = parseIntegerParam(req, res, 'as_of_date', { min: 1 });
+    if (asOfRes.hasError) return;
     const propertyId = req.query.property_id || undefined;
-    const trialBalance = JournalService.getTrialBalance(asOfDate, propertyId);
+    const trialBalance = JournalService.getTrialBalance(asOfRes.value, propertyId);
     successResponse(res, { trialBalance });
   });
 
   // List General Ledger Journal Entries
   router.get('/api/v1/accounting/journal-entries', (req, res) => {
-    const rawLimit = req.query.limit ? parseInt(req.query.limit, 10) : 50;
-    const rawOffset = req.query.offset ? parseInt(req.query.offset, 10) : 0;
-    const limit = Math.min(Math.max(Number.isFinite(rawLimit) ? rawLimit : 50, 1), 200);
-    const offset = Math.max(Number.isFinite(rawOffset) ? rawOffset : 0, 0);
+    const limitRes = parseIntegerParam(req, res, 'limit', { defaultValue: 50, min: 1, max: 200 });
+    if (limitRes.hasError) return;
+    const offsetRes = parseIntegerParam(req, res, 'offset', { defaultValue: 0, min: 0 });
+    if (offsetRes.hasError) return;
+    const startRes = parseIntegerParam(req, res, 'start_date', { min: 1 });
+    if (startRes.hasError) return;
+    const endRes = parseIntegerParam(req, res, 'end_date', { min: 1 });
+    if (endRes.hasError) return;
 
     const { entries, total } = JournalService.listEntries({
       source_type: req.query.source_type,
       source_id: req.query.source_id,
-      start_date: req.query.start_date ? parseInt(req.query.start_date, 10) : undefined,
-      end_date: req.query.end_date ? parseInt(req.query.end_date, 10) : undefined,
-      limit,
-      offset
+      start_date: startRes.value,
+      end_date: endRes.value,
+      limit: limitRes.value!,
+      offset: offsetRes.value!
     });
     successResponse(res, { entries, total });
   });
@@ -210,7 +361,13 @@ export function registerRoutes(router: Router): void {
   });
 
   router.get('/api/v1/accounting/export/schedule-e.csv', (req, res) => {
-    const year = req.query.year ? parseInt(req.query.year, 10) : new Date().getUTCFullYear();
+    const yearRes = parseIntegerParam(req, res, 'year', {
+      defaultValue: new Date().getUTCFullYear(),
+      min: 1900,
+      max: 2100
+    });
+    if (yearRes.hasError) return;
+    const year = yearRes.value!;
     const report = AccountingRepository.getScheduleEReport({ year });
     let csv = `IRS Schedule E Summary - Year ${year}\n\n`;
     csv += 'Category Type,Line Item,Amount ($)\n';
@@ -292,12 +449,17 @@ export function registerRoutes(router: Router): void {
 
   // Preview QuickBooks Journal Entries before export
   router.get('/api/v1/accounting/quickbooks/preview', (req, res) => {
+    const startRes = parseIntegerParam(req, res, 'start_date', { min: 1 });
+    if (startRes.hasError) return;
+    const endRes = parseIntegerParam(req, res, 'end_date', { min: 1 });
+    if (endRes.hasError) return;
+
     const transactions = AccountingRepository.listTransactions({
       property_id: req.query.property_id,
       transaction_type: req.query.transaction_type,
       category: req.query.category,
-      start_date: req.query.start_date ? parseInt(req.query.start_date, 10) : undefined,
-      end_date: req.query.end_date ? parseInt(req.query.end_date, 10) : undefined,
+      start_date: startRes.value,
+      end_date: endRes.value,
       qb_unexported_only: req.query.unexported_only === 'true'
     });
 
@@ -319,10 +481,15 @@ export function registerRoutes(router: Router): void {
 
   // Download QuickBooks Online (QBO) Journal CSV
   router.get('/api/v1/accounting/export/quickbooks/qbo-journal.csv', (req, res) => {
+    const startRes = parseIntegerParam(req, res, 'start_date', { min: 1 });
+    if (startRes.hasError) return;
+    const endRes = parseIntegerParam(req, res, 'end_date', { min: 1 });
+    if (endRes.hasError) return;
+
     const transactions = AccountingRepository.listTransactions({
       property_id: req.query.property_id,
-      start_date: req.query.start_date ? parseInt(req.query.start_date, 10) : undefined,
-      end_date: req.query.end_date ? parseInt(req.query.end_date, 10) : undefined,
+      start_date: startRes.value,
+      end_date: endRes.value,
       qb_unexported_only: req.query.unexported_only === 'true'
     });
 
@@ -342,10 +509,15 @@ export function registerRoutes(router: Router): void {
 
   // Download QuickBooks Desktop IIF File
   router.get('/api/v1/accounting/export/quickbooks/desktop.iif', (req, res) => {
+    const startRes = parseIntegerParam(req, res, 'start_date', { min: 1 });
+    if (startRes.hasError) return;
+    const endRes = parseIntegerParam(req, res, 'end_date', { min: 1 });
+    if (endRes.hasError) return;
+
     const transactions = AccountingRepository.listTransactions({
       property_id: req.query.property_id,
-      start_date: req.query.start_date ? parseInt(req.query.start_date, 10) : undefined,
-      end_date: req.query.end_date ? parseInt(req.query.end_date, 10) : undefined,
+      start_date: startRes.value,
+      end_date: endRes.value,
       qb_unexported_only: req.query.unexported_only === 'true'
     });
 
@@ -365,10 +537,15 @@ export function registerRoutes(router: Router): void {
 
   // Download Web Connect / QBO Banking File
   router.get('/api/v1/accounting/export/quickbooks/bank-feed.qbo', (req, res) => {
+    const startRes = parseIntegerParam(req, res, 'start_date', { min: 1 });
+    if (startRes.hasError) return;
+    const endRes = parseIntegerParam(req, res, 'end_date', { min: 1 });
+    if (endRes.hasError) return;
+
     const transactions = AccountingRepository.listTransactions({
       property_id: req.query.property_id,
-      start_date: req.query.start_date ? parseInt(req.query.start_date, 10) : undefined,
-      end_date: req.query.end_date ? parseInt(req.query.end_date, 10) : undefined,
+      start_date: startRes.value,
+      end_date: endRes.value,
       qb_unexported_only: req.query.unexported_only === 'true'
     });
 

@@ -192,3 +192,56 @@ When running terminal commands on Windows host environments:
 * **Atomic Commits**: Keep commits focused and granular. Do not bundle unrelated features, refactors, or documentation into a single commit.
 * **Code-Documentation Atomicity**: Any change to source code, schemas, APIs, module manifests, or configuration must be accompanied by corresponding updates to documentation under `docs/` and `CHANGELOG.md` within the same pull request.
 
+---
+
+## 6. Security Blast Radius & Defensive Engineering Guardrails
+
+All contributors and automated agents must proactively anticipate, calculate, and mitigate the blast radius of every change. Changes must never introduce unverified assumptions into downstream callers or leave ingress attack vectors unshielded.
+
+### 6.1 Downstream Blast Radius Mapping
+Before modifying or introducing any service method, repository function, or public API:
+* **Trace Callers & Dependents**: Use grep/ripgrep across `api/`, `core/`, `database/`, and `modules/` to identify all direct and indirect consumers of modified types, methods, or database tables.
+* **Context Assumption Audit**: When reading `RequestContext.getTenantId()`, verify that every route leading to this execution is protected by authentication and tenant-membership verification. Never assume an endpoint is internal or pre-authenticated without explicit route-level guards.
+* **Downstream Regression Testing**: When modifying core utilities (`core/context.ts`, `core/crypto.ts`, `database/client.ts`, `api/response.ts`), run all dependent module test suites (`node scripts/test.js <module_name>`), not just unit tests for the modified file.
+
+### 6.2 Ingress Route Security & Zero-Trust Parameter Parsing
+* **Mandatory Route Authentication**: All operational API routes must require an authenticated session and verified tenant membership. Unauthenticated public endpoints must be strictly limited to public system handshakes (`/health`, `/ready`, `/api/v1/auth/*`, `/api/v1/system/setup`, `/api/v1/system/restore`).
+* **Strict Numeric Query Parsing**: Never pass raw `parseInt(req.query.param, 10)` into repository methods or SQL queries. All numeric query parameters must be validated with `Number.isInteger()` or `Number.isFinite()`, bounded to valid ranges, and return HTTP 400 `VALIDATION_ERROR` on failure:
+  ```typescript
+  // CORRECT:
+  const rawAsOf = req.query['as_of'];
+  let asOfDateMs: number | undefined;
+  if (rawAsOf !== undefined) {
+    const parsed = Number(rawAsOf);
+    if (!Number.isInteger(parsed) || parsed <= 0) {
+      return errorResponse(res, 'VALIDATION_ERROR', 'Query parameter "as_of" must be a positive integer millisecond timestamp', 400);
+    }
+    asOfDateMs = parsed;
+  }
+
+  // FORBIDDEN (Propagates NaN into SQL or produces corrupt reports):
+  // const asOf = req.query.as_of ? parseInt(req.query.as_of, 10) : undefined;
+  ```
+* **No NaN Propagation**: Numerical arguments must never evaluate to `NaN` when executing repository logic or SQL queries.
+
+### 6.3 Fail-Closed Security & Infrastructure Invariants
+* **Zero Fail-Open Logic**: Any security check (cryptographic checksum, HMAC token verification, signature comparison, permission check) **MUST FAIL CLOSED**.
+* **Installer & Script Integrity**:
+  * Checksum and signature verification in shell/PowerShell installers (`scripts/install.sh`, `scripts/install.ps1`) must be mandatory.
+  * If a checksum file is missing, empty, malformed, or if required hashing utilities (`sha256sum`, `shasum`, `Get-FileHash`) are unavailable on the host, the script must immediately abort execution with a non-zero exit code (`exit 1` / `throw`).
+  * Never silently proceed with extracting or running unverified release archives.
+  * Archive asset filenames must match their corresponding entry in `SHA256SUMS` exactly; never verify GitHub's dynamic `tarball_url` against release binary checksums.
+
+### 6.4 Financial & Accounting Audit Invariants
+* **Temporal Cutoff Rigor**: Any report or reconciliation taking an `asOf` cutoff timestamp must strictly filter all joins, subledgers, transactions, and lease states to `<= asOf`. Combining historical general ledger balances with unbounded current-state subledgers is strictly prohibited.
+* **Reversal Exclusion**: All financial aggregations, tax reports (e.g., Form 1099-NEC), and ledger inquiries must explicitly exclude reversed entries (`WHERE reversed_by_entry_id IS NULL` and `WHERE reversed_at IS NULL`).
+* **Empirical Audit Truth**: Never declare "three-way bank reconciliation" or "statutory compliance" in APIs, responses, or documentation unless the implementation ingests and verifies against empirical external data (e.g. bank statements) and validates specific statutory jurisdictions rather than generic unverified fallbacks.
+
+### 6.5 Pre-Commit Security Blast Radius Checklist
+Before submitting any pull request or committing changes, contributors and agents must verify:
+1. `npm.cmd run build` — TypeScript compiles with 0 errors.
+2. `node scripts/check-hygiene.js` — Scanned files reveal 0 host path leaks or exposed secrets.
+3. `node scripts/check-security.js` — Route parameters, fail-closed scripts, and security invariants verified.
+4. `node scripts/test.js` — All unit and integration test suites pass with 100% success rate.
+
+
