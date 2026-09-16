@@ -184,6 +184,48 @@ describe('Accounting Module - QuickBooks Compatibility & Double-Entry GL', () =>
     });
   });
 
+  it('allows expense transactions without requiring unrelated accounts', () => {
+    runInTenantContext('tenant-qb-expense-scope-test', () => {
+      const db = getDatabase();
+      const tenantId = 'tenant-qb-expense-scope-test';
+
+      db.prepare(`
+        UPDATE chart_of_accounts
+        SET is_active = 0
+        WHERE tenant_id = ? AND category_mapping IN ('trust_bank', 'accounts_receivable', 'security_deposit')
+      `).run(tenantId);
+
+      assert.doesNotThrow(() => {
+        AccountingRepository.createTransaction({
+          transaction_type: 'expense',
+          category: 'repairs',
+          amount_cents: 37000,
+          transaction_date: Date.now(),
+          description: 'Expense uses only operating bank and expense account'
+        });
+      });
+    });
+  });
+
+  it('skips deleted transactions even when they retain a stale journal_entry_id', () => {
+    runInTenantContext('tenant-qb-deleted-test', () => {
+      const now = Date.now();
+      const tx = AccountingRepository.createTransaction({
+        transaction_type: 'payment',
+        category: 'rent',
+        amount_cents: 125000,
+        transaction_date: now,
+        description: 'Deleted payment snapshot'
+      });
+
+      const deleted = AccountingRepository.deleteTransaction(tx.id);
+      assert.equal(deleted, true);
+
+      const entries = QuickBooksService.generateJournalEntries([tx]);
+      assert.equal(entries.length, 0);
+    });
+  });
+
   it('returns empty journal entries array when given an empty transactions list', () => {
     runInTenantContext('tenant-qb-empty-test', () => {
       // When explicitly passing empty array (filtered query returned 0 results)

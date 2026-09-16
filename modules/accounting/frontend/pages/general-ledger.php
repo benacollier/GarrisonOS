@@ -42,6 +42,11 @@ try {
     $entries = $res['data']['entries'] ?? [];
     $total = $res['data']['total'] ?? 0;
     $totalPages = max(1, (int)ceil($total / $perPage));
+
+    if ($page > $totalPages) {
+        header('Location: /accounting/general-ledger?page=' . $totalPages);
+        exit;
+    }
 } catch (Exception $e) {
     $error = $e->getMessage();
     $totalPages = 1;
@@ -54,6 +59,7 @@ try {
         <h1 class="page-title">General Ledger</h1>
         <p class="page-subtitle">Native immutable double-entry journal entries, audit trail, and line allocations.</p>
     </div>
+
     <div class="actions" style="display: flex; gap: var(--spacing-sm);">
         <form method="POST" action="/accounting/general-ledger" style="display: inline;">
             <?= CSRF::field() ?>
@@ -171,4 +177,3 @@ try {
         </div>
     <?php endif; ?>
 </div>
-

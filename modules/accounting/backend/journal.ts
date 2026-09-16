@@ -79,9 +79,18 @@ export class JournalService {
    * Post an immutable, balanced double-entry journal entry.
    * Enforces invariant: Sum(Debits) == Sum(Credits) > 0.
    */
-  public static postEntry(input: CreateJournalEntryInput, dbInstance?: any): JournalEntryRecord {
+  public static postEntry(
+    input: CreateJournalEntryInput,
+    dbInstance?: any,
+    options?: { historicalReferenceMode?: boolean }
+  ): JournalEntryRecord {
     const tenantId = RequestContext.getTenantId();
-    const db = dbInstance || getDatabase();
+    const isDatabaseInstance = !!dbInstance && typeof dbInstance === 'object' && typeof dbInstance.prepare === 'function';
+    const db = isDatabaseInstance ? dbInstance : getDatabase();
+    const historicalReferenceMode =
+      options?.historicalReferenceMode === true ||
+      (typeof dbInstance === 'boolean' && dbInstance === true) ||
+      (!!dbInstance && typeof dbInstance === 'object' && !isDatabaseInstance && dbInstance.historicalReferenceMode === true);
 
     if (!input.lines || input.lines.length < 2) {
       throw new Error('A journal entry requires at least two lines.');
@@ -123,22 +132,25 @@ export class JournalService {
     const entryDate = input.date_ms || now;
 
     const executeInsert = (conn: any) => {
-      // Validate tenant ownership of account_id, property_id, unit_id, and contact_id
+      // Validate tenant ownership of account_id, property_id, unit_id, and contact_id.
+      // Historical-reference mode is reserved for internal reversal/backfill flows that
+      // must preserve tenant validation while allowing soft-deleted references to remain readable.
+      const deletedFilter = historicalReferenceMode ? '' : ' AND deleted_at IS NULL';
       const checkAccount = conn.prepare(`
         SELECT 1 FROM chart_of_accounts
-        WHERE id = ? AND tenant_id = ? AND deleted_at IS NULL
+        WHERE id = ? AND tenant_id = ?${deletedFilter}
       `);
       const checkProperty = conn.prepare(`
         SELECT 1 FROM properties
-        WHERE id = ? AND tenant_id = ? AND deleted_at IS NULL
+        WHERE id = ? AND tenant_id = ?${deletedFilter}
       `);
       const checkUnit = conn.prepare(`
         SELECT 1 FROM units
-        WHERE id = ? AND tenant_id = ? AND deleted_at IS NULL
+        WHERE id = ? AND tenant_id = ?${deletedFilter}
       `);
       const checkContact = conn.prepare(`
         SELECT 1 FROM contacts
-        WHERE id = ? AND tenant_id = ? AND deleted_at IS NULL
+        WHERE id = ? AND tenant_id = ?${deletedFilter}
       `);
 
       for (const line of input.lines) {
@@ -265,7 +277,7 @@ export class JournalService {
         source_type: 'reversal',
         source_id: original.id,
         lines: reversalLines
-      }, conn);
+      }, conn, { historicalReferenceMode: true });
 
       // Mark original entry as reversed
       conn.prepare(`
@@ -730,7 +742,7 @@ export class JournalService {
           source_type: t.transaction_type,
           source_id: t.id,
           lines
-        }, tx);
+        }, tx, { historicalReferenceMode: true });
 
         tx.prepare(`
           UPDATE transactions

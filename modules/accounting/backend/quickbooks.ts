@@ -69,8 +69,12 @@ export class QuickBooksService {
         // Ensure transactions have backfilled journal entries
         JournalService.backfillLegacyTransactions();
 
-        // Refresh transactions from repository to obtain newly backfilled journal_entry_id values
-        const refreshedTxs = transactions.map((t) => AccountingRepository.getTransactionById(t.id) || t);
+        // Refresh transactions from repository to obtain newly backfilled journal_entry_id values.
+        // Deleted/voided transactions are intentionally excluded: a null lookup means the stale
+        // in-memory transaction should not be exported, even if it still carried a legacy journal_entry_id.
+        const refreshedTxs = transactions
+          .map((t) => AccountingRepository.getTransactionById(t.id))
+          .filter((tx): tx is TransactionRecord => tx !== null);
 
         const txEntryIds = refreshedTxs
           .map((t) => t.journal_entry_id)
