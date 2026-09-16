@@ -1,7 +1,6 @@
 {
   "id": "properties",
   "name": "Properties & Portfolios",
-  "version": "1.0.0",
   "description": "Management of portfolios, physical properties, and rentable units.",
   "navigation": [
     {
@@ -18,4 +17,3 @@
   ],
   "dependencies": []
 }
-

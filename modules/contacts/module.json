@@ -1,7 +1,6 @@
 {
   "id": "contacts",
   "name": "Contacts & Directory",
-  "version": "1.0.0",
   "description": "Directory for tenants, property owners, contractors, vendors, and emergency contacts.",
   "navigation": [
     {
@@ -17,4 +16,3 @@
   ],
   "dependencies": []
 }
-

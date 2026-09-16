@@ -1,7 +1,6 @@
 {
   "id": "accounting",
   "name": "Accounting & Ledger",
-  "version": "1.0.0",
   "description": "Cash-basis ledger, billing cycles, IRS Schedule E reporting, and rent collection.",
   "navigation": [
     {
@@ -32,4 +31,3 @@
   ],
   "dependencies": ["properties", "contacts", "leases"]
 }
-

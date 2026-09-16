@@ -1,7 +1,6 @@
 {
   "id": "leases",
   "name": "Leases & Tenants",
-  "version": "1.0.0",
   "description": "Lease agreements, terms, rent rules, and signatory management.",
   "navigation": [
     {
@@ -18,4 +17,3 @@
   ],
   "dependencies": ["properties", "contacts"]
 }
-
