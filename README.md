@@ -52,8 +52,8 @@ The GarrisonOS MVP is focused strictly on delivering a self-hosted property mana
 
 * **Day-to-Day Operations**: Physical property structures, rentable unit inventories, status lifecycle tracking, human directory management (tenants, owners, vendors, emergency contacts), and maintenance work order dispatching.
 * **Lease Agreements**: Residential lease lifecycles, terms, security deposit tracking, and multi-party signatory assignments.
-* **Native Double-Entry General Ledger & Accounting**: Native, immutable double-entry journal engine (`journal_entries` and `journal_lines`) enforcing balanced zero-sum debit/credit invariants, Chart of Accounts mapped to IRS Schedule E categories, Trial Balance verification, tenant running balances, automated monthly rent charge generation with mid-month proration, waterfall payment allocation, move-out deposit disposition, and streamed exports (Rent Roll, Schedule E P&L, tenant ledgers, QuickBooks QBO/IIF/OFX).
-* **Self-Hosting & Privacy**: Single-tenant or multi-tenant deployment, local SQLite database storage, and complete data portability.
+* **Native Double-Entry General Ledger & Statutory Trust Accounting**: Native, immutable double-entry journal engine (`journal_entries` and `journal_lines`) enforcing balanced zero-sum debit/credit invariants, strict statutory trust accounting separation (`1010 Operating Checking` vs. `1020 Security Deposit Trust Checking` and `2100 Tenant Security Deposits Held Liability`) to comply with state non-commingling mandates, automated three-way bank reconciliation proofs (Bank Statement = GL Trust = Tenant Liabilities), Chart of Accounts mapped to IRS Schedule E categories, Trial Balance verification, tenant running balances, automated monthly rent charge generation with mid-month proration, waterfall payment allocation, statutory move-out deposit disposition timelines, annual vendor 1099-NEC expense tracking (> $600 threshold), and streamed exports (Rent Roll, Schedule E P&L, tenant ledgers, QuickBooks QBO/IIF/OFX).
+* **Self-Hosting & Privacy**: Single-tenant or multi-tenant deployment, local SQLite database storage operating in WAL mode, and complete data portability.
 
 ---
 
@@ -139,7 +139,7 @@ GarrisonOS is intentionally architected with **zero external runtime package dep
 ### 1. Properties & Portfolios (`modules/properties`)
 
 * **Legal Portfolios**: Organize holdings by legal entity / LLC with tax identification.
-* **Physical Properties**: Manage Single-Family Homes, Multifamily Buildings, Condominiums, Townhouses, and Commercial spaces with address, year built, and metadata.
+* **Physical Properties**: Manage Single-Family Homes, Multifamily Buildings, Condominiums, and Townhouses with address, year built, and metadata.
 * **Rentable Units**: Track unit inventories, unit numbers, bedroom/bathroom configurations, square footage, market rent, and target deposits.
 * **Unit Lifecycle States**: `vacant`, `occupied`, `notice_given`, `turnover`, and `maintenance_hold`.
 
@@ -155,15 +155,19 @@ GarrisonOS is intentionally architected with **zero external runtime package dep
 * **Terms & Financials**: Recurring rent amount, security deposit requirements, deposit held, rent due day, late fee grace periods, and late fee amounts.
 * **Multi-Party Signatories**: `lease_contacts` junction supporting Primary Tenants, Co-Tenants, Guarantors, and Occupants with financial responsibility tracking.
 
-### 4. Native Double-Entry General Ledger & Financials (`modules/accounting`)
+### 4. Native Double-Entry General Ledger & Statutory Trust Accounting (`modules/accounting`)
 
 * **Native Double-Entry Engine**: First-class, immutable double-entry journal entries (`journal_entries`) and lines (`journal_lines`) enforcing strict zero-sum debit/credit balance proofs across all operational transactions.
+* **Statutory Trust Accounting & Non-Commingling Invariant**: Enforces fiduciary segregation between operating funds (`1010 Operating Checking`) and tenant security deposits (`1020 Security Deposit Trust Checking` / `2100 Tenant Security Deposits Held Liability`), preventing unlawful commingling under state real estate licensing regulations.
+* **Three-Way Bank Reconciliation**: Automated verification schedules proving parity across all three fiduciary dimensions:
+  $$\text{Bank Statement Balance} \equiv \text{GL Trust Account Balance (1020)} \equiv \sum \text{Active Lease Deposit Liabilities}$$
+* **Statutory Move-Out Disposition & Countdown Timelines**: Jurisdiction-aware statutory deduction deadlines (e.g. CA 21-day, NY 14-day, TX 30-day rules) with itemized statements before security deposit refunds are released.
+* **Vendor Tax Compliance (IRS Form 1099-NEC)**: Vendor Tax ID (EIN/SSN) tracking and annual maintenance expense aggregation with automated alerts for vendors meeting or exceeding the statutory $600/year threshold.
 * **Trial Balance Reporting**: Live verification report proving $\sum \text{Debits} \equiv \sum \text{Credits}$ across all active accounts with period and property filters.
 * **Audit Trail & Reversal Accounting**: Strictly immutable posted entries; voids and adjustments generate explicit contra/reversal entries with linked `reversed_by_entry_id` references.
 * **IRS Schedule E Tax Mapping**: Standard Chart of Accounts directly mapped to IRS Form 1040 Schedule E lines (Advertising, Cleaning & Maintenance, Insurance, Legal/Professional, Management Fees, Mortgage Interest, Repairs, Supplies, Property Taxes, Utilities, HOA Fees, Capital Improvements).
 * **Running Tenant Balances & Waterfall**: Real-time tenant balance calculation and strict priority waterfall payment allocation:
   $$\text{Late Fees} \longrightarrow \text{Utility Rebill / Fees} \longrightarrow \text{Oldest Rent Charges} \longrightarrow \text{Current Rent}$$
-* **Move-Out Deposit Disposition**: Automatic computation of deposit refunds minus unpaid rent and itemized damage deductions.
 * **Automated Monthly Rent Generation**: Scheduled batch generation with idempotency keys (`rent_charge:{lease_id}:{YYYY_MM}`) posting balanced Dr: Accounts Receivable / Cr: Rental Income entries with mid-month proration.
 * **Financial Data & Accounting Exports**: Streamed exports for Rent Roll, Schedule E statements, tenant statements, and direct persistent ledger exports for QuickBooks Online (`.csv`), QuickBooks Desktop (`.iif`), and Web Connect bank feeds (`.qbo`).
 
@@ -198,33 +202,34 @@ For a comprehensive phase-by-phase implementation plan, milestone deliverables, 
 
 |Phase|Topic|Progress|Current position|
 |:---|:---|:---:|:---|
-|**1. Core Engine & Multi-Tenant Foundation**|Node.js HTTP/SQLite engine and native dependency boundary|✅|Implemented with the standard-library runtime and core tests.|
-||AsyncLocalStorage context propagation and `X-Tenant-ID` isolation|✅|Implemented and covered by context/isolation tests.|
-||Tenant lifecycle management|⬜|No complete tenant administration/lifecycle workflow is exposed.|
-||Authentication, sessions, tokens, and rate limiting|🟡|Cryptographic helpers and PHP login/session pieces exist; complete engine integration and rate-limit coverage remain.|
-||EventBus and base repository patterns|✅|EventBus and repository implementations are present and used by modules.|
-|**2. Base Entity & Inventory Management**|Properties, portfolios, units, and inventory routes|🟡|Module repositories, routes, migrations, and tests exist; full lifecycle and UI coverage remain incomplete.|
-||Multi-role contacts directory|🟡|Contacts module and tests exist; broader relationship and workflow coverage remains.|
-||Validation, entity relationships, and REST CRUD completeness|🟡|Basic validation and CRUD paths exist, but coverage is uneven across modules and presentation flows.|
-|**3. Core Property Operations**|Leasing lifecycle|🟡|Lease routes, repository logic, lifecycle states, and tests exist; end-to-end workflow coverage is incomplete.|
-||Maintenance and work-order workflow|🟡|Ticket routes, status handling, assignment fields, UI pages, and tests exist; dispatch/resolution flows need more coverage.|
-||Cross-module operational events|🟡|Event definitions/listeners exist, but complete event-driven workflow verification is still outstanding.|
-|**4. Financial Ledger & Accounting**|Immutable double-entry journal and integer-cents ledger|✅|Journal/ledger services, schema, invariants, and focused tests are implemented.|
-||Chart of Accounts, Schedule E, and QuickBooks compatibility|🟡|Account/reporting and compatibility code exists; production-grade compatibility validation is incomplete.|
-||Automated rent, payments, deposits, and operational transactions|🟡|Billing and allocation services exist with tests; full automation and edge-case validation remain.|
-||Financial exports and reporting|🟡|Ledger, rent-roll, Schedule E, and export paths exist; broader verification and operator workflows remain.|
-|**5. Native Presentation Layer & User Experience**|Native PHP shell, layouts, and CSS system|🟡|The server-rendered shell and CSS are present; deployment/runtime integration is not production-validated.|
-||Dashboard and operator views|🟡|Dashboard and several module pages exist; UI coverage is uneven and some flows are read-only or incomplete.|
-||Financial reporting views|🟡|Ledger, rent-roll, Schedule E, and related pages exist; end-to-end usability verification remains.|
-||Form validation, CSRF, and session handling|🟡|CSRF/session helpers and login flows exist; complete validation and security review remain.|
-|**6. Data Portability, Resilience & Backup**|SQLite snapshots and WAL checkpointing|✅|Snapshot service and safe checkpointing are implemented and tested.|
-||Tenant data export/import and integrity verification|✅|Tenant-scoped `.json.gz` export/import and SHA-256 verification are implemented and tested.|
-||Disaster-recovery restore|🟡|Restore tooling exists; operational recovery procedures and broader failure testing remain.|
-||Scheduled backups, monitoring, vacuuming, and upgrade/rollback procedures|⬜|No complete operational scheduling and runbook package is implemented.|
-|**7. MVP Verification, Hardening & Self-Hosting**|Unit/module tests and tenant-isolation regression coverage|🟡|Core and module suites exist; broader end-to-end and release acceptance coverage remains.|
-||Security review and production hardening|🟡|Security-related controls are present in several areas; the complete review and remediation pass is outstanding.|
-||Local setup and self-hosting workflow|🟡|A setup script and local start path exist; production service and reverse-proxy configurations are not complete.|
-||Systemd/Supervisord packaging and release readiness|⬜|No complete production packaging or stable-release sign-off exists yet.|
+|**1. Core Engine & Multi-Tenant Foundation**|Node.js HTTP/SQLite engine and native dependency boundary|✅|Implemented with standard-library runtime, WAL mode, and core test coverage.|
+||AsyncLocalStorage context propagation and `X-Tenant-ID` isolation|✅|Implemented across HTTP middleware and EventBus async boundaries; covered by isolation tests.|
+||Tenant lifecycle management|⬜|No complete tenant administration or tenant onboarding lifecycle workflow is exposed.|
+||Authentication, sessions, tokens, and role-based access|🟡|HMAC tokens, scrypt hashing, spoofing prevention, and backup owner-role gates implemented; rate limiting across all routes remains.|
+||EventBus and base repository patterns|✅|EventBus pub/sub with synchronous context inheritance and base repository patterns fully operational.|
+|**2. Base Entity & Inventory Management**|Properties, portfolios, units, and inventory routes|🟡|Module repositories, routes, migrations, and tests exist; full UI coverage and vacant-unit turn workflows remain.|
+||Multi-role contacts directory|🟡|Unified directory and tests exist; vendor specialization profiles and W-9 tax flags need full integration.|
+||Validation, entity relationships, and REST CRUD completeness|🟡|Basic validation and CRUD paths exist; centralized declarative schema validation remains ongoing.|
+|**3. Core Property Operations**|Leasing lifecycle & statutory compliance|🟡|Lease routes, state transitions, and atomic deposit disposition exist; statutory notice periods and late-fee caps remain.|
+||Maintenance and work-order workflow|🟡|Ticket lifecycle, priority triage, vendor assignment, and test suites exist; dispatch notifications need completion.|
+||Cross-module operational events|✅|EventBus context propagation resolved; operational triggers (`lease.created`, `maintenance.completed`) implemented and tested.|
+|**4. Financial Ledger & Trust Accounting**|Immutable double-entry journal and integer-cents ledger|✅|Journal/ledger engine (`journal_entries`/`lines`), zero-sum debit/credit proofs, and reversal accounting implemented.|
+||Statutory trust accounting & operating fund segregation|✅|Chart of Accounts separates `1010 Operating` and `1020 Trust`; strict non-commingling validation and deposit routing enforced.|
+||Three-way bank reconciliation & audit reporting|✅|Automated proof schedule verifying Bank Balance = GL Trust Balance = Active Lease Liabilities.|
+||Vendor tax compliance (W-9 & 1099-NEC aggregation)|✅|Vendor Tax ID tracking and annual maintenance expense aggregation with statutory $600 threshold reporting.|
+||IRS Schedule E, NOI, and QuickBooks compatibility|✅|Schedule E mapping, Rent Roll, QBO/IIF/OFX exports, and year-end 1099-NEC vendor aggregation implemented and tested.|
+|**5. Native Presentation Layer & User Experience**|Native PHP shell, layouts, and CSS system|🟡|Server-rendered shell, design tokens, and light/dark theme operational; deployment integration being hardened.|
+||Dashboard and operator views|🟡|Dashboard KPI summary cards and entity CRUD views exist; several reporting sub-tabs remain read-only.|
+||Financial reporting views|🟡|Ledger, Rent Roll, and Schedule E views exist; 3-way reconciliation audit view to be added.|
+||Form validation, CSRF, and session handling|🟡|CSRF tokens, timing-safe auth verification, and session helpers exist; complete end-to-end security review remains.|
+|**6. Data Portability, Resilience & Backup**|SQLite snapshots and WAL checkpointing|✅|Snapshot service, online `VACUUM INTO`, and safe WAL checkpointing implemented and tested.|
+||Tenant data export/import and integrity verification|✅|Tenant-scoped `.json.gz` export/import with SHA-256 cryptographic verification implemented and tested.|
+||Disaster-recovery restore|🟡|CLI restore tooling exists with header validation; automated scheduled backup daemon and runbooks remain.|
+||Scheduled backups, monitoring, and vacuum routines|⬜|Operational backup scheduling service and automated database maintenance daemon are planned.|
+|**7. MVP Verification, Hardening & Self-Hosting**|Unit/module tests and tenant-isolation regression coverage|✅|Core and module test suites pass with zero dependencies; deterministic event listeners replace legacy timer sleeps.|
+||Security review and production hardening|🟡|Token spoofing prevention and Actions SHA-pinning complete; comprehensive third-party audit planned for Tranche 4.|
+||Secure release packaging (Method 2) & checksum verification|✅|Pre-packaged release archives with cryptographic SHA-256 verification implemented across installer tooling.|
+||Production daemon supervision & containerization|⬜|Turnkey Docker Compose bundle and Systemd service packaging scheduled for release hardening.|
 
 ---
 
@@ -237,9 +242,8 @@ To maintain focus, agility, and uncompromising simplicity, commercial-grade and 
   * Retail percentage rent based on tenant sales reporting.
   * CPI-indexed and fixed annual lease escalation schedules.
 * **Enterprise Accounting & Finance**:
-  * Formal trust/escrow bank account compliance reporting and statutory audits.
   * Integrated payment processing gateways (direct ACH debit, credit card rails) and automated live bank feeds (Plaid API sync).
-  * Automated 1099-MISC / 1099-NEC vendor tax form generation and e-filing.
+  * Automated 1099-MISC / 1099-NEC bulk electronic filing and direct transmission to the IRS.
 * **Portals & External Interfaces**:
   * Dedicated self-service Tenant Portal (online payments, maintenance ticket submission, lease document downloads).
   * Dedicated Property Owner Portal (monthly distribution statements, capital expense approval workflows).
@@ -347,23 +351,43 @@ Ensure you have the following installed on your system:
 
 ---
 
-### 2. Automated One-Line Installation
+### 2. Verified Release Archive Installation (Method 2)
 
 > [!NOTE]
-> The automated installation scripts below are provided for developer evaluation, testing, and preview environments. As noted in the [Pre-Production Disclaimer](#pre-production-disclaimer), end users should not install this software for production property operations until an official stable release is issued.
+> Pre-packaged release archives and installation scripts are provided for developer evaluation, testing, and preview environments. As noted in the [Pre-Production Disclaimer](#pre-production-disclaimer), end users should not install this software for production property operations until an official stable release is issued.
 
-Install directly from GitHub Releases with a single terminal command:
+Download and verify the latest release package with cryptographic SHA-256 validation:
+
+#### Linux / macOS (Bash)
+
+```bash
+# Download the release archive and checksum file
+curl -LO https://github.com/garrisonos/GarrisonOS/releases/latest/download/garrisonos.tar.gz
+curl -LO https://github.com/garrisonos/GarrisonOS/releases/latest/download/SHA256SUMS
+
+# Verify cryptographic SHA-256 integrity
+sha256sum -c --ignore-missing SHA256SUMS
+
+# Extract and run setup
+mkdir -p garrison-os && tar -xzf garrisonos.tar.gz -C garrison-os --strip-components=1
+cd garrison-os && npm run setup
+```
 
 #### Windows (PowerShell)
 
 ```powershell
-irm https://raw.githubusercontent.com/garrisonos/GarrisonOS/main/scripts/install.ps1 | iex
-```
+# Download the release package and checksum file
+Invoke-WebRequest -Uri "https://github.com/garrisonos/GarrisonOS/releases/latest/download/garrisonos.zip" -OutFile "garrisonos.zip"
+Invoke-WebRequest -Uri "https://github.com/garrisonos/GarrisonOS/releases/latest/download/SHA256SUMS.txt" -OutFile "SHA256SUMS.txt"
 
-**Linux / macOS**:
+# Verify cryptographic SHA-256 integrity
+$expected = (Get-Content SHA256SUMS.txt -Raw).Split()[0].Trim().ToLower()
+$actual = (Get-FileHash -Path garrisonos.zip -Algorithm SHA256).Hash.ToLower()
+if ($expected -and ($actual -ne $expected)) { throw "Checksum verification failed!" }
 
-```bash
-curl -fsSL https://raw.githubusercontent.com/garrisonos/GarrisonOS/main/scripts/install.sh | bash
+# Extract and run setup
+Expand-Archive -Path garrisonos.zip -DestinationPath garrison-os -Force
+cd garrison-os; npm.cmd run setup
 ```
 
 ---
@@ -498,8 +522,12 @@ GarrisonOS is built on and inspired by foundational open-source standards, tools
 
 ---
 
-## License
+## License & Governance
 
 GarrisonOS is licensed under the [GNU Affero General Public License v3 (AGPLv3)](LICENSE) with a Section 7(b) attribution addendum.
 
-Pursuant to Section 7(b), any web-facing or interactive deployment of this software must preserve and prominently display original author attribution and branding ("Powered by GarrisonOS" linking to [https://github.com/garrisonos/GarrisonOS](https://github.com/garrisonos/GarrisonOS)) in the primary application footer or navigation interface. Dual-licensing and commercial licensing options are available for organizations requiring proprietary embedding.
+Pursuant to Section 7(b), any web-facing or interactive deployment of this software must preserve and prominently display original author attribution and branding ("Powered by GarrisonOS" linking to [https://github.com/garrisonos/GarrisonOS](https://github.com/garrisonos/GarrisonOS)) in the primary application footer or navigation interface.
+
+### Non-Profit Stewardship
+
+GarrisonOS is maintained and governed by the GarrisonOS Foundation (501(c)(3) registration pending), a public-benefit organization dedicated to democratizing property management technology, preventing proprietary vendor lock-in, and providing community, workforce, and affordable housing operators with perpetual open-source data sovereignty.
