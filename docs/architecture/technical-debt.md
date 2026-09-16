@@ -128,11 +128,11 @@ This document provides a technical critique of the GarrisonOS architecture, runt
 
 ## 7. Action Plan & Prioritized Matrix
 
-| Priority | Subsystem | Issue | Action Item |
-| :--- | :--- | :--- | :--- |
-| **High** | **Context & Events** | Context loss in async event handlers | Auto-propagate `RequestContext` in `EventBus.subscribe()` |
-| **High** | **Database Migrator** | Alphabetical migration execution | Topological sort migrations by `dependencies` in `module.json` |
-| **Medium** | **HTTP Router** | Linear regex matching order sensitivity | Introduce static-first segment precedence in route dispatcher |
-| **Medium** | **Security** | Legacy HMAC tokens without `tv` cannot be revoked | Define and document a compatibility window before rejecting legacy tokens |
-| **Medium** | **Frontend API** | Sequential cURL overhead on composite pages | Provide composite/batch API endpoint for dashboard hydration |
-| **Low** | **Accounting** | Statutory trust reconciliation reporting | Add dedicated escrow/trust statutory compliance reports |
+| Priority | Subsystem | Issue | Action Item | Status |
+| :--- | :--- | :--- | :--- | :--- |
+| **High** | **Context & Events** | Context loss in async event handlers | Auto-propagate `RequestContext` in `EventBus.publish()` | **Resolved** |
+| **High** | **Database Migrator** | Alphabetical migration execution | Topological sort migrations by `dependencies` in `module.json` | **Resolved** |
+| **Medium** | **Frontend API** | Sequential cURL overhead on composite pages | Provide composite/batch API endpoint for dashboard hydration | **Resolved** |
+| **Medium** | **HTTP Router** | Linear regex matching order sensitivity | Introduce static-first segment precedence in route dispatcher | Backlog |
+| **Medium** | **Security** | Legacy HMAC tokens without `tv` cannot be revoked | Define and document a compatibility window before rejecting legacy tokens | Planned |
+| **Low** | **Accounting** | Statutory trust reconciliation reporting | Add dedicated escrow/trust statutory compliance reports | Backlog |

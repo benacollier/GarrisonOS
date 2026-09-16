@@ -1,3 +1,4 @@
+import type { DatabaseSync } from 'node:sqlite';
 import { getDatabase, withTransaction } from '../../../database/client.js';
 import { RequestContext } from '../../../core/context.js';
 import { generateUUIDv7 } from '../../../core/crypto.js';
@@ -391,9 +392,9 @@ export class AccountingRepository {
     return true;
   }
 
-  public static getLeaseTransactions(leaseId: string): TransactionRecord[] {
+  public static getLeaseTransactions(leaseId: string, dbInstance?: DatabaseSync): TransactionRecord[] {
     const tenantId = RequestContext.getTenantId();
-    const db = getDatabase();
+    const db = dbInstance || getDatabase();
     return db.prepare(`
       SELECT * FROM transactions
       WHERE lease_id = ? AND tenant_id = ? AND deleted_at IS NULL
@@ -401,12 +402,12 @@ export class AccountingRepository {
     `).all(leaseId, tenantId) as unknown as TransactionRecord[];
   }
 
-  public static getLeaseBalance(leaseId: string): {
+  public static getLeaseBalance(leaseId: string, dbInstance?: DatabaseSync): {
     leaseId: string;
     balanceCents: number;
     transactionCount: number;
   } {
-    const transactions = AccountingRepository.getLeaseTransactions(leaseId);
+    const transactions = AccountingRepository.getLeaseTransactions(leaseId, dbInstance);
     const balanceCents = calculateTenantBalance(transactions);
     return {
       leaseId,
@@ -474,7 +475,7 @@ export class AccountingRepository {
 
   public static processDepositDisposition(
     leaseId: string,
-    deductions: Array<{ description: string; amount_cents: number; category?: string }>
+    deductions: Array<{ description: string; amount_cents: number; category?: string }> = []
   ): {
     leaseId: string;
     depositHeldCents: number;
@@ -486,28 +487,27 @@ export class AccountingRepository {
     const tenantId = RequestContext.getTenantId();
     const db = getDatabase();
 
-    const lease = db.prepare(`
-      SELECT l.*, u.property_id
-      FROM leases l
-      LEFT JOIN units u ON l.unit_id = u.id AND u.tenant_id = l.tenant_id
-      WHERE l.id = ? AND l.tenant_id = ? AND l.deleted_at IS NULL
-    `).get(leaseId, tenantId) as any;
+    return withTransaction((tx) => {
+      const lease = tx.prepare(`
+        SELECT l.*, u.property_id
+        FROM leases l
+        LEFT JOIN units u ON l.unit_id = u.id AND u.tenant_id = l.tenant_id
+        WHERE l.id = ? AND l.tenant_id = ? AND l.deleted_at IS NULL
+      `).get(leaseId, tenantId) as any;
 
-    if (!lease) {
-      throw new Error('Lease not found');
-    }
+      if (!lease) {
+        throw new Error('Lease not found');
+      }
 
-    const currentBalance = AccountingRepository.getLeaseBalance(leaseId).balanceCents;
-    const unpaidRentCents = Math.max(0, currentBalance);
-    const depositHeldCents = lease.deposit_held_cents || 0;
+      const currentBalance = AccountingRepository.getLeaseBalance(leaseId, tx).balanceCents;
+      const unpaidRentCents = Math.max(0, currentBalance);
+      const depositHeldCents = lease.deposit_held_cents || 0;
 
-    const damageTotalCents = deductions.reduce((sum, d) => sum + Math.abs(d.amount_cents), 0);
-    const totalDeductionsCents = unpaidRentCents + damageTotalCents;
-    const finalRefundCents = Math.max(0, depositHeldCents - totalDeductionsCents);
+      const damageTotalCents = deductions.reduce((sum, d) => sum + Math.abs(d.amount_cents), 0);
+      const totalDeductionsCents = unpaidRentCents + damageTotalCents;
+      const finalRefundCents = Math.max(0, depositHeldCents - totalDeductionsCents);
 
-    const createdTxs: TransactionRecord[] = [];
-
-    withTransaction((tx) => {
+      const createdTxs: TransactionRecord[] = [];
       const now = Date.now();
 
       // 1. Post damage deduction transactions if any
@@ -545,15 +545,15 @@ export class AccountingRepository {
         UPDATE leases SET deposit_held_cents = 0, status = 'terminated', updated_at = ?
         WHERE id = ? AND tenant_id = ?
       `).run(now, leaseId, tenantId);
-    }, db);
 
-    return {
-      leaseId,
-      depositHeldCents,
-      unpaidChargesCents: unpaidRentCents,
-      damageDeductionsCents: damageTotalCents,
-      finalRefundCents,
-      createdTransactions: createdTxs
-    };
+      return {
+        leaseId,
+        depositHeldCents,
+        unpaidChargesCents: unpaidRentCents,
+        damageDeductionsCents: damageTotalCents,
+        finalRefundCents,
+        createdTransactions: createdTxs
+      };
+    }, db);
   }
 }

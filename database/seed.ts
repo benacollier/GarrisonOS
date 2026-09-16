@@ -14,8 +14,9 @@ export async function seedDatabase(dbInstance?: DatabaseSync): Promise<void> {
 
   const now = Date.now();
   const TENANT_ID = 'tenant-demo';
+  const passwordHash = await hashPassword('Password123!');
 
-  await withTransaction(async (tx) => {
+  withTransaction((tx) => {
     // 1. Clean existing demo data if present
     tx.prepare('DELETE FROM quickbooks_export_logs WHERE tenant_id = ?').run(TENANT_ID);
     tx.prepare('DELETE FROM chart_of_accounts WHERE tenant_id = ?').run(TENANT_ID);
@@ -38,7 +39,6 @@ export async function seedDatabase(dbInstance?: DatabaseSync): Promise<void> {
     `).run(TENANT_ID, 'Garrison Heritage Properties', 'demo', now, now);
 
     // 3. Create Operator User (Password: Password123!)
-    const passwordHash = await hashPassword('Password123!');
     const userId = generateUUIDv7();
     tx.prepare(`
       INSERT INTO users (id, tenant_id, email, password_hash, first_name, last_name, role, token_version, created_at, updated_at)

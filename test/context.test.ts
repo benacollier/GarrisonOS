@@ -40,10 +40,12 @@ describe('RequestContext & Multi-Tenant Store Subsystem', () => {
     let receivedCorrelationId: string | undefined;
 
     const testEventBus = new EventBus();
-    
-    testEventBus.subscribe('test.event', (payload: BaseEventPayload & { data: string }) => {
-      receivedTenantId = RequestContext.tryGet()?.tenantId;
-      receivedCorrelationId = RequestContext.tryGet()?.correlationId;
+    const eventHandled = new Promise<void>((resolve) => {
+      testEventBus.subscribe('test.event', (payload: BaseEventPayload & { data: string }) => {
+        receivedTenantId = RequestContext.tryGet()?.tenantId;
+        receivedCorrelationId = RequestContext.tryGet()?.correlationId;
+        resolve();
+      });
     });
 
     await RequestContext.run(
@@ -56,10 +58,41 @@ describe('RequestContext & Multi-Tenant Store Subsystem', () => {
       }
     );
 
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    await eventHandled;
 
     assert.equal(receivedTenantId, 'tenant-event-test', 'Tenant ID should be propagated through EventBus');
     assert.ok(receivedCorrelationId, 'Correlation ID should be propagated through EventBus');
+  });
+
+  it('propagates active RequestContext when payload omits tenantId', async () => {
+    let receivedTenantId: string | undefined;
+    let receivedCorrelationId: string | undefined;
+    let receivedUserId: string | undefined;
+
+    const testEventBus = new EventBus();
+    const eventHandled = new Promise<void>((resolve) => {
+      testEventBus.subscribe('test.no_tenant', (payload: any) => {
+        receivedTenantId = RequestContext.tryGet()?.tenantId;
+        receivedCorrelationId = RequestContext.tryGet()?.correlationId;
+        receivedUserId = RequestContext.tryGet()?.userId;
+        resolve();
+      });
+    });
+
+    await RequestContext.run(
+      { tenantId: 'tenant-inherited', correlationId: 'corr-inherited', userId: 'user-inherited' },
+      async () => {
+        testEventBus.publish('test.no_tenant', {
+          data: 'test-data-without-explicit-tenant'
+        });
+      }
+    );
+
+    await eventHandled;
+
+    assert.equal(receivedTenantId, 'tenant-inherited');
+    assert.equal(receivedCorrelationId, 'corr-inherited');
+    assert.equal(receivedUserId, 'user-inherited');
   });
 });
 

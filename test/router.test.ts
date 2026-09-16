@@ -120,5 +120,20 @@ describe('Zero-Dependency HTTP Router Subsystem', () => {
     assert.equal(parsed.success, false);
     assert.equal(parsed.error.code, 'NOT_FOUND');
   });
+
+  it('identifies batch-safe and batch-unsafe GET routes', () => {
+    const router = new Router();
+
+    router.getBatchSafe('/health', (_req, res) => { res.end('ok'); });
+    router.getBatchSafe('/api/v1/modules', (_req, res) => { res.end('ok'); });
+    router.get('/api/v1/properties', (_req, res) => { res.end('ok'); });
+    router.getUnsafe('/api/v1/system/backup', (_req, res) => { res.end('ok'); });
+
+    assert.equal(router.isBatchSafeGetPath('/health'), true);
+    assert.equal(router.isBatchSafeGetPath('/api/v1/modules'), true);
+    assert.equal(router.isBatchSafeGetPath('/api/v1/properties'), false);
+    assert.equal(router.isBatchSafeGetPath('/api/v1/system/backup'), false);
+    assert.equal(router.isBatchSafeGetPath('/nonexistent'), false);
+  });
 });
 

@@ -341,7 +341,7 @@ export function createRouter(serverPort: number = PORT): Router {
     const passwordHash = await hashPassword(cleanPassword);
 
     try {
-      await withTransaction(async (tx) => {
+      withTransaction((tx) => {
         // 1. Create primary tenant
         tx.prepare(`
           INSERT INTO tenants (id, name, subdomain, currency, created_at, updated_at)

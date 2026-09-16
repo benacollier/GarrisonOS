@@ -1,23 +1,53 @@
-import { describe, it } from 'node:test';
+import { describe, it, before, after } from 'node:test';
 import * as assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
-import { resolveCorsOrigin, securityHeadersMiddleware } from '../api/middleware.js';
+import { resolveCorsOrigin, securityHeadersMiddleware, tenantContextMiddleware } from '../api/middleware.js';
+import { createToken } from '../core/crypto.js';
+import { RequestContext } from '../core/context.js';
+import { createTestDb } from './helpers.js';
+import { closeDatabase } from '../database/client.js';
 
 class MockRequest extends EventEmitter {
+  public method: string;
+  public path: string;
   public headers: Record<string, string>;
+  public tenantId?: string;
+  public userId?: string;
+  public correlationId?: string;
   public socket = { remoteAddress: '127.0.0.1' };
 
-  constructor(headers: Record<string, string> = {}) {
+  constructor(method = 'GET', path = '/', headers: Record<string, string> = {}) {
     super();
+    this.method = method;
+    this.path = path;
     this.headers = headers;
   }
 }
 
 class MockResponse {
   public headers: Record<string, string> = {};
+  public statusCode = 200;
+  public body = '';
+  public writableEnded = false;
 
   public setHeader(key: string, value: string): void {
     this.headers[key.toLowerCase()] = value;
+  }
+
+  public writeHead(statusCode: number, headers?: Record<string, any>): void {
+    this.statusCode = statusCode;
+    if (headers) {
+      for (const [k, v] of Object.entries(headers)) {
+        this.headers[k.toLowerCase()] = String(v);
+      }
+    }
+  }
+
+  public end(chunk?: any): void {
+    if (chunk) {
+      this.body += typeof chunk === 'string' ? chunk : chunk.toString();
+    }
+    this.writableEnded = true;
   }
 }
 
@@ -32,7 +62,7 @@ describe('Security middleware CORS policy', () => {
   });
 
   it('never emits a wildcard CORS origin', async () => {
-    const request = new MockRequest({ origin: 'https://untrusted.example' });
+    const request = new MockRequest('GET', '/', { origin: 'https://untrusted.example' });
     const response = new MockResponse();
 
     await securityHeadersMiddleware(request as any, response as any, async () => {});
@@ -47,12 +77,179 @@ describe('Security middleware CORS policy', () => {
   });
 
   it('does not echo an unconfigured origin', async () => {
-    const request = new MockRequest({ origin: 'https://untrusted.example' });
+    const request = new MockRequest('GET', '/', { origin: 'https://untrusted.example' });
     const response = new MockResponse();
 
     await securityHeadersMiddleware(request as any, response as any, async () => {});
 
     assert.notEqual(response.headers['access-control-allow-origin'], 'https://untrusted.example');
     assert.notEqual(response.headers['access-control-allow-origin'], '*');
+  });
+});
+
+describe('Tenant context & authentication middleware', () => {
+  const secret = process.env['APP_SECRET'] || 'garrison-os-development-secret';
+  let db: any;
+
+  before(() => {
+    db = createTestDb();
+    const now = Date.now();
+    db.prepare(`
+      INSERT INTO tenants (id, name, subdomain, currency, created_at, updated_at)
+      VALUES ('tenant-auth-1', 'Auth Test Tenant', 'authtest', 'USD', ?, ?)
+    `).run(now, now);
+
+    db.prepare(`
+      INSERT INTO users (id, tenant_id, email, password_hash, first_name, last_name, role, token_version, created_at, updated_at)
+      VALUES
+        ('user-owner-1', 'tenant-auth-1', 'owner@auth.local', '$scrypt$dummy', 'Owner', 'User', 'owner', 1, ?, ?),
+        ('user-manager-1', 'tenant-auth-1', 'manager@auth.local', '$scrypt$dummy', 'Manager', 'User', 'manager', 1, ?, ?)
+    `).run(now, now, now, now);
+  });
+
+  after(() => {
+    closeDatabase();
+  });
+
+  it('rejects request when X-Tenant-ID does not match token tenant', async () => {
+    const token = createToken({
+      sub: 'user-owner-1',
+      tid: 'tenant-auth-1',
+      role: 'owner',
+      exp: Math.floor(Date.now() / 1000) + 3600,
+      tv: 1
+    }, secret);
+
+    const req = new MockRequest('GET', '/api/v1/properties', {
+      'authorization': `Bearer ${token}`,
+      'x-tenant-id': 'tenant-spoofed'
+    });
+    const res = new MockResponse();
+
+    let nextCalled = false;
+    await tenantContextMiddleware(req as any, res as any, async () => { nextCalled = true; });
+
+    assert.equal(nextCalled, false);
+    assert.equal(res.statusCode, 401);
+    const body = JSON.parse(res.body);
+    assert.equal(body.error.code, 'UNAUTHORIZED');
+    assert.match(body.error.message, /Tenant identity does not match/);
+  });
+
+  it('rejects request when X-User-ID header does not match token sub', async () => {
+    const token = createToken({
+      sub: 'user-owner-1',
+      tid: 'tenant-auth-1',
+      role: 'owner',
+      exp: Math.floor(Date.now() / 1000) + 3600,
+      tv: 1
+    }, secret);
+
+    const req = new MockRequest('GET', '/api/v1/properties', {
+      'authorization': `Bearer ${token}`,
+      'x-tenant-id': 'tenant-auth-1',
+      'x-user-id': 'user-spoofed'
+    });
+    const res = new MockResponse();
+
+    let nextCalled = false;
+    await tenantContextMiddleware(req as any, res as any, async () => { nextCalled = true; });
+
+    assert.equal(nextCalled, false);
+    assert.equal(res.statusCode, 401);
+    const body = JSON.parse(res.body);
+    assert.equal(body.error.code, 'UNAUTHORIZED');
+    assert.match(body.error.message, /User identity does not match/);
+  });
+
+  it('populates RequestContext and passes through when credentials match', async () => {
+    const token = createToken({
+      sub: 'user-owner-1',
+      tid: 'tenant-auth-1',
+      role: 'owner',
+      exp: Math.floor(Date.now() / 1000) + 3600,
+      tv: 1
+    }, secret);
+
+    const req = new MockRequest('GET', '/api/v1/properties', {
+      'authorization': `Bearer ${token}`,
+      'x-tenant-id': 'tenant-auth-1',
+      'x-user-id': 'user-owner-1'
+    });
+    const res = new MockResponse();
+
+    let observedTenantId: string | undefined;
+    let observedUserId: string | undefined;
+
+    await tenantContextMiddleware(req as any, res as any, async () => {
+      observedTenantId = RequestContext.getTenantId();
+      observedUserId = RequestContext.getUserId();
+    });
+
+    assert.equal(observedTenantId, 'tenant-auth-1');
+    assert.equal(observedUserId, 'user-owner-1');
+    assert.equal(req.tenantId, 'tenant-auth-1');
+    assert.equal(req.userId, 'user-owner-1');
+  });
+
+  it('blocks unauthenticated access to administrator backup endpoint', async () => {
+    const req = new MockRequest('GET', '/api/v1/system/backup', {
+      'x-tenant-id': 'tenant-auth-1',
+      'x-user-id': 'user-owner-1'
+    });
+    const res = new MockResponse();
+
+    let nextCalled = false;
+    await tenantContextMiddleware(req as any, res as any, async () => { nextCalled = true; });
+
+    assert.equal(nextCalled, false);
+    assert.equal(res.statusCode, 403);
+    const body = JSON.parse(res.body);
+    assert.equal(body.error.code, 'FORBIDDEN');
+  });
+
+  it('blocks non-owner access to administrator backup endpoint', async () => {
+    const token = createToken({
+      sub: 'user-manager-1',
+      tid: 'tenant-auth-1',
+      role: 'manager',
+      exp: Math.floor(Date.now() / 1000) + 3600,
+      tv: 1
+    }, secret);
+
+    const req = new MockRequest('GET', '/api/v1/system/backup', {
+      'authorization': `Bearer ${token}`,
+      'x-tenant-id': 'tenant-auth-1'
+    });
+    const res = new MockResponse();
+
+    let nextCalled = false;
+    await tenantContextMiddleware(req as any, res as any, async () => { nextCalled = true; });
+
+    assert.equal(nextCalled, false);
+    assert.equal(res.statusCode, 403);
+    const body = JSON.parse(res.body);
+    assert.equal(body.error.code, 'FORBIDDEN');
+  });
+
+  it('allows owner access to administrator backup endpoint', async () => {
+    const token = createToken({
+      sub: 'user-owner-1',
+      tid: 'tenant-auth-1',
+      role: 'owner',
+      exp: Math.floor(Date.now() / 1000) + 3600,
+      tv: 1
+    }, secret);
+
+    const req = new MockRequest('GET', '/api/v1/system/backup', {
+      'authorization': `Bearer ${token}`,
+      'x-tenant-id': 'tenant-auth-1'
+    });
+    const res = new MockResponse();
+
+    let nextCalled = false;
+    await tenantContextMiddleware(req as any, res as any, async () => { nextCalled = true; });
+
+    assert.equal(nextCalled, true);
   });
 });

@@ -137,4 +137,12 @@ describe('Accounting Module - Repository & Financial Workflows', () => {
       assert.equal(txAfter.deleted_at, null);
     });
   });
+
+  it('throws and preserves state if processDepositDisposition targets nonexistent lease', () => {
+    runInTenantContext('tenant-acct-test', () => {
+      assert.throws(() => {
+        AccountingRepository.processDepositDisposition('non-existent-lease');
+      }, /Lease not found/);
+    });
+  });
 });
