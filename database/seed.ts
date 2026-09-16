@@ -41,8 +41,8 @@ export async function seedDatabase(dbInstance?: DatabaseSync): Promise<void> {
     const passwordHash = await hashPassword('Password123!');
     const userId = generateUUIDv7();
     tx.prepare(`
-      INSERT INTO users (id, tenant_id, email, password_hash, first_name, last_name, role, created_at, updated_at)
-      VALUES (?, ?, 'operator@garrisonos.local', ?, 'Alexander', 'Garrison', 'owner', ?, ?)
+      INSERT INTO users (id, tenant_id, email, password_hash, first_name, last_name, role, token_version, created_at, updated_at)
+      VALUES (?, ?, 'operator@garrisonos.local', ?, 'Alexander', 'Garrison', 'owner', 1, ?, ?)
     `).run(userId, TENANT_ID, passwordHash, now, now);
 
     // 4. Create Portfolios

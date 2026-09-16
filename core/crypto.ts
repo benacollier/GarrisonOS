@@ -112,6 +112,7 @@ export interface TokenPayload {
   role: string;
   iat: number;
   exp: number;
+  tv?: number;
   [key: string]: unknown;
 }
 
@@ -120,6 +121,7 @@ export interface TokenInput {
   tid: string;
   role: string;
   exp: number;
+  tv?: number;
   [key: string]: unknown;
 }
 
@@ -186,4 +188,42 @@ export function verifyToken(token: string, secret: string): TokenPayload | null 
   } catch {
     return null;
   }
+}
+
+/**
+ * Verify token with database-backed token version validation.
+ * Used for stateless token revocation - when a user's password or role changes,
+ * their token_version is incremented, invalidating all existing tokens.
+ */
+export function verifyTokenWithDatabase(
+  token: string,
+  secret: string,
+  db: any
+): TokenPayload | null {
+  const payload = verifyToken(token, secret);
+  if (!payload) {
+    return null;
+  }
+
+  const tokenVersion = payload.tv;
+
+  // Legacy tokens without tv claim - accept but they cannot be revoked
+  if (tokenVersion === undefined) {
+    return payload;
+  }
+
+  // Fetch user's current token version from database
+  const user = db.prepare(
+    'SELECT token_version FROM users WHERE id = ? AND deleted_at IS NULL'
+  ).get(payload.sub) as { token_version: number } | undefined;
+
+  if (!user) {
+    return null;
+  }
+
+  if (user.token_version !== tokenVersion) {
+    return null;
+  }
+
+  return payload;
 }

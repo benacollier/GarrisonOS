@@ -1,4 +1,4 @@
-import { test, describe, it } from 'node:test';
+import { test, describe, it, before, after } from 'node:test';
 import * as assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
 import {
@@ -7,8 +7,11 @@ import {
   hashPassword,
   verifyPassword,
   createToken,
-  verifyToken
+  verifyToken,
+  verifyTokenWithDatabase
 } from '../core/crypto.js';
+import { getDatabase, closeDatabase } from '../database/client.js';
+import { runMigrations } from '../database/migrator.js';
 
 describe('Cryptography & Identity Subsystem', () => {
   it('generates valid RFC 9562 UUIDv7 identifiers', () => {
@@ -85,6 +88,142 @@ describe('Cryptography & Identity Subsystem', () => {
       secret
     );
     assert.equal(verifyToken(expiredToken, secret), null);
+  });
+
+  it('creates and verifies tokens with token version for revocation', () => {
+    const secret = 'super-secret-test-key-at-least-32-chars-long';
+
+    // Token with version
+    const tokenWithVersion = createToken(
+      {
+        sub: 'user-456',
+        tid: 'tenant-xyz',
+        role: 'manager',
+        exp: Math.floor(Date.now() / 1000) + 3600,
+        tv: 1
+      },
+      secret
+    );
+
+    const verified = verifyToken(tokenWithVersion, secret);
+    assert.ok(verified !== null);
+    assert.equal(verified?.tv, 1);
+  });
+
+  it('backward compatible with legacy tokens without version', () => {
+    const secret = 'super-secret-test-key-at-least-32-chars-long';
+
+    // Legacy token without tv field
+    const legacyToken = createToken(
+      {
+        sub: 'user-789',
+        tid: 'tenant-legacy',
+        role: 'read_only',
+        exp: Math.floor(Date.now() / 1000) + 3600
+      },
+      secret
+    );
+
+    const verified = verifyToken(legacyToken, secret);
+    assert.ok(verified !== null);
+    assert.equal(verified?.sub, 'user-789');
+    assert.equal(verified?.tv, undefined);
+  });
+});
+
+describe('Token Revocation with Database Backing', () => {
+  const secret = 'test-revocation-secret-key-1234567890';
+  let db: any;
+
+  before(async () => {
+    db = getDatabase({ inMemory: true });
+    runMigrations(db);
+
+    await db.exec(`
+      INSERT INTO tenants (id, name, subdomain, currency, created_at, updated_at)
+      VALUES ('tenant-rev-test', 'Revocation Test Tenant', 'rev-test', 'USD', ${Date.now()}, ${Date.now()})
+    `);
+
+    await db.exec(`
+      INSERT INTO users (id, tenant_id, email, password_hash, first_name, last_name, role, token_version, created_at, updated_at)
+      VALUES ('user-rev-test', 'tenant-rev-test', 'test@rev.local', '\$scrypt\$dummy', 'Test', 'User', 'owner', 1, ${Date.now()}, ${Date.now()})
+    `);
+  });
+
+  after(() => {
+    try { closeDatabase(); } catch {}
+  });
+
+  it('verifies tokens with matching database version', () => {
+    const token = createToken(
+      {
+        sub: 'user-rev-test',
+        tid: 'tenant-rev-test',
+        role: 'owner',
+        exp: Math.floor(Date.now() / 1000) + 3600,
+        tv: 1
+      },
+      secret
+    );
+
+    const verified = verifyTokenWithDatabase(token, secret, db);
+    assert.ok(verified !== null);
+    assert.equal(verified?.sub, 'user-rev-test');
+  });
+
+  it('rejects tokens with mismatched version', () => {
+    const token = createToken(
+      {
+        sub: 'user-rev-test',
+        tid: 'tenant-rev-test',
+        role: 'owner',
+        exp: Math.floor(Date.now() / 1000) + 3600,
+        tv: 2
+      },
+      secret
+    );
+
+    const verified = verifyTokenWithDatabase(token, secret, db);
+    assert.equal(verified, null, 'Token with mismatched version should be rejected');
+  });
+
+  it('accepts legacy tokens without version check', () => {
+    const token = createToken(
+      {
+        sub: 'user-rev-test',
+        tid: 'tenant-rev-test',
+        role: 'owner',
+        exp: Math.floor(Date.now() / 1000) + 3600
+      },
+      secret
+    );
+
+    const verified = verifyTokenWithDatabase(token, secret, db);
+    assert.ok(verified !== null, 'Legacy tokens without tv should still work');
+  });
+
+  it('rejects tokens for deleted users', async () => {
+    await db.exec(`
+      UPDATE users SET deleted_at = ${Date.now()} WHERE id = 'user-rev-test'
+    `);
+
+    const token = createToken(
+      {
+        sub: 'user-rev-test',
+        tid: 'tenant-rev-test',
+        role: 'owner',
+        exp: Math.floor(Date.now() / 1000) + 3600,
+        tv: 1
+      },
+      secret
+    );
+
+    const verified = verifyTokenWithDatabase(token, secret, db);
+    assert.equal(verified, null, 'Token for deleted user should be rejected');
+
+    await db.exec(`
+      UPDATE users SET deleted_at = NULL WHERE id = 'user-rev-test'
+    `);
   });
 });
 

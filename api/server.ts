@@ -84,13 +84,14 @@ export function createRouter(): Router {
       return errorResponse(res, 'INVALID_CREDENTIALS', 'Invalid email or password', 401);
     }
 
-    // Generate session token valid for 24 hours
+    // Generate session token valid for 24 hours with token version
     const token = createToken(
       {
         sub: user.id,
         tid: user.tenant_id,
         role: user.role,
-        exp: Math.floor(Date.now() / 1000) + 86400
+        exp: Math.floor(Date.now() / 1000) + 86400,
+        tv: user.token_version || 1
       },
       APP_SECRET
     );
@@ -219,8 +220,8 @@ export function createRouter(): Router {
 
         // 2. Create owner user
         tx.prepare(`
-          INSERT INTO users (id, tenant_id, email, password_hash, first_name, last_name, role, created_at, updated_at)
-          VALUES (?, ?, ?, ?, ?, ?, 'owner', ?, ?)
+          INSERT INTO users (id, tenant_id, email, password_hash, first_name, last_name, role, token_version, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, 'owner', 1, ?, ?)
         `).run(userId, tenantId, cleanEmail, passwordHash, cleanFirst, cleanLast, now, now);
 
         // 3. Audit log
@@ -292,7 +293,8 @@ export function createRouter(): Router {
           sub: userId,
           tid: tenantId,
           role: 'owner',
-          exp: Math.floor(Date.now() / 1000) + 86400
+          exp: Math.floor(Date.now() / 1000) + 86400,
+          tv: 1
         },
         APP_SECRET
       );
