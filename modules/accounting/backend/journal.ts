@@ -79,9 +79,18 @@ export class JournalService {
    * Post an immutable, balanced double-entry journal entry.
    * Enforces invariant: Sum(Debits) == Sum(Credits) > 0.
    */
-  public static postEntry(input: CreateJournalEntryInput, dbInstance?: any): JournalEntryRecord {
+  public static postEntry(
+    input: CreateJournalEntryInput,
+    dbInstance?: any,
+    options?: { historicalReferenceMode?: boolean }
+  ): JournalEntryRecord {
     const tenantId = RequestContext.getTenantId();
-    const db = dbInstance || getDatabase();
+    const isDatabaseInstance = !!dbInstance && typeof dbInstance === 'object' && typeof dbInstance.prepare === 'function';
+    const db = isDatabaseInstance ? dbInstance : getDatabase();
+    const historicalReferenceMode =
+      options?.historicalReferenceMode === true ||
+      (typeof dbInstance === 'boolean' && dbInstance === true) ||
+      (!!dbInstance && typeof dbInstance === 'object' && !isDatabaseInstance && dbInstance.historicalReferenceMode === true);
 
     if (!input.lines || input.lines.length < 2) {
       throw new Error('A journal entry requires at least two lines.');
@@ -123,6 +132,42 @@ export class JournalService {
     const entryDate = input.date_ms || now;
 
     const executeInsert = (conn: any) => {
+      // Validate tenant ownership of account_id, property_id, unit_id, and contact_id.
+      // Historical-reference mode is reserved for internal reversal/backfill flows that
+      // must preserve tenant validation while allowing soft-deleted references to remain readable.
+      const deletedFilter = historicalReferenceMode ? '' : ' AND deleted_at IS NULL';
+      const checkAccount = conn.prepare(`
+        SELECT 1 FROM chart_of_accounts
+        WHERE id = ? AND tenant_id = ?${deletedFilter}
+      `);
+      const checkProperty = conn.prepare(`
+        SELECT 1 FROM properties
+        WHERE id = ? AND tenant_id = ?${deletedFilter}
+      `);
+      const checkUnit = conn.prepare(`
+        SELECT 1 FROM units
+        WHERE id = ? AND tenant_id = ?${deletedFilter}
+      `);
+      const checkContact = conn.prepare(`
+        SELECT 1 FROM contacts
+        WHERE id = ? AND tenant_id = ?${deletedFilter}
+      `);
+
+      for (const line of input.lines) {
+        if (!checkAccount.get(line.account_id, tenantId)) {
+          throw new Error(`Account '${line.account_id}' does not exist or does not belong to the current tenant.`);
+        }
+        if (line.property_id && !checkProperty.get(line.property_id, tenantId)) {
+          throw new Error(`Property '${line.property_id}' does not exist or does not belong to the current tenant.`);
+        }
+        if (line.unit_id && !checkUnit.get(line.unit_id, tenantId)) {
+          throw new Error(`Unit '${line.unit_id}' does not exist or does not belong to the current tenant.`);
+        }
+        if (line.contact_id && !checkContact.get(line.contact_id, tenantId)) {
+          throw new Error(`Contact '${line.contact_id}' does not exist or does not belong to the current tenant.`);
+        }
+      }
+
       // Obtain next sequential entry_number for this tenant
       const maxRow = conn.prepare(`
         SELECT COALESCE(MAX(entry_number), 0) as max_num
@@ -186,7 +231,6 @@ export class JournalService {
     if (!createdEntry) {
       throw new Error('Failed to retrieve created journal entry.');
     }
-
     return createdEntry;
   }
 
@@ -198,33 +242,34 @@ export class JournalService {
     const tenantId = RequestContext.getTenantId();
     const db = dbInstance || getDatabase();
 
-    const original = this.getEntryById(entryId, db);
-    if (!original) {
-      throw new Error('Journal entry not found.');
-    }
-
-    if (original.reversed_by_entry_id) {
-      throw new Error('Journal entry has already been reversed.');
-    }
-
-    if (!original.lines || original.lines.length === 0) {
-      throw new Error('Journal entry has no lines to reverse.');
-    }
-
-    // Prepare swapped reversal lines
-    const reversalLines: CreateJournalLineInput[] = original.lines.map((line) => ({
-      account_id: line.account_id,
-      debit_cents: line.credit_cents,
-      credit_cents: line.debit_cents,
-      property_id: line.property_id,
-      unit_id: line.unit_id,
-      contact_id: line.contact_id,
-      description: `Reversal: ${line.description || original.memo}`
-    }));
-
     let reversalEntry: JournalEntryRecord;
 
     const executeReversal = (conn: any) => {
+      // Re-read original entry inside write lock / transaction
+      const original = this.getEntryById(entryId, conn);
+      if (!original) {
+        throw new Error('Journal entry not found.');
+      }
+
+      if (original.reversed_by_entry_id) {
+        throw new Error('Journal entry has already been reversed.');
+      }
+
+      if (!original.lines || original.lines.length === 0) {
+        throw new Error('Journal entry has no lines to reverse.');
+      }
+
+      // Prepare swapped reversal lines
+      const reversalLines: CreateJournalLineInput[] = original.lines.map((line) => ({
+        account_id: line.account_id,
+        debit_cents: line.credit_cents,
+        credit_cents: line.debit_cents,
+        property_id: line.property_id,
+        unit_id: line.unit_id,
+        contact_id: line.contact_id,
+        description: `Reversal: ${line.description || original.memo}`
+      }));
+
       // Post reversal entry
       reversalEntry = this.postEntry({
         date_ms: Date.now(),
@@ -232,7 +277,7 @@ export class JournalService {
         source_type: 'reversal',
         source_id: original.id,
         lines: reversalLines
-      }, conn);
+      }, conn, { historicalReferenceMode: true });
 
       // Mark original entry as reversed
       conn.prepare(`
@@ -385,8 +430,15 @@ export class JournalService {
         COALESCE(SUM(jl.debit_cents), 0) as total_debit_cents,
         COALESCE(SUM(jl.credit_cents), 0) as total_credit_cents
       FROM chart_of_accounts coa
-      LEFT JOIN journal_lines jl ON coa.id = jl.account_id AND jl.tenant_id = coa.tenant_id
-      LEFT JOIN journal_entries je ON jl.journal_entry_id = je.id AND je.deleted_at IS NULL AND je.date_ms <= ?
+      LEFT JOIN (
+        SELECT jl.*
+        FROM journal_lines jl
+        JOIN journal_entries je
+          ON jl.journal_entry_id = je.id
+         AND jl.tenant_id = je.tenant_id
+        WHERE je.deleted_at IS NULL
+          AND je.date_ms <= ?
+      ) jl ON coa.id = jl.account_id AND coa.tenant_id = jl.tenant_id
       WHERE coa.tenant_id = ? AND coa.deleted_at IS NULL
     `;
     const params: any[] = [cutoffDate, tenantId];
@@ -467,10 +519,11 @@ export class JournalService {
     const tenantId = RequestContext.getTenantId();
     const db = getDatabase();
 
-    // Find transactions that do not yet have a journal_entry_id
+    // Find active transactions that do not yet have a journal_entry_id
     const unmigrated = db.prepare(`
       SELECT * FROM transactions
-      WHERE tenant_id = ? AND (journal_entry_id IS NULL OR journal_entry_id = '')
+      WHERE tenant_id = ? AND deleted_at IS NULL
+        AND (journal_entry_id IS NULL OR journal_entry_id = '')
       ORDER BY transaction_date ASC, created_at ASC
     `).all(tenantId) as any[];
 
@@ -488,6 +541,17 @@ export class JournalService {
 
     withTransaction((tx) => {
       for (const t of unmigrated) {
+        // Re-read candidate transaction inside transaction to guarantee idempotency
+        const current = tx.prepare(`
+          SELECT id, journal_entry_id, deleted_at FROM transactions
+          WHERE id = ? AND tenant_id = ?
+        `).get(t.id, tenantId) as { id: string; journal_entry_id: string | null; deleted_at: number | null } | undefined;
+
+        if (!current || current.deleted_at !== null || (current.journal_entry_id && current.journal_entry_id !== '')) {
+          skipped++;
+          continue;
+        }
+
         if (!t.amount_cents || t.amount_cents <= 0) {
           skipped++;
           continue;
@@ -678,7 +742,7 @@ export class JournalService {
           source_type: t.transaction_type,
           source_id: t.id,
           lines
-        }, tx);
+        }, tx, { historicalReferenceMode: true });
 
         tx.prepare(`
           UPDATE transactions

@@ -27,6 +27,7 @@ export interface ChartOfAccountRecord {
   deleted_at?: number | null;
 }
 
+
 export interface DefaultAccountDefinition {
   account_number: string;
   account_name: string;
@@ -258,9 +259,9 @@ export class ChartOfAccountsRepository {
   /**
    * Seed standard Chart of Accounts defaults for the current tenant if none exist.
    */
-  public static ensureDefaultAccounts(): void {
+  public static ensureDefaultAccounts(dbInstance?: any): void {
     const tenantId = RequestContext.getTenantId();
-    const db = getDatabase();
+    const db = dbInstance || getDatabase();
 
     const countRow = db.prepare(`
       SELECT COUNT(*) as count FROM chart_of_accounts
@@ -268,7 +269,7 @@ export class ChartOfAccountsRepository {
     `).get(tenantId) as { count: number };
 
     if (countRow.count === 0) {
-      withTransaction((tx) => {
+      const seedAccounts = (tx: any) => {
         const stmt = tx.prepare(`
           INSERT INTO chart_of_accounts (
             id, tenant_id, account_number, account_name, account_type,
@@ -292,7 +293,13 @@ export class ChartOfAccountsRepository {
             now
           );
         }
-      }, db);
+      };
+
+      if (dbInstance) {
+        seedAccounts(dbInstance);
+      } else {
+        withTransaction(seedAccounts, db);
+      }
     }
   }
 
@@ -325,10 +332,10 @@ export class ChartOfAccountsRepository {
     return row || null;
   }
 
-  public static getAccountByMapping(categoryMapping: string): ChartOfAccountRecord | null {
-    this.ensureDefaultAccounts();
+  public static getAccountByMapping(categoryMapping: string, dbInstance?: any): ChartOfAccountRecord | null {
+    this.ensureDefaultAccounts(dbInstance);
     const tenantId = RequestContext.getTenantId();
-    const db = getDatabase();
+    const db = dbInstance || getDatabase();
 
     const row = db.prepare(`
       SELECT * FROM chart_of_accounts
@@ -439,4 +446,3 @@ export class ChartOfAccountsRepository {
     return this.getAccountById(id);
   }
 }
-

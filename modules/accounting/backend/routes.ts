@@ -129,13 +129,18 @@ export function registerRoutes(router: Router): void {
 
   // List General Ledger Journal Entries
   router.get('/api/v1/accounting/journal-entries', (req, res) => {
+    const rawLimit = req.query.limit ? parseInt(req.query.limit, 10) : 50;
+    const rawOffset = req.query.offset ? parseInt(req.query.offset, 10) : 0;
+    const limit = Math.min(Math.max(Number.isFinite(rawLimit) ? rawLimit : 50, 1), 200);
+    const offset = Math.max(Number.isFinite(rawOffset) ? rawOffset : 0, 0);
+
     const { entries, total } = JournalService.listEntries({
       source_type: req.query.source_type,
       source_id: req.query.source_id,
       start_date: req.query.start_date ? parseInt(req.query.start_date, 10) : undefined,
       end_date: req.query.end_date ? parseInt(req.query.end_date, 10) : undefined,
-      limit: req.query.limit ? parseInt(req.query.limit, 10) : 50,
-      offset: req.query.offset ? parseInt(req.query.offset, 10) : 0
+      limit,
+      offset
     });
     successResponse(res, { entries, total });
   });

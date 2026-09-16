@@ -15,6 +15,7 @@ This document establishes the mandatory engineering standards, architectural con
 
 * Maintain clean, idiomatic, human-grade engineering standards.
 * No conversational explanations, boilerplate disclaimers, or generic placeholder comments (e.g. `// TODO: Implement your logic here`).
+* **100% Docstring Coverage**: Every exported function, class, method, module, and public API surface must include complete docstrings or equivalent API documentation comments (for example TSDoc/JSDoc for TypeScript and PHPDoc for PHP). Undocumented public symbols are non-compliant and must be corrected before merge.
 * **Markdown Linting**: Always markdown lint edits containing markdown.
 * **Portable Path Hygiene**: Never hardcode host- or user-specific absolute filesystem paths (e.g., `C:\Users\...`, `/home/user/...`, `/Users/...`) in source code, automated tests, seed scripts, mock fixtures, comments, or documentation. All filesystem interactions must be strictly portable and relative, utilizing `node:path` primitives (`path.join()`, `path.resolve()`, `import.meta.url`) or standard environment configuration (`STORAGE_PATH`, `SQLITE_PATH`).
 * Commit messages must strictly follow the [Conventional Commits](https://www.conventionalcommits.org/) specification:
