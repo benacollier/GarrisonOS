@@ -102,7 +102,7 @@ export function createRouter(serverPort: number = PORT): Router {
         !item ||
         typeof item.path !== 'string' ||
         item.path.length > 512 ||
-        !(item.path === '/health' || item.path === '/ready' || item.path.startsWith('/api/v1/')) ||
+        !(item.path === '/health' || item.path === '/ready' || item.path === '/api/v1/modules' || item.path === '/api/v1/system/status') ||
         item.path === '/api/v1/batch' ||
         (item.method !== undefined && item.method !== 'GET')
       ) {
