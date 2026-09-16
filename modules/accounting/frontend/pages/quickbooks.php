@@ -69,13 +69,13 @@ try {
                 'mark_exported' => 'true'
             ]);
             ?>
-            <a href="/api/v1/accounting/export/quickbooks/qbo-journal.csv?<?= $exportQuery ?>" class="btn btn-primary" target="_blank">
+            <a href="/api/v1/accounting/export/quickbooks/qbo-journal.csv?<?= htmlspecialchars($exportQuery, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?>" class="btn btn-primary" target="_blank">
                 📥 Export QuickBooks Online (QBO) Journal CSV
             </a>
-            <a href="/api/v1/accounting/export/quickbooks/desktop.iif?<?= $exportQuery ?>" class="btn btn-secondary" target="_blank">
+            <a href="/api/v1/accounting/export/quickbooks/desktop.iif?<?= htmlspecialchars($exportQuery, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?>" class="btn btn-secondary" target="_blank">
                 📥 Export QuickBooks Desktop (IIF)
             </a>
-            <a href="/api/v1/accounting/export/quickbooks/bank-feed.qbo?<?= $exportQuery ?>" class="btn btn-secondary" target="_blank">
+            <a href="/api/v1/accounting/export/quickbooks/bank-feed.qbo?<?= htmlspecialchars($exportQuery, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?>" class="btn btn-secondary" target="_blank">
                 📥 Export Web Connect Bank Feed (.QBO)
             </a>
         </div>
@@ -213,4 +213,3 @@ try {
         </table>
     </div>
 </div>
-

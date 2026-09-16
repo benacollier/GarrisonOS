@@ -60,7 +60,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <a href="/maintenance" class="text-muted">← Back to Work Orders</a>
         <h1 class="page-title"><?= htmlspecialchars($workOrder['title']) ?></h1>
         <p class="page-subtitle">
-            Ticket #<?= substr($workOrder['id'], 0, 8) ?> •
+            Ticket #<?= htmlspecialchars(substr($workOrder['id'], 0, 8), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?> •
             <?= htmlspecialchars($workOrder['property_name'] ?? 'Property') ?>
             <?php if (!empty($workOrder['unit_number'])): ?>
                 (Unit <?= htmlspecialchars($workOrder['unit_number']) ?>)
@@ -184,4 +184,3 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         </div>
     </form>
 </dialog>
-
