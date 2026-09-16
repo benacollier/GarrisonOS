@@ -99,7 +99,7 @@ $$\text{NOI} = \text{Operating Income (Rent, Fees)} - \text{Operating Expenses (
 
 ### 4.3. Statutory Compliance & Reconciliation
 * `GET /api/v1/accounting/reconciliation/three-way`: Statutory Three-Way Bank Reconciliation report proving parity across Bank Balance, GL Trust Cash (`1020`), and Active Lease Deposit Liabilities (`2100`)
-* `GET /api/v1/accounting/reports/1099-nec`: Annual IRS Form 1099-NEC vendor expense summary report with statutory $600 threshold flagging (`?year=YYYY`)
+* `GET /api/v1/accounting/reports/1099-nec`: Annual IRS Form 1099-NEC vendor expense summary report with maintained statutory threshold flagging (`?year=YYYY`)
 * `GET /api/v1/accounting/disposition/timeline`: Statutory move-out deposit deduction deadline and countdown schedule (`?move_out_date=...&state=...`)
 
 ### 4.4. Exports & External Compatibility
@@ -140,19 +140,19 @@ GarrisonOS exports directly from persistent General Ledger entries into standard
 
 ## 6. Statutory Trust Accounting & Regulatory Compliance
 
-To satisfy real estate commission licensing mandates across all 50 US states, GarrisonOS enforces strict separation of fiduciary funds and automated audit proofs:
+To satisfy real estate commission licensing mandates across state jurisdictions, GarrisonOS enforces strict separation of fiduciary funds and automated audit proofs:
 
 ### 6.1. Non-Commingling Invariant
-Tenant security deposits are the legal property of the tenant held in trust. The accounting engine rejects any journal entry that attempts to deposit tenant security funds into `1010 Operating Checking` or pay operating expenses from `1020 Security Deposit Trust Checking` without an offsetting liability settlement.
+Tenant security deposits are the legal property of the tenant held in trust. The accounting engine rejects any journal entry that attempts to deposit tenant security funds into `1010 Operating Checking` or pay operating expenses from `1020 Security Deposit Trust Checking` without an equal and offsetting liability settlement (`2100 Tenant Security Deposits Held`).
 
 ### 6.2. Three-Way Bank Reconciliation
 State real estate licensing laws require monthly verification proving three-way balance parity:
 $$\text{Bank Statement Balance} \equiv \text{GL Trust Account Balance (1020)} \equiv \sum \text{Active Lease Deposit Liabilities}$$
 
-The `/api/v1/accounting/reconciliation/three-way` endpoint audits this equation and outputs an itemized lease breakdown with discrepancy tracking.
+The `/api/v1/accounting/reconciliation/three-way` endpoint audits this equation using empirical bank statement balances, persistent journal cash lines, and itemized active lease subledgers (filtered by status and temporal cutoff), outputting an itemized lease breakdown with discrepancy tracking.
 
 ### 6.3. Vendor Tax Compliance (IRS Form 1099-NEC)
-Property managers must report annual non-employee compensation of $600 or more paid to unincorporated contractors and repair vendors. GarrisonOS aggregates all payments linked to vendor contacts across both single-entry transactions and double-entry journal lines, generating an annual summary flagging qualifying vendors for IRS Form 1099-NEC filing.
+Property managers must report annual non-employee compensation ($2,000 or more beginning tax year 2026, or $600 historically) paid to unincorporated contractors and repair vendors. GarrisonOS aggregates all payments linked to vendor contacts across both standalone transactions and double-entry journal lines (excluding reversed entries), generating an annual summary flagging qualifying vendors for IRS Form 1099-NEC filing based on the maintained statutory threshold for the requested tax year.
 
 ### 6.4. Statutory Move-Out Deduction Timelines
-State laws establish strict statutory windows within which an itemized statement of deductions and remaining deposit refund must be delivered to a vacated tenant (e.g., California Civil Code § 1950.5 mandates 21 days; New York General Obligations Law § 7-103 mandates 14 days; Texas Property Code § 92.104 mandates 30 days). GarrisonOS computes real-time countdown alerts and flags overdue dispositions.
+State laws establish strict statutory windows within which an itemized statement of deductions and remaining deposit refund must be delivered to a vacated tenant. GarrisonOS maintains verified statutory rules for supported jurisdictions (including NY [14 days], AZ [14 days], FL [15 days], CA [21 days], WA [21 days], CO [30 days], TX [30 days], IL [30 days], MA [30 days], NJ [30 days], and PA [30 days]), computing real-time countdown alerts and flagging overdue dispositions. Generic fallback (`US`) defaults to 30 days while unsupported state codes are explicitly rejected.

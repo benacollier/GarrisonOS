@@ -175,17 +175,37 @@ export class JournalService {
 
       // Statutory Trust Accounting Non-Commingling Invariant:
       // Fiduciary funds held in Security Deposit Trust Checking (Account 1020 / category_mapping 'trust_bank')
-      // must never be directly commingled with operating revenue or operating expense accounts
-      // without an offsetting deposit liability (Account 2100 / category_mapping 'security_deposit').
-      const hasTrustBank = lineAccounts.some(({ account }) => account.account_number === '1020' || account.category_mapping === 'trust_bank');
-      if (hasTrustBank) {
-        const hasOperatingIncomeOrExpense = lineAccounts.some(({ account }) =>
-          account.account_type === 'Income' || account.account_type === 'Expense' || account.account_type === 'CostOfGoodsSold'
+      // must never be commingled with operating accounts (Income, Expense, CostOfGoodsSold, or operating_bank)
+      // without an exactly matching and offsetting tenant deposit liability movement (Account 2100 / category_mapping 'security_deposit').
+      let netTrustMovement = 0;
+      let netLiabilityMovement = 0;
+      let hasTrustBankLines = false;
+      let hasOperatingLines = false;
+
+      for (const { line, account } of lineAccounts) {
+        const isTrustBank = account.account_number === '1020' || account.category_mapping === 'trust_bank';
+        const isDepositLiability = account.account_number === '2100' || account.category_mapping === 'security_deposit';
+        const isOperating = (
+          account.account_type === 'Income' ||
+          account.account_type === 'Expense' ||
+          account.account_type === 'CostOfGoodsSold' ||
+          account.category_mapping === 'operating_bank'
         );
-        const hasDepositLiability = lineAccounts.some(({ account }) =>
-          account.account_number === '2100' || account.category_mapping === 'security_deposit'
-        );
-        if (hasOperatingIncomeOrExpense && !hasDepositLiability) {
+
+        if (isTrustBank) {
+          hasTrustBankLines = true;
+          netTrustMovement += (line.debit_cents - line.credit_cents);
+        }
+        if (isDepositLiability) {
+          netLiabilityMovement += (line.credit_cents - line.debit_cents);
+        }
+        if (isOperating) {
+          hasOperatingLines = true;
+        }
+      }
+
+      if (hasTrustBankLines && hasOperatingLines) {
+        if (netTrustMovement !== netLiabilityMovement || netTrustMovement !== 0) {
           throw new Error(
             'Trust accounting violation: Security Deposit Trust funds (Account 1020) cannot be directly commingled with operating income or operating expenses. Deposits must balance against Tenant Security Deposits Held (Account 2100).'
           );
