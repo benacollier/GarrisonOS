@@ -174,5 +174,76 @@ describe('Accounting Module - Native Double-Entry Journal Service', () => {
       assert.equal(rentReport?.net_balance_cents, 200000); // Revenue credit
     });
   });
+
+  it('excludes future journal entries from Trial Balance as-of cutoff date', () => {
+    runInTenantContext('tenant-cutoff-test', () => {
+      ChartOfAccountsRepository.ensureDefaultAccounts();
+      const accounts = ChartOfAccountsRepository.listAccounts();
+      const ar = accounts.find((a) => a.category_mapping === 'accounts_receivable')!;
+      const rent = accounts.find((a) => a.category_mapping === 'rent')!;
+
+      const cutoff = 1700000000000;
+
+      // 1. Entry before cutoff
+      JournalService.postEntry({
+        date_ms: cutoff - 10000,
+        memo: 'Historical Rent Charge',
+        source_type: 'rent_billing',
+        lines: [
+          { account_id: ar.id, debit_cents: 100000, credit_cents: 0 },
+          { account_id: rent.id, debit_cents: 0, credit_cents: 100000 }
+        ]
+      });
+
+      // 2. Future entry after cutoff
+      JournalService.postEntry({
+        date_ms: cutoff + 100000,
+        memo: 'Future Rent Charge',
+        source_type: 'rent_billing',
+        lines: [
+          { account_id: ar.id, debit_cents: 250000, credit_cents: 0 },
+          { account_id: rent.id, debit_cents: 0, credit_cents: 250000 }
+        ]
+      });
+
+      // As-of cutoff report should only sum historical entry
+      const report = JournalService.getTrialBalance(cutoff);
+      assert.ok(report.isBalanced);
+      assert.equal(report.totalDebitCents, 100000);
+      assert.equal(report.totalCreditCents, 100000);
+
+      const arItem = report.accounts.find((a) => a.account_id === ar.id);
+      assert.equal(arItem?.total_debit_cents, 100000);
+    });
+  });
+
+  it('rejects foreign entity references belonging to other tenants', () => {
+    runInTenantContext('tenant-a', () => {
+      ChartOfAccountsRepository.ensureDefaultAccounts();
+    });
+
+    runInTenantContext('tenant-b', () => {
+      ChartOfAccountsRepository.ensureDefaultAccounts();
+      const tenantBAccounts = ChartOfAccountsRepository.listAccounts();
+      const bRent = tenantBAccounts.find((a) => a.category_mapping === 'rent')!;
+
+      runInTenantContext('tenant-a', () => {
+        const tenantAAccounts = ChartOfAccountsRepository.listAccounts();
+        const aAr = tenantAAccounts.find((a) => a.category_mapping === 'accounts_receivable')!;
+
+        // Attempting to use tenant B's account in tenant A's journal entry must fail
+        assert.throws(() => {
+          JournalService.postEntry({
+            memo: 'Cross tenant attack',
+            source_type: 'manual_journal',
+            lines: [
+              { account_id: aAr.id, debit_cents: 50000, credit_cents: 0 },
+              { account_id: bRent.id, debit_cents: 0, credit_cents: 50000 }
+            ]
+          });
+        }, /does not exist or does not belong to the current tenant/);
+      });
+    });
+  });
 });
 

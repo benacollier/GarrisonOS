@@ -4,18 +4,38 @@ $pageTitle = 'Trial Balance';
 
 $trialBalance = null;
 $error = null;
-$asOfDateInput = $_GET['as_of_date'] ?? date('Y-m-d');
-$propertyIdInput = $_GET['property_id'] ?? '';
+$rawAsOfDate = $_GET['as_of_date'] ?? date('Y-m-d');
+$rawPropertyId = $_GET['property_id'] ?? '';
 
-$asOfDateMs = strtotime($asOfDateInput . ' 23:59:59') * 1000;
+// Ensure property_id is strictly a string
+$propertyIdInput = is_string($rawPropertyId) ? trim($rawPropertyId) : '';
+
+// Strictly validate as_of_date format (Y-m-d) and valid calendar values
+$asOfDateInput = date('Y-m-d');
+$isValidDate = false;
+if (is_string($rawAsOfDate) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $rawAsOfDate)) {
+    $parsedDate = DateTime::createFromFormat('Y-m-d', $rawAsOfDate, new DateTimeZone('UTC'));
+    if ($parsedDate && $parsedDate->format('Y-m-d') === $rawAsOfDate) {
+        $asOfDateInput = $rawAsOfDate;
+        $isValidDate = true;
+    }
+}
+
+if (!$isValidDate && isset($_GET['as_of_date'])) {
+    $error = 'Invalid date format provided. Please provide date in YYYY-MM-DD format.';
+}
+
+$asOfDateMs = (new DateTime($asOfDateInput . ' 23:59:59', new DateTimeZone('UTC')))->getTimestamp() * 1000;
 
 try {
-    $url = '/api/v1/accounting/trial-balance?as_of_date=' . $asOfDateMs;
-    if (!empty($propertyIdInput)) {
-        $url .= '&property_id=' . urlencode($propertyIdInput);
+    if ($isValidDate || !isset($_GET['as_of_date'])) {
+        $url = '/api/v1/accounting/trial-balance?as_of_date=' . $asOfDateMs;
+        if (!empty($propertyIdInput)) {
+            $url .= '&property_id=' . urlencode($propertyIdInput);
+        }
+        $res = $api->get($url);
+        $trialBalance = $res['data']['trialBalance'] ?? null;
     }
-    $res = $api->get($url);
-    $trialBalance = $res['data']['trialBalance'] ?? null;
 } catch (Exception $e) {
     $error = $e->getMessage();
 }

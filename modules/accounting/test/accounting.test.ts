@@ -60,4 +60,81 @@ describe('Accounting Module - Repository & Financial Workflows', () => {
       assert.equal(scheduleE.expenseByCategory['repairs'], 32000);
     });
   });
+
+  it('executes processDepositDisposition atomically with deductions and refund', () => {
+    runInTenantContext('tenant-acct-test', () => {
+      const db = getDatabase();
+      const now = Date.now();
+      const leaseId = 'lease-disp-test';
+      const propId = 'prop-disp-1';
+      const unitId = 'unit-disp-1';
+
+      // Insert property & unit for FK constraints
+      db.prepare(`
+        INSERT INTO properties (
+          id, tenant_id, name, property_type, address_line1, city, state, postal_code, created_at, updated_at
+        ) VALUES (?, 'tenant-acct-test', 'Test Building', 'single_family', '123 Main', 'City', 'ST', '12345', ?, ?)
+      `).run(propId, now, now);
+
+      db.prepare(`
+        INSERT INTO units (
+          id, tenant_id, property_id, unit_number, status, market_rent_cents, created_at, updated_at
+        ) VALUES (?, 'tenant-acct-test', ?, '101', 'occupied', 200000, ?, ?)
+      `).run(unitId, propId, now, now);
+
+      // Insert dummy lease with deposit held
+      db.prepare(`
+        INSERT INTO leases (
+          id, tenant_id, unit_id, start_date, end_date, rent_amount_cents,
+          deposit_held_cents, status, created_at, updated_at
+        ) VALUES (?, 'tenant-acct-test', ?, ?, ?, 200000, 200000, 'active', ?, ?)
+      `).run(leaseId, unitId, now - 1000000, now + 1000000, now, now);
+
+      // Process disposition with $500 damage deduction and $1500 refund
+      const disposition = AccountingRepository.processDepositDisposition(leaseId, [
+        { category: 'repairs', amount_cents: 50000, description: 'Wall repair' }
+      ]);
+
+      assert.equal(disposition.leaseId, leaseId);
+      assert.equal(disposition.depositHeldCents, 200000);
+      assert.equal(disposition.damageDeductionsCents, 50000);
+      assert.equal(disposition.finalRefundCents, 150000);
+
+      // Verify lease is terminated and deposit_held_cents is 0
+      const updatedLease = db.prepare(`SELECT * FROM leases WHERE id = ?`).get(leaseId) as any;
+      assert.equal(updatedLease.deposit_held_cents, 0);
+      assert.equal(updatedLease.status, 'terminated');
+    });
+  });
+
+  it('fails deleteTransaction and rolls back if linked journal entry does not exist', () => {
+    runInTenantContext('tenant-acct-test', () => {
+      const now = Date.now();
+      const db = getDatabase();
+
+      // Create a valid transaction with balanced journal entry
+      const tx = AccountingRepository.createTransaction({
+        transaction_type: 'payment',
+        category: 'rent',
+        amount_cents: 100000,
+        transaction_date: now,
+        description: 'Test payment'
+      });
+
+      // Temporarily disable FK to simulate an orphaned journal_entry_id reference
+      db.exec('PRAGMA foreign_keys = OFF;');
+      assert.ok(tx.journal_entry_id);
+      db.prepare(`DELETE FROM journal_entries WHERE id = ?`).run(tx.journal_entry_id);
+      db.exec('PRAGMA foreign_keys = ON;');
+
+      assert.throws(() => {
+        AccountingRepository.deleteTransaction(tx.id);
+      }, /Linked journal entry not found/);
+
+      // Verify transaction was NOT soft-deleted
+      const txAfter = AccountingRepository.getTransactionById(tx.id);
+      assert.ok(txAfter);
+      assert.equal(txAfter.deleted_at, null);
+    });
+  });
 });

@@ -183,5 +183,13 @@ describe('Accounting Module - QuickBooks Compatibility & Double-Entry GL', () =>
       assert.ok(!unexportedAfter.some((t) => t.id === tx.id), 'Exported transaction should be excluded');
     });
   });
+
+  it('returns empty journal entries array when given an empty transactions list', () => {
+    runInTenantContext('tenant-qb-empty-test', () => {
+      // When explicitly passing empty array (filtered query returned 0 results)
+      const entries = QuickBooksService.generateJournalEntries([]);
+      assert.equal(entries.length, 0);
+    });
+  });
 });
 

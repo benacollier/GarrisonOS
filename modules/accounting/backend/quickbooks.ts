@@ -4,6 +4,7 @@ import { generateUUIDv7 } from '../../../core/crypto.js';
 import { TransactionRecord } from './ledger.js';
 import { ChartOfAccountsRepository, ChartOfAccountRecord } from './chart_of_accounts.js';
 import { JournalService, JournalEntryRecord } from './journal.js';
+import { AccountingRepository } from './repository.js';
 
 export interface JournalLine {
   id: string;
@@ -63,19 +64,25 @@ export class QuickBooksService {
 
     let persistentEntries: JournalEntryRecord[] = [];
 
-    if (transactions && transactions.length > 0) {
-      // Ensure transactions have backfilled journal entries
-      JournalService.backfillLegacyTransactions();
+    if (transactions !== undefined) {
+      if (transactions.length > 0) {
+        // Ensure transactions have backfilled journal entries
+        JournalService.backfillLegacyTransactions();
 
-      const txEntryIds = transactions
-        .map((t) => t.journal_entry_id)
-        .filter((id): id is string => Boolean(id));
+        // Refresh transactions from repository to obtain newly backfilled journal_entry_id values
+        const refreshedTxs = transactions.map((t) => AccountingRepository.getTransactionById(t.id) || t);
 
-      if (txEntryIds.length > 0) {
-        persistentEntries = txEntryIds
-          .map((id) => JournalService.getEntryById(id))
-          .filter((e): e is JournalEntryRecord => Boolean(e));
+        const txEntryIds = refreshedTxs
+          .map((t) => t.journal_entry_id)
+          .filter((id): id is string => Boolean(id));
+
+        if (txEntryIds.length > 0) {
+          persistentEntries = txEntryIds
+            .map((id) => JournalService.getEntryById(id))
+            .filter((e): e is JournalEntryRecord => Boolean(e));
+        }
       }
+      // If transactions was explicitly passed as empty array ([]), persistentEntries remains []
     } else {
       const result = JournalService.listEntries({ limit: 5000 });
       persistentEntries = result.entries;
