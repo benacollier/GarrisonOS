@@ -59,6 +59,35 @@ describe('Accounting Module - Migration 0003 & Backfill Verification', () => {
       const trialBalance = JournalService.getTrialBalance();
       assert.ok(trialBalance.isBalanced);
       assert.equal(trialBalance.totalDebitCents, trialBalance.totalCreditCents);
+
+      // Re-running backfill is completely idempotent (0 migrated)
+      const repeatResult = JournalService.backfillLegacyTransactions();
+      assert.equal(repeatResult.migrated, 0);
+    });
+  });
+
+  it('skips soft-deleted legacy transactions during backfill', () => {
+    runInTenantContext('tenant-backfill-deleted-test', () => {
+      const db = getDatabase();
+      const now = Date.now();
+
+      // Insert soft-deleted legacy transaction (deleted_at is set)
+      db.prepare(`
+        INSERT INTO transactions (
+          id, tenant_id, transaction_type, category, amount_cents,
+          transaction_date, description, created_at, updated_at, deleted_at
+        ) VALUES ('tx-legacy-deleted', 'tenant-backfill-deleted-test', 'charge', 'rent', 120000, ?, 'Deleted Rent', ?, ?, ?)
+      `).run(now - 1000, now - 1000, now - 1000, now);
+
+      // Run backfill
+      const backfillResult = JournalService.backfillLegacyTransactions();
+      assert.equal(backfillResult.migrated, 0);
+
+      const tx = db.prepare(`
+        SELECT journal_entry_id FROM transactions WHERE id = 'tx-legacy-deleted'
+      `).get() as { journal_entry_id: string | null };
+
+      assert.equal(tx.journal_entry_id, null);
     });
   });
 });

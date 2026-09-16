@@ -354,6 +354,7 @@ For manual repository setup or development:
 
    > [!TIP]
    > **Windows PowerShell Users**: If your terminal restricts PowerShell script execution (`PSSecurityException`), run commands using `npm.cmd` or invoke Node directly:
+   >
    > ```powershell
    > npm.cmd run setup
    > # or directly via node:
@@ -478,7 +479,7 @@ GarrisonOS is built on and inspired by foundational open-source standards, tools
 
 ### Accounting & Domain Standards
 
-* **[IRS Form 1040 Schedule E](https://www.irs.gov/forms-pubs/about-schedule-e-form-1040)** *(U.S. Public Domain, 17 U.S.C. § 105)*: Supplemental Income and Loss tax reporting standard informing our cash ledger chart of accounts and operating expense categories.
+* **[IRS Form 1040 Schedule E](https://www.irs.gov/forms-pubs/about-schedule-e-form-1040)** *(U.S. Public Domain, 17 U.S.C. § 105)*: Supplemental Income and Loss tax reporting standard informing our double-entry chart of accounts and operating expense categories.
 * **Intuit QuickBooks Integration Standards** *(Public Interoperability Formats)*: Universal file format specifications (`.iif`, `.qbo`, and standard batch journal layouts) guiding our export interoperability.
 
 ### Development, Tooling & Governance

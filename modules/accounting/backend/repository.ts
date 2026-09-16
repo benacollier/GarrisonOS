@@ -105,10 +105,10 @@ export class AccountingRepository {
    * Create a financial transaction and automatically post its corresponding
    * balanced double-entry journal entry atomically.
    */
-  public static createTransaction(data: CreateTransactionData): TransactionRecord {
+  public static createTransaction(data: CreateTransactionData, dbInstance?: any): TransactionRecord {
     ChartOfAccountsRepository.ensureDefaultAccounts();
     const tenantId = RequestContext.getTenantId();
-    const db = getDatabase();
+    const db = dbInstance || getDatabase();
     const id = generateUUIDv7();
     const now = Date.now();
     const amount = Math.abs(data.amount_cents);
@@ -117,17 +117,25 @@ export class AccountingRepository {
       throw new Error('Transaction amount must be greater than 0 cents.');
     }
 
-    const operatingBank = ChartOfAccountsRepository.getAccountByMapping('operating_bank')!;
-    const trustBank = ChartOfAccountsRepository.getAccountByMapping('trust_bank')!;
-    const accountsReceivable = ChartOfAccountsRepository.getAccountByMapping('accounts_receivable')!;
-    const depositLiability = ChartOfAccountsRepository.getAccountByMapping('security_deposit')!;
+    const requireAccount = (mapping: string) => {
+      const account = ChartOfAccountsRepository.getAccountByMapping(mapping);
+      if (!account) {
+        throw new Error(`Chart of accounts is missing an active account mapped to '${mapping}'.`);
+      }
+      return account;
+    };
+
+    const operatingBank = requireAccount('operating_bank');
+    const trustBank = requireAccount('trust_bank');
+    const accountsReceivable = requireAccount('accounts_receivable');
+    const depositLiability = requireAccount('security_deposit');
     const mappedAccount = ChartOfAccountsRepository.getAccountByMapping(data.category);
 
     const lines: CreateJournalLineInput[] = [];
 
     switch (data.transaction_type) {
       case 'charge': {
-        const revAccount = mappedAccount || ChartOfAccountsRepository.getAccountByMapping('rent')!;
+        const revAccount = mappedAccount || requireAccount('rent');
         lines.push(
           {
             account_id: accountsReceivable.id,
@@ -174,7 +182,7 @@ export class AccountingRepository {
         break;
       }
       case 'expense': {
-        const expAccount = mappedAccount || ChartOfAccountsRepository.getAccountByMapping('repairs')!;
+        const expAccount = mappedAccount || requireAccount('repairs');
         lines.push(
           {
             account_id: expAccount.id,
@@ -293,19 +301,20 @@ export class AccountingRepository {
         throw new Error(`Unsupported transaction type: ${data.transaction_type}`);
     }
 
-    let journalEntryId: string;
+    let journalEntryId: string | null = null;
 
-    withTransaction((tx) => {
+    const executeCreate = (conn: any) => {
+      // 1. Post double-entry journal entry atomically
       const journalEntry = JournalService.postEntry({
         date_ms: data.transaction_date,
         memo: data.description,
         source_type: data.transaction_type,
         source_id: id,
         lines
-      }, tx);
+      }, conn);
       journalEntryId = journalEntry.id;
 
-      tx.prepare(`
+      conn.prepare(`
         INSERT INTO transactions (
           id, tenant_id, transaction_type, category, amount_cents,
           transaction_date, description, payment_method, reference_number,
@@ -331,7 +340,15 @@ export class AccountingRepository {
         now,
         now
       );
-    }, db);
+    };
+
+    if (dbInstance) {
+      executeCreate(dbInstance);
+    } else {
+      withTransaction((tx) => {
+        executeCreate(tx);
+      }, db);
+    }
 
     return AccountingRepository.getTransactionById(id)!;
   }
@@ -349,10 +366,12 @@ export class AccountingRepository {
 
     withTransaction((tx) => {
       if (txRecord.journal_entry_id) {
-        try {
+        const entry = JournalService.getEntryById(txRecord.journal_entry_id, tx);
+        if (!entry) {
+          throw new Error('Linked journal entry not found.');
+        }
+        if (!entry.reversed_by_entry_id) {
           JournalService.reverseEntry(txRecord.journal_entry_id, `Transaction deleted/voided`, tx);
-        } catch {
-          // If already reversed or not present, proceed
         }
       }
 
@@ -461,7 +480,10 @@ export class AccountingRepository {
     const db = getDatabase();
 
     const lease = db.prepare(`
-      SELECT * FROM leases WHERE id = ? AND tenant_id = ? AND deleted_at IS NULL
+      SELECT l.*, u.property_id
+      FROM leases l
+      LEFT JOIN units u ON l.unit_id = u.id AND u.tenant_id = l.tenant_id
+      WHERE l.id = ? AND l.tenant_id = ? AND l.deleted_at IS NULL
     `).get(leaseId, tenantId) as any;
 
     if (!lease) {
@@ -492,7 +514,7 @@ export class AccountingRepository {
           property_id: lease.property_id || null,
           unit_id: lease.unit_id || null,
           lease_id: leaseId
-        });
+        }, tx);
         createdTxs.push(created);
       }
 
@@ -507,7 +529,7 @@ export class AccountingRepository {
           property_id: lease.property_id || null,
           unit_id: lease.unit_id || null,
           lease_id: leaseId
-        });
+        }, tx);
         createdTxs.push(created);
       }
 
