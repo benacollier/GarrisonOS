@@ -63,10 +63,11 @@ This document establishes the mandatory engineering standards, architectural con
 
 ## 6. Modular Architecture
 
-* Domain features live inside self-contained modules under `modules/[module_name]/`.
-* Modules must supply a `module.json` manifest and follow standard contracts for backend migrations, routes, events, repositories, frontend hooks/pages, and packaged automated tests under `modules/[module_name]/test/`.
-* Whenever a new module is introduced, its associated unit and integration test suite must be co-located within the module's `test/` directory.
-* Cross-module communication must use the asynchronous in-process `EventBus` (`core/events.ts`).
+* Domain features **MUST** live inside self-contained, loosely coupled modules under `modules/[module_name]/`. Each module **SHALL** expose well-defined, stable interfaces and **MUST NOT** create tight coupling with other modules.
+* Modules **MUST** supply a `module.json` manifest and follow standard contracts for backend migrations, routes, events, repositories, frontend hooks/pages, and packaged automated tests under `modules/[module_name]/test/`.
+* Whenever a new module is introduced, its associated unit and integration test suite **MUST** be co-located within the module's `test/` directory and **MUST** achieve full coverage of all public APIs before merge.
+* Cross-module communication **MUST** use the asynchronous in-process `EventBus` (`core/events.ts`). Direct module-to-module imports **ARE PROHIBITED** except through explicitly defined public interfaces.
+* Modules **MUST** be independently replaceable, testable, and deployable. Module boundaries **SHALL** be enforced through interface contracts, not implementation sharing.
 
 ---
 
@@ -115,3 +116,32 @@ This document establishes the mandatory engineering standards, architectural con
 
 * **Output Sanitization**: All dynamic values rendered in PHP templates must be strictly escaped using `htmlspecialchars($val, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8')` or a designated escaping helper to eliminate XSS vectors.
 * **Script & Content Isolation**: Inline dynamic scripts and unvalidated DOM injections (`innerHTML`, `eval()`) are forbidden; preserve strict Content Security Policy (CSP) compliance.
+
+---
+
+## 13. Forward Compatibility & Versioning
+
+* **MANDATORY Forward Compatibility**: All public APIs, data schemas, and module interfaces **MUST** be designed to accommodate future evolution without breaking existing consumers. Breaking changes to public contracts **ARE PROHIBITED** without a major version increment and a documented deprecation cycle.
+* **Additive Changes First**: New functionality **MUST** be introduced additively where possible (new endpoints, new optional fields, new modules) rather than through modifications to existing contracts. Existing fields, endpoints, and interfaces **SHALL NOT** be altered or removed without deprecation.
+* **Deprecation Policy**: Deprecated APIs, endpoints, or schema elements **MUST** emit runtime warnings via standard logging channels and **MUST** continue to function for a minimum of one major version cycle or twelve months, whichever is longer. Deprecation **MUST** be announced in CHANGELOG.md with migration guidance.
+* **Schema Evolution**: Database schema changes **MUST** be backward-compatible. Adding nullable columns or new tables **IS PERMITTED**; renaming, removing, or changing the type of existing columns **IS PROHIBITED** without a migration path that preserves existing data. All schema changes **MUST** be versioned through the migration system.
+* **Interface Stability**: Public TypeScript interfaces, PHP class contracts, REST API endpoints, and EventBus topics **MUST** maintain stable signatures. Removing or renaming public symbols **IS PROHIBITED** without a major version bump. Internal/private symbols may change freely.
+* **Configuration Forward Compatibility**: Environment variables and configuration options **MUST** be forward-compatible. New configuration keys may be added, but existing keys **MUST NOT** be removed or have their semantics changed without a major version increment and documented migration path.
+
+---
+
+## 14. Documentation Maintenance & Synchronization
+
+* **MANDATORY Documentation Updates**: Documentation **MUST** be updated in the same commit or pull request as the corresponding code or configuration change. It is **NEVER ACCEPTABLE** to merge code changes without synchronously updating all relevant documentation.
+* **Code-Documentation Atomicity**: Any change to source code, database schemas, API contracts, module manifests, configuration options, or architectural decisions **MUST** be accompanied by corresponding updates to all affected documentation files. This includes but is not limited to:
+  * Module documentation under `docs/modules/`
+  * API documentation under `docs/api/`
+  * Architecture documentation under `docs/architecture/`
+  * Configuration references under `docs/deployment/`
+  * Inline code documentation (TSDoc, JSDoc, PHPDoc)
+  * README files and module manifests
+* **Documentation Review**: All documentation changes **MUST** undergo the same rigorous review process as code changes. Documentation pull requests **MUST** adhere to the PR template and include verification evidence.
+* **Documentation-First for New Features**: Before implementing any new feature, module, or public API, the corresponding documentation **MUST** be drafted and reviewed. Documentation **SHALL NOT** be treated as an afterthought.
+* **Documentation Audits**: When modifying or removing any code, module, configuration, or architectural component, contributors **MUST** audit the entire documentation corpus for references to the changed item and update or remove them accordingly. Dead links, outdated examples, and stale references **ARE PROHIBITED**.
+* **Changelog Requirement**: Every merge to the main branch that affects user-facing behavior, public APIs, configuration, or deployment requirements **MUST** include an entry in CHANGELOG.md describing the change, its impact, and any migration steps required.
+* **Markdown Standard**: All documentation **MUST** be valid, well-formed Markdown. Documentation **MUST** be markdown-linted as part of the CI process.
