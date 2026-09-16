@@ -33,12 +33,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
+$page = isset($_GET['page']) && is_numeric($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
+$perPage = 50;
+$offset = ($page - 1) * $perPage;
+
 try {
-    $res = $api->get('/api/v1/accounting/journal-entries?limit=100');
+    $res = $api->get('/api/v1/accounting/journal-entries?limit=' . $perPage . '&offset=' . $offset);
     $entries = $res['data']['entries'] ?? [];
     $total = $res['data']['total'] ?? 0;
+    $totalPages = max(1, (int)ceil($total / $perPage));
+
+    if ($page > $totalPages) {
+        header('Location: /accounting/general-ledger?page=' . $totalPages);
+        exit;
+    }
 } catch (Exception $e) {
     $error = $e->getMessage();
+    $totalPages = 1;
 }
 ?>
 
@@ -48,6 +59,7 @@ try {
         <h1 class="page-title">General Ledger</h1>
         <p class="page-subtitle">Native immutable double-entry journal entries, audit trail, and line allocations.</p>
     </div>
+
     <div class="actions" style="display: flex; gap: var(--spacing-sm);">
         <form method="POST" action="/accounting/general-ledger" style="display: inline;">
             <?= CSRF::field() ?>
@@ -149,5 +161,19 @@ try {
             </tbody>
         </table>
     </div>
+    <?php if ($totalPages > 1): ?>
+        <div class="card-footer" style="display: flex; justify-content: space-between; align-items: center; padding: var(--spacing-md); border-top: 1px solid var(--color-border);">
+            <div style="font-size: var(--font-size-sm); color: var(--color-text-muted);">
+                Page <?= $page ?> of <?= $totalPages ?> (showing <?= count($entries) ?> of <?= $total ?> entries)
+            </div>
+            <div style="display: flex; gap: var(--spacing-xs);">
+                <?php if ($page > 1): ?>
+                    <a href="/accounting/general-ledger?page=<?= $page - 1 ?>" class="btn btn-sm btn-secondary">← Previous</a>
+                <?php endif; ?>
+                <?php if ($page < $totalPages): ?>
+                    <a href="/accounting/general-ledger?page=<?= $page + 1 ?>" class="btn btn-sm btn-secondary">Next →</a>
+                <?php endif; ?>
+            </div>
+        </div>
+    <?php endif; ?>
 </div>
-
