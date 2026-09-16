@@ -64,5 +64,35 @@ describe('Dynamic Module Loader & Migration Discovery Subsystem', () => {
       );
     }
   });
+
+  it('resolves module migration dependencies with topological sort', () => {
+    const migrations = findMigrations();
+
+    const moduleOrder = new Map<string, number>();
+    let currentOrder = 0;
+    for (const mig of migrations) {
+      if (!moduleOrder.has(mig.module)) {
+        moduleOrder.set(mig.module, currentOrder++);
+      }
+    }
+
+    const orderedModules = [...moduleOrder.entries()].sort((a, b) => a[1] - b[1]);
+    const moduleIndices = new Map(orderedModules.map(([mod, idx]) => [mod, idx]));
+
+    for (const mig of migrations) {
+      const thisModuleIdx = moduleIndices.get(mig.module)!;
+      for (const dep of mig.dependencies) {
+        const depIdx = moduleIndices.get(dep);
+        assert.ok(
+          depIdx !== undefined,
+          `Dependency ${dep} of module ${mig.module} not found in migration list`
+        );
+        assert.ok(
+          depIdx < thisModuleIdx,
+          `Module ${mig.module} (order: ${thisModuleIdx}) must come after dependency ${dep} (order: ${depIdx})`
+        );
+      }
+    }
+  });
 });
 

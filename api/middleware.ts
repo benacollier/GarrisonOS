@@ -1,8 +1,9 @@
 import { ServerResponse } from 'node:http';
 import { ApiRequest, Middleware } from './router.js';
 import { errorResponse } from './response.js';
-import { generateUUIDv7, verifyToken } from '../core/crypto.js';
+import { generateUUIDv7, verifyToken, verifyTokenWithDatabase } from '../core/crypto.js';
 import { RequestContext } from '../core/context.js';
+import { getDatabase } from '../database/client.js';
 
 const APP_SECRET = process.env['APP_SECRET'] || 'garrison-os-default-secret-key-change-in-production';
 
@@ -91,10 +92,27 @@ export const tenantContextMiddleware: Middleware = async (req, res, next) => {
   const authHeader = req.headers['authorization'];
   if (authHeader && authHeader.startsWith('Bearer ')) {
     const token = authHeader.slice(7).trim();
-    const payload = verifyToken(token, APP_SECRET);
+    let payload: any = null;
+
+    if (!isPublicRoute) {
+      // Use version-aware verification for non-public routes
+      const db = getDatabase();
+      payload = verifyTokenWithDatabase(token, APP_SECRET, db);
+    } else {
+      // For public routes (login, setup), use simple verification
+      payload = verifyToken(token, APP_SECRET);
+    }
+
     if (payload) {
       if (!tenantId) tenantId = payload.tid;
       if (!userId) userId = payload.sub;
+    } else if (authHeader && !isPublicRoute) {
+      return errorResponse(
+        res,
+        'UNAUTHORIZED',
+        'Invalid or expired authentication token',
+        401
+      );
     }
   }
 

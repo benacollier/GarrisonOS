@@ -1,4 +1,6 @@
 import { EventEmitter } from 'node:events';
+import { RequestContext } from './context.js';
+import { generateUUIDv7 } from './crypto.js';
 
 export interface BaseEventPayload {
   tenantId: string;
@@ -47,9 +49,17 @@ export class EventBus {
   public publish<K extends keyof EventMap>(event: K, payload: EventMap[K]): void;
   public publish<T>(event: string, payload: T): void;
   public publish(event: string, payload: unknown): void {
+    // Extract tenantId from payload if available (all BaseEventPayload have it)
+    const basePayload = payload as { tenantId?: string };
+    const tenantId = basePayload.tenantId || 'system';
+
     // Dispatch asynchronously on next tick to decouple producer from consumers
+    // Wrap emission in RequestContext to preserve tenant isolation
     setImmediate(() => {
-      this.emitter.emit(event, payload);
+      RequestContext.run(
+        { tenantId, correlationId: generateUUIDv7() },
+        () => this.emitter.emit(event, payload)
+      );
     });
   }
 

@@ -11,12 +11,104 @@ export interface MigrationFile {
   module: string;
   fullPath: string;
   sql: string;
+  dependencies: string[];
+}
+
+export function buildDependencyGraph(migrations: MigrationFile[]): Map<string, Set<string>> {
+  const graph = new Map<string, Set<string>>();
+
+  for (const mig of migrations) {
+    const node = mig.module;
+    if (!graph.has(node)) {
+      graph.set(node, new Set());
+    }
+
+    for (const dep of mig.dependencies) {
+      if (!graph.has(dep)) {
+        graph.set(dep, new Set());
+      }
+      graph.get(dep)!.add(node);
+    }
+  }
+
+  return graph;
+}
+
+export function topologicalSort(migrations: MigrationFile[]): MigrationFile[] {
+  if (migrations.length === 0) {
+    return [];
+  }
+
+  const graph = buildDependencyGraph(migrations);
+  const inDegree = new Map<string, number>();
+  const queue: string[] = [];
+  const result: MigrationFile[] = [];
+  const sortedModules = new Set<string>();
+
+  for (const node of graph.keys()) {
+    inDegree.set(node, 0);
+  }
+
+  for (const [node, deps] of graph) {
+    for (const dep of deps) {
+      inDegree.set(dep, (inDegree.get(dep) || 0) + 1);
+    }
+  }
+
+  for (const [node, degree] of inDegree) {
+    if (degree === 0) {
+      queue.push(node);
+    }
+  }
+
+  while (queue.length > 0) {
+    const module = queue.shift()!;
+    sortedModules.add(module);
+
+    const moduleMigrations = migrations.filter((m) => m.module === module);
+    result.push(...moduleMigrations);
+
+    const dependents = graph.get(module) || new Set();
+    for (const dep of dependents) {
+      const degree = inDegree.get(dep) || 0;
+      inDegree.set(dep, degree - 1);
+      if (degree - 1 === 0) {
+        queue.push(dep);
+      }
+    }
+  }
+
+  if (sortedModules.size < graph.size) {
+    const unprocessed = [...graph.keys()].filter((m) => !sortedModules.has(m));
+    throw new Error(`Circular dependency detected involving modules: ${unprocessed.join(', ')}`);
+  }
+
+  return result;
 }
 
 export function findMigrations(baseDir: string = process.cwd()): MigrationFile[] {
   const migrations: MigrationFile[] = [];
 
-  // 1. Core migrations
+  // 1. Load module manifests to get dependencies
+  const modulesManifests = new Map<string, { dependencies: string[] }>();
+  const modulesDir = path.resolve(baseDir, 'modules');
+  if (fs.existsSync(modulesDir)) {
+    const moduleNames = fs.readdirSync(modulesDir).sort();
+    for (const mod of moduleNames) {
+      const manifestPath = path.join(modulesDir, mod, 'module.json');
+      if (fs.existsSync(manifestPath)) {
+        try {
+          const manifestRaw = fs.readFileSync(manifestPath, 'utf8');
+          const manifest = JSON.parse(manifestRaw) as { dependencies?: string[] };
+          modulesManifests.set(mod, { dependencies: manifest.dependencies || [] });
+        } catch {
+          modulesManifests.set(mod, { dependencies: [] });
+        }
+      }
+    }
+  }
+
+  // 2. Core migrations (no dependencies)
   const coreMigrationsDir = path.resolve(baseDir, 'database/migrations');
   if (fs.existsSync(coreMigrationsDir)) {
     const files = fs.readdirSync(coreMigrationsDir).filter((f) => f.endsWith('.sql')).sort();
@@ -28,19 +120,20 @@ export function findMigrations(baseDir: string = process.cwd()): MigrationFile[]
         name: file,
         module: 'core',
         fullPath,
-        sql
+        sql,
+        dependencies: []
       });
     }
   }
 
-  // 2. Module migrations
-  const modulesDir = path.resolve(baseDir, 'modules');
+  // 3. Module migrations
   if (fs.existsSync(modulesDir)) {
     const moduleNames = fs.readdirSync(modulesDir).sort();
     for (const mod of moduleNames) {
       const modMigrationsDir = path.join(modulesDir, mod, 'backend/migrations');
       if (fs.existsSync(modMigrationsDir) && fs.statSync(modMigrationsDir).isDirectory()) {
         const files = fs.readdirSync(modMigrationsDir).filter((f) => f.endsWith('.sql')).sort();
+        const deps = modulesManifests.get(mod)?.dependencies || [];
         for (const file of files) {
           const fullPath = path.join(modMigrationsDir, file);
           const sql = fs.readFileSync(fullPath, 'utf8');
@@ -49,14 +142,16 @@ export function findMigrations(baseDir: string = process.cwd()): MigrationFile[]
             name: file,
             module: mod,
             fullPath,
-            sql
+            sql,
+            dependencies: deps
           });
         }
       }
     }
   }
 
-  return migrations;
+  // Apply topological sort based on module dependencies
+  return topologicalSort(migrations);
 }
 
 export function runMigrations(dbInstance?: DatabaseSync, baseDir: string = process.cwd()): string[] {
