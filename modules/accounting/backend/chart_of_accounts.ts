@@ -27,6 +27,7 @@ export interface ChartOfAccountRecord {
   deleted_at?: number | null;
 }
 
+
 export interface DefaultAccountDefinition {
   account_number: string;
   account_name: string;

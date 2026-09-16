@@ -59,6 +59,7 @@ try {
         <h1 class="page-title">General Ledger</h1>
         <p class="page-subtitle">Native immutable double-entry journal entries, audit trail, and line allocations.</p>
     </div>
+
     <div class="actions" style="display: flex; gap: var(--spacing-sm);">
         <form method="POST" action="/accounting/general-ledger" style="display: inline;">
             <?= CSRF::field() ?>
