@@ -1,7 +1,7 @@
 # GarrisonOS LLM Review - 2026-09-15
 
 > **Review Date**: 2026-09-15  
-> **Reviewer**: Mistral Vibe CLI Agent  
+> **Review Date**: 2026-09-15  
 > **Branch**: main  
 > **Commit**: a40df89  
 > **Document Type**: Comprehensive Project Critique & Progress Analysis
@@ -378,7 +378,7 @@ The **next 4 weeks are critical** - fixing the EventBus context issue, migration
 
 ---
 
-> **Document Generated**: 2026-09-15 by Mistral Vibe CLI Agent  
+> **Document Generated**: 2026-09-15  
 > **Source Commit**: a40df89  
 > **Review Branch**: main  
 > **Next Review Recommended**: 2026-09-29 (after Sprint 1 completion)
