@@ -132,6 +132,45 @@ describe('Accounting Module - Native Double-Entry Journal Service', () => {
     });
   });
 
+  it('allows historical account references only in internal historical-reference mode', () => {
+    runInTenantContext('tenant-historical-reference-test', () => {
+      const db = getDatabase();
+      ChartOfAccountsRepository.ensureDefaultAccounts();
+      const accounts = ChartOfAccountsRepository.listAccounts();
+      const bank = accounts.find((a) => a.category_mapping === 'operating_bank')!;
+      const repairs = accounts.find((a) => a.category_mapping === 'repairs')!;
+
+      db.prepare(`
+        UPDATE chart_of_accounts
+        SET deleted_at = ?
+        WHERE id = ? AND tenant_id = ?
+      `).run(Date.now(), bank.id, 'tenant-historical-reference-test');
+
+      assert.throws(() => {
+        JournalService.postEntry({
+          memo: 'Blocked deleted account reference',
+          source_type: 'manual_journal',
+          lines: [
+            { account_id: bank.id, debit_cents: 10000, credit_cents: 0 },
+            { account_id: repairs.id, debit_cents: 0, credit_cents: 10000 }
+          ]
+        });
+      }, /Account '.*' does not exist or does not belong to the current tenant/);
+
+      const entry = JournalService.postEntry({
+        memo: 'Historical account reference permitted internally',
+        source_type: 'manual_journal',
+        lines: [
+          { account_id: bank.id, debit_cents: 25000, credit_cents: 0 },
+          { account_id: repairs.id, debit_cents: 0, credit_cents: 25000 }
+        ]
+      }, undefined, { historicalReferenceMode: true });
+
+      assert.ok(entry.id);
+      assert.equal(entry.lines?.length, 2);
+    });
+  });
+
   it('computes perfectly balanced Trial Balance report', () => {
     runInTenantContext('tenant-trial-balance-test', () => {
       ChartOfAccountsRepository.ensureDefaultAccounts();

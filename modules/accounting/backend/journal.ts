@@ -85,8 +85,12 @@ export class JournalService {
     options?: { historicalReferenceMode?: boolean }
   ): JournalEntryRecord {
     const tenantId = RequestContext.getTenantId();
-    const db = dbInstance || getDatabase();
-    const historicalReferenceMode = options?.historicalReferenceMode === true;
+    const isDatabaseInstance = !!dbInstance && typeof dbInstance === 'object' && typeof dbInstance.prepare === 'function';
+    const db = isDatabaseInstance ? dbInstance : getDatabase();
+    const historicalReferenceMode =
+      options?.historicalReferenceMode === true ||
+      (typeof dbInstance === 'boolean' && dbInstance === true) ||
+      (!!dbInstance && typeof dbInstance === 'object' && !isDatabaseInstance && dbInstance.historicalReferenceMode === true);
 
     if (!input.lines || input.lines.length < 2) {
       throw new Error('A journal entry requires at least two lines.');
@@ -128,7 +132,9 @@ export class JournalService {
     const entryDate = input.date_ms || now;
 
     const executeInsert = (conn: any) => {
-      // Validate tenant ownership while allowing internal historical references.
+      // Validate tenant ownership of account_id, property_id, unit_id, and contact_id.
+      // Historical-reference mode is reserved for internal reversal/backfill flows that
+      // must preserve tenant validation while allowing soft-deleted references to remain readable.
       const deletedFilter = historicalReferenceMode ? '' : ' AND deleted_at IS NULL';
       const checkAccount = conn.prepare(`
         SELECT 1 FROM chart_of_accounts
