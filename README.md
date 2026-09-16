@@ -177,17 +177,39 @@ GarrisonOS is intentionally architected with **zero external runtime package dep
 
 ## Project Milestones
 
-For a comprehensive phase-by-phase implementation plan, milestone deliverables, and technical task breakdowns, see the [GarrisonOS MVP Roadmap](docs/ROADMAP.md).
+For a comprehensive phase-by-phase implementation plan, milestone deliverables, and technical task breakdowns, see the [GarrisonOS MVP Roadmap](docs/ROADMAP.md). The progress below is tracked by topic so that implemented prototype code is not confused with completed MVP or production-ready work.
 
-| Milestone | Focus Area | Status | Description |
-| :--- | :--- | :---: | :--- |
-| **Phase 1** | **Core Engine & Multi-Tenant Foundation** | Completed | Zero-dependency Node.js HTTP/SQLite engine (`node:http`, `node:sqlite`, `node:crypto`), `AsyncLocalStorage` context propagation, tenant isolation (`X-Tenant-ID`), auth, session/token management, rate limiting, and in-process `EventBus` pub/sub backbone. |
-| **Phase 2** | **Base Entity & Inventory Management** | Completed | Portfolios, properties, rentable unit inventory, multi-role contacts directory (tenants, owners, vendors, emergency contacts), foundational relationships, validation schemas, and REST CRUD APIs. |
-| **Phase 3** | **Core Property Operations (Leasing & Maintenance)** | Completed | Residential leasing lifecycle (draft, active, renewal, termination), maintenance work order triage, vendor assignment, and operational event publishing (`lease.created`, `maintenance.completed`). |
-| **Phase 4** | **Financial Ledger & Accounting Subsystem** | Completed | Immutable cash-basis ledger with integer-cents tracking, standardized Chart of Accounts (Schedule E and QuickBooks compatibility), running tenant balances, waterfall payment allocation, deposit disposition, automated rent generation, and financial exports. |
-| **Phase 5** | **Native Presentation Layer & User Experience** | Completed | Zero-framework native PHP-FPM presentation architecture, executive KPI dashboard, responsive semantic HTML5/CSS design system, CSRF protection, and operator views for properties, contacts, leases, maintenance, and ledger reporting. |
-| **Phase 6** | **Data Portability, Resilience & Backup** | Completed | Point-in-time SQLite database snapshots (`VACUUM INTO`), safe WAL checkpointing, tenant-isolated data export/import workflows (`.json.gz`), SHA-256 integrity verification, and disaster recovery CLI tooling. |
-| **Phase 7** | **MVP Verification, Hardening & Self-Hosting Packaging** | In Progress | End-to-end integration and tenant isolation regression test suites, security review (input sanitization, CSP/XSS defense, timing-safe auth checks), and production packaging (Systemd / Supervisord configs, reverse proxy templates, and single-command local setup scripts). |
+**Progress key:** ✅ Implemented and covered | 🟡 Partial or needs verification | ⬜ Not implemented
+
+|Phase|Topic|Progress|Current position|
+|:---|:---|:---:|:---|
+|**1. Core Engine & Multi-Tenant Foundation**|Node.js HTTP/SQLite engine and native dependency boundary|✅|Implemented with the standard-library runtime and core tests.|
+||AsyncLocalStorage context propagation and `X-Tenant-ID` isolation|✅|Implemented and covered by context/isolation tests.|
+||Tenant lifecycle management|⬜|No complete tenant administration/lifecycle workflow is exposed.|
+||Authentication, sessions, tokens, and rate limiting|🟡|Cryptographic helpers and PHP login/session pieces exist; complete engine integration and rate-limit coverage remain.|
+||EventBus and base repository patterns|✅|EventBus and repository implementations are present and used by modules.|
+|**2. Base Entity & Inventory Management**|Properties, portfolios, units, and inventory routes|🟡|Module repositories, routes, migrations, and tests exist; full lifecycle and UI coverage remain incomplete.|
+||Multi-role contacts directory|🟡|Contacts module and tests exist; broader relationship and workflow coverage remains.|
+||Validation, entity relationships, and REST CRUD completeness|🟡|Basic validation and CRUD paths exist, but coverage is uneven across modules and presentation flows.|
+|**3. Core Property Operations**|Leasing lifecycle|🟡|Lease routes, repository logic, lifecycle states, and tests exist; end-to-end workflow coverage is incomplete.|
+||Maintenance and work-order workflow|🟡|Ticket routes, status handling, assignment fields, UI pages, and tests exist; dispatch/resolution flows need more coverage.|
+||Cross-module operational events|🟡|Event definitions/listeners exist, but complete event-driven workflow verification is still outstanding.|
+|**4. Financial Ledger & Accounting**|Immutable double-entry journal and integer-cents ledger|✅|Journal/ledger services, schema, invariants, and focused tests are implemented.|
+||Chart of Accounts, Schedule E, and QuickBooks compatibility|🟡|Account/reporting and compatibility code exists; production-grade compatibility validation is incomplete.|
+||Automated rent, payments, deposits, and operational transactions|🟡|Billing and allocation services exist with tests; full automation and edge-case validation remain.|
+||Financial exports and reporting|🟡|Ledger, rent-roll, Schedule E, and export paths exist; broader verification and operator workflows remain.|
+|**5. Native Presentation Layer & User Experience**|Native PHP shell, layouts, and CSS system|🟡|The server-rendered shell and CSS are present; deployment/runtime integration is not production-validated.|
+||Dashboard and operator views|🟡|Dashboard and several module pages exist; UI coverage is uneven and some flows are read-only or incomplete.|
+||Financial reporting views|🟡|Ledger, rent-roll, Schedule E, and related pages exist; end-to-end usability verification remains.|
+||Form validation, CSRF, and session handling|🟡|CSRF/session helpers and login flows exist; complete validation and security review remain.|
+|**6. Data Portability, Resilience & Backup**|SQLite snapshots and WAL checkpointing|✅|Snapshot service and safe checkpointing are implemented and tested.|
+||Tenant data export/import and integrity verification|✅|Tenant-scoped `.json.gz` export/import and SHA-256 verification are implemented and tested.|
+||Disaster-recovery restore|🟡|Restore tooling exists; operational recovery procedures and broader failure testing remain.|
+||Scheduled backups, monitoring, vacuuming, and upgrade/rollback procedures|⬜|No complete operational scheduling and runbook package is implemented.|
+|**7. MVP Verification, Hardening & Self-Hosting**|Unit/module tests and tenant-isolation regression coverage|🟡|Core and module suites exist; broader end-to-end and release acceptance coverage remains.|
+||Security review and production hardening|🟡|Security-related controls are present in several areas; the complete review and remediation pass is outstanding.|
+||Local setup and self-hosting workflow|🟡|A setup script and local start path exist; production service and reverse-proxy configurations are not complete.|
+||Systemd/Supervisord packaging and release readiness|⬜|No complete production packaging or stable-release sign-off exists yet.|
 
 ---
 
