@@ -5,7 +5,22 @@ import { generateUUIDv7, verifyToken, verifyTokenWithDatabase } from '../core/cr
 import { RequestContext } from '../core/context.js';
 import { getDatabase } from '../database/client.js';
 
-const APP_SECRET = process.env['APP_SECRET'] || 'garrison-os-default-secret-key-change-in-production';
+const NODE_ENV = process.env['NODE_ENV'] || 'development';
+const APP_SECRET = process.env['APP_SECRET'] || (
+  NODE_ENV === 'development' || NODE_ENV === 'test'
+    ? 'garrison-os-development-secret'
+    : ''
+);
+const CORS_ALLOWED_ORIGINS = new Set(
+  (process.env['CORS_ALLOWED_ORIGINS'] || process.env['ALLOWED_ORIGINS'] || (
+    NODE_ENV === 'development'
+      ? `http://${process.env['WEB_HOST'] || 'localhost'}:${process.env['WEB_PORT'] || '8080'}`
+      : ''
+  ))
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter((origin) => origin.length > 0)
+);
 
 // Sliding-window rate limiter state
 interface RateLimitRecord {
@@ -17,15 +32,29 @@ const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000; // 15 minutes
 const RATE_LIMIT_MAX_ATTEMPTS = 10;
 
 /**
+ * Resolve the response origin without ever reflecting an unconfigured origin.
+ */
+export function resolveCorsOrigin(origin: string | undefined, allowedOrigins: ReadonlySet<string>): string | undefined {
+  if (origin && allowedOrigins.has(origin)) return origin;
+  return allowedOrigins.values().next().value;
+}
+
+/**
  * Security headers and CORS middleware
  */
-export const securityHeadersMiddleware: Middleware = async (_req, res, next) => {
+export const securityHeadersMiddleware: Middleware = async (req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'DENY');
   res.setHeader('Content-Security-Policy', "default-src 'self'");
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  const origin = req.headers.origin;
+  const allowedOrigin = resolveCorsOrigin(typeof origin === 'string' ? origin : undefined, CORS_ALLOWED_ORIGINS);
+  if (allowedOrigin) {
+    res.setHeader('Access-Control-Allow-Origin', allowedOrigin);
+    res.setHeader('Vary', 'Origin');
+  }
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Tenant-ID, X-Request-ID, X-User-ID');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
   await next();
 };
 
@@ -140,4 +169,3 @@ export const tenantContextMiddleware: Middleware = async (req, res, next) => {
     }
   );
 };
-

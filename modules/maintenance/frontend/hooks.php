@@ -9,9 +9,8 @@ HookRegistry::registerNavigation([
     'section' => 'operations'
 ]);
 
-HookRegistry::registerDashboardCard(function ($api) {
+HookRegistry::registerDashboardCard('/api/v1/maintenance/metrics', function ($res) {
     try {
-        $res = $api->get('/api/v1/maintenance/metrics');
         $metrics = $res['data']['metrics'] ?? [];
         $openOrders = $metrics['openWorkOrders'] ?? 0;
         $emergencies = $metrics['emergencyWorkOrders'] ?? 0;
@@ -27,4 +26,3 @@ HookRegistry::registerDashboardCard(function ($api) {
         return null;
     }
 });
-

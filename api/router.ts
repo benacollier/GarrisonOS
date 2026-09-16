@@ -186,9 +186,8 @@ export class Router {
       } else {
         if (method === 'OPTIONS') {
           res.writeHead(204, {
-            'Access-Control-Allow-Origin': '*',
             'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
-            'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Tenant-ID, X-Request-ID'
+            'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Tenant-ID, X-Request-ID, X-User-ID'
           });
           res.end();
           return;
@@ -211,4 +210,3 @@ export class Router {
     }
   }
 }
-
