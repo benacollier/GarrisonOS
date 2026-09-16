@@ -164,6 +164,9 @@ class ApiClient {
      * @return array<string, array<string, mixed>>
      */
     public function batch(array $paths): array {
+        if (count($paths) !== count(array_unique($paths))) {
+            throw new InvalidArgumentException('Batch paths must be unique');
+        }
         $response = $this->post('/api/v1/batch', [
             'requests' => array_map(
                 static fn (string $path): array => ['method' => 'GET', 'path' => $path],
