@@ -42,6 +42,11 @@ try {
     $entries = $res['data']['entries'] ?? [];
     $total = $res['data']['total'] ?? 0;
     $totalPages = max(1, (int)ceil($total / $perPage));
+
+    if ($page > $totalPages) {
+        header('Location: /accounting/general-ledger?page=' . $totalPages);
+        exit;
+    }
 } catch (Exception $e) {
     $error = $e->getMessage();
     $totalPages = 1;
@@ -171,4 +176,3 @@ try {
         </div>
     <?php endif; ?>
 </div>
-

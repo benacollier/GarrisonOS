@@ -70,7 +70,9 @@ export class QuickBooksService {
         JournalService.backfillLegacyTransactions();
 
         // Refresh transactions from repository to obtain newly backfilled journal_entry_id values
-        const refreshedTxs = transactions.map((t) => AccountingRepository.getTransactionById(t.id) || t);
+        const refreshedTxs = transactions
+          .map((t) => AccountingRepository.getTransactionById(t.id))
+          .filter((tx): tx is TransactionRecord => tx !== null);
 
         const txEntryIds = refreshedTxs
           .map((t) => t.journal_entry_id)

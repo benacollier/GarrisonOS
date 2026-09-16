@@ -106,9 +106,9 @@ export class AccountingRepository {
    * balanced double-entry journal entry atomically.
    */
   public static createTransaction(data: CreateTransactionData, dbInstance?: any): TransactionRecord {
-    ChartOfAccountsRepository.ensureDefaultAccounts();
     const tenantId = RequestContext.getTenantId();
     const db = dbInstance || getDatabase();
+    ChartOfAccountsRepository.ensureDefaultAccounts(dbInstance);
     const id = generateUUIDv7();
     const now = Date.now();
     const amount = Math.abs(data.amount_cents);
@@ -118,23 +118,19 @@ export class AccountingRepository {
     }
 
     const requireAccount = (mapping: string) => {
-      const account = ChartOfAccountsRepository.getAccountByMapping(mapping);
+      const account = ChartOfAccountsRepository.getAccountByMapping(mapping, dbInstance);
       if (!account) {
         throw new Error(`Chart of accounts is missing an active account mapped to '${mapping}'.`);
       }
       return account;
     };
 
-    const operatingBank = requireAccount('operating_bank');
-    const trustBank = requireAccount('trust_bank');
-    const accountsReceivable = requireAccount('accounts_receivable');
-    const depositLiability = requireAccount('security_deposit');
-    const mappedAccount = ChartOfAccountsRepository.getAccountByMapping(data.category);
-
+    const mappedAccount = ChartOfAccountsRepository.getAccountByMapping(data.category, dbInstance);
     const lines: CreateJournalLineInput[] = [];
 
     switch (data.transaction_type) {
       case 'charge': {
+        const accountsReceivable = requireAccount('accounts_receivable');
         const revAccount = mappedAccount || requireAccount('rent');
         lines.push(
           {
@@ -159,6 +155,8 @@ export class AccountingRepository {
         break;
       }
       case 'payment': {
+        const operatingBank = requireAccount('operating_bank');
+        const accountsReceivable = requireAccount('accounts_receivable');
         lines.push(
           {
             account_id: operatingBank.id,
@@ -182,6 +180,7 @@ export class AccountingRepository {
         break;
       }
       case 'expense': {
+        const operatingBank = requireAccount('operating_bank');
         const expAccount = mappedAccount || requireAccount('repairs');
         lines.push(
           {
@@ -206,6 +205,8 @@ export class AccountingRepository {
         break;
       }
       case 'refund': {
+        const operatingBank = requireAccount('operating_bank');
+        const accountsReceivable = requireAccount('accounts_receivable');
         lines.push(
           {
             account_id: accountsReceivable.id,
@@ -229,6 +230,8 @@ export class AccountingRepository {
         break;
       }
       case 'deposit_inflow': {
+        const trustBank = requireAccount('trust_bank');
+        const depositLiability = requireAccount('security_deposit');
         lines.push(
           {
             account_id: trustBank.id,
@@ -252,6 +255,8 @@ export class AccountingRepository {
         break;
       }
       case 'deposit_return': {
+        const trustBank = requireAccount('trust_bank');
+        const depositLiability = requireAccount('security_deposit');
         lines.push(
           {
             account_id: depositLiability.id,
@@ -275,6 +280,8 @@ export class AccountingRepository {
         break;
       }
       case 'deposit_deduction': {
+        const accountsReceivable = requireAccount('accounts_receivable');
+        const depositLiability = requireAccount('security_deposit');
         lines.push(
           {
             account_id: depositLiability.id,
