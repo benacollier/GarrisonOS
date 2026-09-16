@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# GarrisonOS Linux / macOS Automated Installer
+# GarrisonOS Linux / macOS Automated Installer (Method 2: Verified Release Archive)
 # ==============================================================================
 # Usage:
-#   curl -fsSL https://raw.githubusercontent.com/garrisonos/GarrisonOS/main/scripts/install.sh | bash
-# Or with parameters:
-#   ./scripts/install.sh --port 8080 --seed
+#   ./scripts/install.sh [options]
+# Examples:
+#   ./scripts/install.sh --dir /var/www/garrison-os --port 8080 --seed
 # ==============================================================================
 
 set -e
@@ -122,7 +122,9 @@ if [ ! -f "$TARGET_DIR/package.json" ]; then
     fi
 
     TEMP_TAR="/tmp/garrison-release-$$.tar.gz"
+    TEMP_CHECKSUM="/tmp/garrison-checksum-$$.txt"
     TAR_URL=$(curl -sSL -H "User-Agent: GarrisonOS-Installer" "$API_URL" | grep '"tarball_url":' | sed -E 's/.*"([^"]+)".*/\1/')
+    CHECKSUM_URL=$(curl -sSL -H "User-Agent: GarrisonOS-Installer" "$API_URL" | grep '"browser_download_url":' | grep -i 'sha256' | head -n 1 | sed -E 's/.*"([^"]+)".*/\1/')
 
     if [ -z "$TAR_URL" ]; then
         echo "❌ Could not find release tarball on GitHub."
@@ -132,6 +134,33 @@ if [ ! -f "$TARGET_DIR/package.json" ]; then
 
     echo "  Downloading release from $TAR_URL..."
     curl -sSL -H "User-Agent: GarrisonOS-Installer" -o "$TEMP_TAR" "$TAR_URL"
+
+    # Cryptographic SHA-256 integrity verification if release checksum asset is published
+    if [ -n "$CHECKSUM_URL" ]; then
+        echo "  Verifying cryptographic SHA-256 checksum from $CHECKSUM_URL..."
+        curl -sSL -H "User-Agent: GarrisonOS-Installer" -o "$TEMP_CHECKSUM" "$CHECKSUM_URL"
+        EXPECTED_HASH=$(awk '{print $1}' "$TEMP_CHECKSUM" | head -n 1)
+        if command -v sha256sum >/dev/null 2>&1; then
+            ACTUAL_HASH=$(sha256sum "$TEMP_TAR" | awk '{print $1}')
+        elif command -v shasum >/dev/null 2>&1; then
+            ACTUAL_HASH=$(shasum -a 256 "$TEMP_TAR" | awk '{print $1}')
+        else
+            ACTUAL_HASH=""
+        fi
+
+        if [ -n "$ACTUAL_HASH" ] && [ -n "$EXPECTED_HASH" ]; then
+            if [ "$ACTUAL_HASH" != "$EXPECTED_HASH" ]; then
+                echo "❌ Checksum verification failed!"
+                echo "   Expected: $EXPECTED_HASH"
+                echo "   Actual:   $ACTUAL_HASH"
+                rm -f "$TEMP_TAR" "$TEMP_CHECKSUM"
+                exit 1
+            fi
+            echo "  ✔ Cryptographic SHA-256 checksum verified ($ACTUAL_HASH)"
+        fi
+        rm -f "$TEMP_CHECKSUM"
+    fi
+
     tar -xzf "$TEMP_TAR" --strip-components=1 -C "$TARGET_DIR"
     rm -f "$TEMP_TAR"
     echo "  ✔ Release files extracted to $TARGET_DIR"
