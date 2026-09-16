@@ -16,8 +16,9 @@ export function ensureTenant(tenantId: string, dbInstance?: DatabaseSync): void 
     const db = dbInstance || getDatabase();
     const now = Date.now();
     db.prepare(`
-      INSERT OR IGNORE INTO tenants (id, name, created_at, updated_at)
+      INSERT INTO tenants (id, name, created_at, updated_at)
       VALUES (?, ?, ?, ?)
+      ON CONFLICT (id) DO NOTHING
     `).run(tenantId, `Tenant ${tenantId}`, now, now);
   } catch {
     // Ignore if table not yet initialized in isolated test

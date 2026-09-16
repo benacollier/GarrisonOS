@@ -51,13 +51,16 @@ export class EventBus {
   public publish(event: string, payload: unknown): void {
     // Extract tenantId from payload if available (all BaseEventPayload have it)
     const basePayload = payload as { tenantId?: string };
-    const tenantId = basePayload.tenantId || 'system';
+    const currentContext = RequestContext.tryGet();
+    const tenantId = basePayload.tenantId || currentContext?.tenantId || 'system';
+    const correlationId = currentContext?.correlationId || generateUUIDv7();
+    const userId = currentContext?.userId;
 
     // Dispatch asynchronously on next tick to decouple producer from consumers
     // Wrap emission in RequestContext to preserve tenant isolation
     setImmediate(() => {
       RequestContext.run(
-        { tenantId, correlationId: generateUUIDv7() },
+        { tenantId, correlationId, userId },
         () => this.emitter.emit(event, payload)
       );
     });

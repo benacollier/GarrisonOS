@@ -42,10 +42,10 @@ try {
     <?php else: ?>
         <?php foreach ($dashboardCards as $card): ?>
             <div class="card metric-card">
-                <div class="metric-label"><?= htmlspecialchars($card['title']) ?></div>
-                <div class="metric-value"><?= htmlspecialchars($card['value']) ?></div>
+                <div class="metric-label"><?= htmlspecialchars((string)$card['title'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?></div>
+                <div class="metric-value"><?= htmlspecialchars((string)$card['value'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?></div>
                 <?php if (!empty($card['subtitle'])): ?>
-                    <div class="metric-subtitle"><?= htmlspecialchars($card['subtitle']) ?></div>
+                    <div class="metric-subtitle"><?= htmlspecialchars((string)$card['subtitle'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?></div>
                 <?php endif; ?>
             </div>
         <?php endforeach; ?>
@@ -78,8 +78,8 @@ try {
                     <?php foreach ($recentTransactions as $tx): ?>
                     <tr>
                         <td><?= date('M j', (int)($tx['transaction_date'] / 1000)) ?></td>
-                        <td><span class="badge"><?= htmlspecialchars(ucfirst($tx['transaction_type'])) ?></span></td>
-                        <td><?= htmlspecialchars($tx['description']) ?></td>
+                        <td><span class="badge"><?= htmlspecialchars(ucfirst((string)$tx['transaction_type']), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?></span></td>
+                        <td><?= htmlspecialchars((string)$tx['description'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?></td>
                         <td>
                             <?php if ($tx['transaction_type'] === 'payment'): ?>
                                 <span class="text-success font-bold">+$<?= number_format($tx['amount_cents'] / 100, 2) ?></span>
@@ -121,14 +121,14 @@ try {
                     <?php else: ?>
                     <?php foreach ($openWorkOrders as $wo): ?>
                     <tr>
-                        <td><strong><?= htmlspecialchars($wo['title']) ?></strong></td>
-                        <td><?= htmlspecialchars($wo['property_name']) ?></td>
+                        <td><strong><?= htmlspecialchars((string)$wo['title'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?></strong></td>
+                        <td><?= htmlspecialchars((string)$wo['property_name'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?></td>
                         <td>
                             <span class="badge badge-<?= $wo['priority'] === 'emergency' ? 'danger' : 'warning' ?>">
-                                <?= htmlspecialchars(ucfirst($wo['priority'])) ?>
+                                <?= htmlspecialchars(ucfirst((string)$wo['priority']), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?>
                             </span>
                         </td>
-                        <td><a href="/maintenance/show?id=<?= urlencode($wo['id']) ?>" class="btn btn-sm btn-secondary">Review</a></td>
+                        <td><a href="/maintenance/show?id=<?= urlencode((string)$wo['id']) ?>" class="btn btn-sm btn-secondary">Review</a></td>
                     </tr>
                     <?php endforeach; ?>
                     <?php endif; ?>

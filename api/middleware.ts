@@ -116,7 +116,8 @@ export const tenantContextMiddleware: Middleware = async (req, res, next) => {
   );
 
   let tenantId = isBatchRoute ? '' : ((req.headers['x-tenant-id'] as string) || '');
-  let userId = isBatchRoute ? undefined : ((req.headers['x-user-id'] as string) || undefined);
+  const headerUserId = isBatchRoute ? undefined : ((req.headers['x-user-id'] as string) || undefined);
+  let userId: string | undefined = undefined;
   let batchAuthenticated = false;
 
   // Extract Bearer token if present
@@ -148,8 +149,16 @@ export const tenantContextMiddleware: Middleware = async (req, res, next) => {
             401
           );
         }
+        if (!isPublicRoute && headerUserId && payload.sub !== headerUserId) {
+          return errorResponse(
+            res,
+            'UNAUTHORIZED',
+            'User identity does not match authentication token',
+            401
+          );
+        }
         if (!tenantId) tenantId = payload.tid;
-        if (!userId) userId = payload.sub;
+        userId = typeof payload.sub === 'string' ? payload.sub : undefined;
       }
     } else if (authHeader && !isPublicRoute) {
       return errorResponse(

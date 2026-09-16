@@ -31,16 +31,15 @@ This document provides a technical critique of the GarrisonOS architecture, runt
 * Strict multi-tenancy enforced through `AsyncLocalStorage` in `core/context.ts`.
 * Inbound requests resolve tenant identity via `X-Tenant-ID` header or verified HMAC token in `api/middleware.ts`.
 * Repositories extract `tenantId` implicitly from `RequestContext.getTenantId()`.
+* **Resolved Context Propagation**: Asynchronous context loss across event loop boundaries has been resolved in `EventBus.publish()`, which synchronously captures the active `RequestContext` (including `tenantId`, `correlationId`, and `userId`) prior to dispatching via `setImmediate()` and executes subscriber callbacks wrapped in `RequestContext.run()`.
 
 ### Identified Risks & Limitations
 
-* **Asynchronous Context Loss in Event Subscribers**: `EventBus.publish()` dispatches events on the next event loop tick via `setImmediate()`. Consequently, the active `AsyncLocalStorage` store is detached from subscriber callbacks. If a subscriber executes repository queries without explicitly re-wrapping the execution in `RequestContext.run()`, the runtime throws an uncaught context error (`No active request context found in execution store`).
 * **Coupled Middleware Public Route Registry**: In `api/middleware.ts`, public endpoints (`/health`, `/ready`, `/api/v1/auth/*`, `/api/v1/system/backup`) are hardcoded directly into the tenant resolution middleware. Modules cannot declare public or webhook endpoints independently without modifying core middleware.
 
 ### Recommendations
 
-1. Enhance `EventBus.subscribe()` to automatically detect tenant-scoped payloads (e.g. payloads implementing `{ tenantId: string }`) and auto-wrap callback execution in `RequestContext.run()`.
-2. Allow route registration to specify metadata flags (e.g., `router.get(path, { isPublic: true }, ...handlers)`) to decouple endpoint access control from global middleware logic.
+1. Allow route registration to specify metadata flags (e.g., `router.get(path, { isPublic: true }, ...handlers)`) to decouple endpoint access control from global middleware logic.
 
 ---
 
@@ -128,11 +127,11 @@ This document provides a technical critique of the GarrisonOS architecture, runt
 
 ## 7. Action Plan & Prioritized Matrix
 
-| Priority | Subsystem | Issue | Action Item |
-| :--- | :--- | :--- | :--- |
-| **High** | **Context & Events** | Context loss in async event handlers | Auto-propagate `RequestContext` in `EventBus.subscribe()` |
-| **High** | **Database Migrator** | Alphabetical migration execution | Topological sort migrations by `dependencies` in `module.json` |
-| **Medium** | **HTTP Router** | Linear regex matching order sensitivity | Introduce static-first segment precedence in route dispatcher |
-| **Medium** | **Security** | Legacy HMAC tokens without `tv` cannot be revoked | Define and document a compatibility window before rejecting legacy tokens |
-| **Medium** | **Frontend API** | Sequential cURL overhead on composite pages | Provide composite/batch API endpoint for dashboard hydration |
-| **Low** | **Accounting** | Statutory trust reconciliation reporting | Add dedicated escrow/trust statutory compliance reports |
+| Priority | Subsystem | Issue | Action Item | Status |
+| :--- | :--- | :--- | :--- | :--- |
+| **High** | **Context & Events** | Context loss in async event handlers | Auto-propagate `RequestContext` in `EventBus.publish()` | **Resolved** |
+| **High** | **Database Migrator** | Alphabetical migration execution | Topological sort migrations by `dependencies` in `module.json` | **Resolved** |
+| **Medium** | **Frontend API** | Sequential cURL overhead on composite pages | Provide composite/batch API endpoint for dashboard hydration | **Resolved** |
+| **Medium** | **HTTP Router** | Linear regex matching order sensitivity | Introduce static-first segment precedence in route dispatcher | Backlog |
+| **Medium** | **Security** | Legacy HMAC tokens without `tv` cannot be revoked | Define and document a compatibility window before rejecting legacy tokens | Planned |
+| **Low** | **Accounting** | Statutory trust reconciliation reporting | Add dedicated escrow/trust statutory compliance reports | Backlog |

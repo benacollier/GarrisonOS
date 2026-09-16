@@ -135,19 +135,20 @@ describe('Token Revocation with Database Backing', () => {
   const secret = 'test-revocation-secret-key-1234567890';
   let db: any;
 
-  before(async () => {
+  before(() => {
     db = getDatabase({ inMemory: true });
     runMigrations(db);
 
-    await db.exec(`
+    const now = Date.now();
+    db.prepare(`
       INSERT INTO tenants (id, name, subdomain, currency, created_at, updated_at)
-      VALUES ('tenant-rev-test', 'Revocation Test Tenant', 'rev-test', 'USD', ${Date.now()}, ${Date.now()})
-    `);
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run('tenant-rev-test', 'Revocation Test Tenant', 'rev-test', 'USD', now, now);
 
-    await db.exec(`
+    db.prepare(`
       INSERT INTO users (id, tenant_id, email, password_hash, first_name, last_name, role, token_version, created_at, updated_at)
-      VALUES ('user-rev-test', 'tenant-rev-test', 'test@rev.local', '\$scrypt\$dummy', 'Test', 'User', 'owner', 1, ${Date.now()}, ${Date.now()})
-    `);
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run('user-rev-test', 'tenant-rev-test', 'test@rev.local', '$scrypt$dummy', 'Test', 'User', 'owner', 1, now, now);
   });
 
   after(() => {
@@ -202,10 +203,9 @@ describe('Token Revocation with Database Backing', () => {
     assert.ok(verified !== null, 'Legacy tokens without tv should still work');
   });
 
-  it('rejects tokens for deleted users', async () => {
-    await db.exec(`
-      UPDATE users SET deleted_at = ${Date.now()} WHERE id = 'user-rev-test'
-    `);
+  it('rejects tokens for deleted users', () => {
+    const now = Date.now();
+    db.prepare('UPDATE users SET deleted_at = ? WHERE id = ?').run(now, 'user-rev-test');
 
     const token = createToken(
       {
@@ -221,9 +221,7 @@ describe('Token Revocation with Database Backing', () => {
     const verified = verifyTokenWithDatabase(token, secret, db);
     assert.equal(verified, null, 'Token for deleted user should be rejected');
 
-    await db.exec(`
-      UPDATE users SET deleted_at = NULL WHERE id = 'user-rev-test'
-    `);
+    db.prepare('UPDATE users SET deleted_at = NULL WHERE id = ?').run('user-rev-test');
   });
 });
 

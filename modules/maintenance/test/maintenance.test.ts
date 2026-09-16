@@ -97,6 +97,13 @@ describe('Maintenance Module - Work Orders & Event Dispatch', () => {
         actual_cost_cents: 85000
       });
 
+      const eventHandled = new Promise<void>((resolve) => {
+        const unsubscribe = eventBus.subscribe('work_order.completed', () => {
+          unsubscribe();
+          resolve();
+        });
+      });
+
       // Emit work_order.completed event through EventBus
       eventBus.publish('work_order.completed', {
         tenantId: 'tenant-maint-test',
@@ -106,8 +113,7 @@ describe('Maintenance Module - Work Orders & Event Dispatch', () => {
         actualCostCents: 85000
       });
 
-      // Give event loop a microtick to process subscriber
-      await new Promise((resolve) => setTimeout(resolve, 10));
+      await eventHandled;
 
       // Verify transaction recorded in Accounting module
       const txs = AccountingRepository.listTransactions({ transaction_type: 'expense' });
