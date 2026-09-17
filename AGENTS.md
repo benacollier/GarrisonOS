@@ -61,21 +61,25 @@ Automated agents and contributors must observe these cross-dialect portability r
 | **JSON Fields** | Stored as `TEXT`; parsed/serialized in application layer | Native dialect-specific JSON query functions |
 | **Partial Indexes** | ANSI partial index syntax: `WHERE deleted_at IS NULL` | Non-standard index expressions |
 
-### Row-Level Multi-Tenancy
+### Row-Level Operator Isolation (Multi-Operator Architecture)
 
-* Every operational database table must contain a `tenant_id TEXT NOT NULL REFERENCES tenants(id)`.
-* Compound indexes supporting queries must lead with `tenant_id` (e.g., `CREATE INDEX idx_orders_tenant_created ON orders(tenant_id, created_at);`).
-* **Zero Parameter Leakage**: Business logic, repositories, and routes must **NEVER** accept `tenant_id` from client request bodies, query parameters, or URL route parameters.
-* Always extract tenant context implicitly from `RequestContext.getTenantId()` (see `core/context.ts`):
+* **Separation of Architectural vs. Domain Concepts**:
+  * **Operator (Software System Multi-Tenancy)**: The property management firm, owner-operator, or managing entity isolation boundary. Operational tables use `operator_id TEXT NOT NULL REFERENCES operators(id)`.
+  * **Tenant (Real Estate Domain Entity)**: Renters, leaseholders, residents, or occupants of properties. They are represented within modules (e.g., `contact_type = 'tenant'`, `role = 'primary_tenant'`, `calculateTenantBalance()`, Tenant Ledgers).
+  * **Organization**: Reserved for commercial real estate entities (future roadmap).
+* Every operational database table must contain an `operator_id TEXT NOT NULL REFERENCES operators(id)` (with `tenant_id` retained where appropriate for backward compatibility).
+* Compound indexes supporting queries must lead with `operator_id` (e.g., `CREATE INDEX idx_orders_operator_created ON orders(operator_id, created_at);`).
+* **Zero Parameter Leakage**: Business logic, repositories, and routes must **NEVER** accept `operator_id` or `tenant_id` from client request bodies, query parameters, or URL route parameters.
+* Always extract operator context implicitly from `RequestContext.getOperatorId()` (see `core/context.ts`):
 
   ```typescript
   // CORRECT:
-  const tenantId = RequestContext.getTenantId();
-  const stmt = db.prepare('SELECT * FROM properties WHERE tenant_id = ? AND id = ? AND deleted_at IS NULL');
-  const property = stmt.get(tenantId, propertyId);
+  const operatorId = RequestContext.getOperatorId();
+  const stmt = db.prepare('SELECT * FROM properties WHERE operator_id = ? AND id = ? AND deleted_at IS NULL');
+  const property = stmt.get(operatorId, propertyId);
 
   // FORBIDDEN:
-  // app.get('/api/properties/:tenant_id') <-- NEVER put tenant_id in routes or request payloads
+  // app.get('/api/properties/:operator_id') <-- NEVER put operator_id in routes or request payloads
   ```
 
 ### Data Representation Standards

@@ -11,28 +11,34 @@ export function createTestDb(): DatabaseSync {
   return db;
 }
 
-export function ensureTenant(tenantId: string, dbInstance?: DatabaseSync): void {
+export function ensureOperator(operatorId: string, dbInstance?: DatabaseSync): void {
   try {
     const db = dbInstance || getDatabase();
     const now = Date.now();
     db.prepare(`
-      INSERT INTO tenants (id, name, created_at, updated_at)
+      INSERT INTO operators (id, name, created_at, updated_at)
       VALUES (?, ?, ?, ?)
       ON CONFLICT (id) DO NOTHING
-    `).run(tenantId, `Tenant ${tenantId}`, now, now);
+    `).run(operatorId, `Operator ${operatorId}`, now, now);
   } catch {
     // Ignore if table not yet initialized in isolated test
   }
 }
 
-export function runInTenantContext<T>(tenantId: string, fn: () => T, userId?: string): T {
-  ensureTenant(tenantId);
+export const ensureTenant = ensureOperator;
+
+export function runInOperatorContext<T>(operatorId: string, fn: () => T, userId?: string): T {
+  ensureOperator(operatorId);
   return RequestContext.run(
     {
-      tenantId,
+      operatorId,
+      tenantId: operatorId,
       userId: userId || generateUUIDv7(),
       correlationId: generateUUIDv7()
     },
     fn
   );
 }
+
+export const runInTenantContext = runInOperatorContext;
+

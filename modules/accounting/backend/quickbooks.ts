@@ -44,18 +44,18 @@ export class QuickBooksService {
    * If transactions are provided, extracts corresponding persistent journal entries.
    */
   public static generateJournalEntries(transactions?: TransactionRecord[]): JournalEntry[] {
-    const tenantId = RequestContext.getTenantId();
+    const operatorId = RequestContext.getOperatorId();
     const db = getDatabase();
 
     // Cache properties and contacts for dimension mapping (Class & Customer/Vendor Name)
     const propertyRows = db.prepare(`
-      SELECT id, name FROM properties WHERE tenant_id = ? AND deleted_at IS NULL
-    `).all(tenantId) as Array<{ id: string; name: string }>;
+      SELECT id, name FROM properties WHERE operator_id = ? AND deleted_at IS NULL
+    `).all(operatorId) as Array<{ id: string; name: string }>;
     const propertyMap = new Map<string, string>(propertyRows.map((p) => [p.id, p.name]));
 
     const contactRows = db.prepare(`
-      SELECT id, first_name, last_name, company_name FROM contacts WHERE tenant_id = ? AND deleted_at IS NULL
-    `).all(tenantId) as Array<{ id: string; first_name: string; last_name: string; company_name: string | null }>;
+      SELECT id, first_name, last_name, company_name FROM contacts WHERE operator_id = ? AND deleted_at IS NULL
+    `).all(operatorId) as Array<{ id: string; first_name: string; last_name: string; company_name: string | null }>;
     const contactMap = new Map<string, string>();
     for (const c of contactRows) {
       const name = c.company_name || `${c.first_name} ${c.last_name}`.trim();
@@ -399,7 +399,7 @@ ${stmtTrns}
     result: QuickBooksExportResult,
     userId?: string
   ): void {
-    const tenantId = RequestContext.getTenantId();
+    const operatorId = RequestContext.getOperatorId();
     const db = getDatabase();
     const now = Date.now();
     const logId = generateUUIDv7();
@@ -408,12 +408,12 @@ ${stmtTrns}
       // 1. Insert audit log
       tx.prepare(`
         INSERT INTO quickbooks_export_logs (
-          id, tenant_id, export_type, transaction_count, total_debit_cents,
+          id, operator_id, export_type, transaction_count, total_debit_cents,
           total_credit_cents, exported_by_user_id, created_at
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       `).run(
         logId,
-        tenantId,
+        operatorId,
         exportType,
         result.entryCount,
         result.totalDebitCents,
@@ -427,11 +427,11 @@ ${stmtTrns}
         const updateStmt = tx.prepare(`
           UPDATE transactions
           SET qb_exported_at = ?
-          WHERE id = ? AND tenant_id = ?
+          WHERE id = ? AND operator_id = ?
         `);
 
         for (const tid of result.transactionIds) {
-          updateStmt.run(now, tid, tenantId);
+          updateStmt.run(now, tid, operatorId);
         }
       }
     }, db);

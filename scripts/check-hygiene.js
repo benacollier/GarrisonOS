@@ -172,11 +172,11 @@ function checkFile(relPath) {
     });
   }
 
-  // 6. Tenant Isolation & Zero Parameter Leakage
+  // 6. Operator Isolation & Zero Parameter Leakage
   if (isSource && !relPath.includes('/test/')) {
     lines.forEach((line, index) => {
-      if (/router\.(?:get|post|put|delete|patch)\s*\(\s*['"][^'"]*:\s*tenant_id/i.test(line)) {
-        reportViolation('TENANT LEAKAGE', relPath, index + 1, `Route parameter ":tenant_id" is forbidden. Tenant must be resolved implicitly via RequestContext.`);
+      if (/router\.(?:get|post|put|delete|patch)\s*\(\s*['"][^'"]*:\s*(?:operator_id|tenant_id)/i.test(line)) {
+        reportViolation('OPERATOR LEAKAGE', relPath, index + 1, `Route parameter ":operator_id" or ":tenant_id" is forbidden. Operator must be resolved implicitly via RequestContext.`);
       }
     });
   }

@@ -65,8 +65,8 @@ Operational records are preserved with a `deleted_at INTEGER` column:
 All default repository queries include `deleted_at IS NULL`. Compound unique indexes account for soft deletion via partial indexes:
 
 ```sql
-CREATE UNIQUE INDEX IF NOT EXISTS idx_users_tenant_email 
-ON users(tenant_id, email) 
+CREATE UNIQUE INDEX IF NOT EXISTS idx_users_operator_email 
+ON users(operator_id, email) 
 WHERE deleted_at IS NULL;
 ```
 
@@ -74,7 +74,7 @@ WHERE deleted_at IS NULL;
 
 ## 5. Chart of Accounts & General Ledger Mapping
 
-To support seamless integration with external accounting software such as QuickBooks without compromising single-entry operational speed, GarrisonOS defines a standard Chart of Accounts mapping (`chart_of_accounts`) stored with tenant isolation:
+To support seamless integration with external accounting software such as QuickBooks without compromising operational speed, GarrisonOS defines a standard Chart of Accounts mapping (`chart_of_accounts`) stored with operator isolation:
 
 * **Account Types**: `Bank`, `AccountsReceivable`, `OtherCurrentAsset`, `AccountsPayable`, `OtherCurrentLiability`, `Equity`, `Income`, `Expense`, `CostOfGoodsSold`.
 * **Category Mapping**: Connects operational transaction categories (`rent`, `late_fee`, `repairs`, etc.) and system roles (`operating_bank`, `trust_bank`, `accounts_receivable`, `security_deposits_held`) to GL accounts.

@@ -4,8 +4,9 @@ import { generateUUIDv7 } from '../../../core/crypto.js';
 
 export interface BackupRecord {
   id: string;
-  tenant_id: string;
-  backup_type: 'full_system' | 'tenant_data';
+  operator_id: string;
+  tenant_id?: string;
+  backup_type: 'full_system' | 'operator_data' | 'tenant_data';
   filename: string;
   relative_path: string;
   file_size_bytes: number;
@@ -18,7 +19,7 @@ export interface BackupRecord {
 }
 
 export interface CreateBackupInput {
-  backup_type: 'full_system' | 'tenant_data';
+  backup_type: 'full_system' | 'operator_data' | 'tenant_data';
   filename: string;
   relative_path: string;
   metadata_json?: string | null;
@@ -34,20 +35,20 @@ export interface UpdateBackupStatusInput {
 
 export class BackupRepository {
   public static create(input: CreateBackupInput): BackupRecord {
-    const tenantId = RequestContext.getTenantId();
+    const operatorId = RequestContext.getOperatorId();
     const id = generateUUIDv7();
     const now = Date.now();
     const db = getDatabase();
 
     db.prepare(`
       INSERT INTO backups (
-        id, tenant_id, backup_type, filename, relative_path,
+        id, operator_id, backup_type, filename, relative_path,
         file_size_bytes, checksum_sha256, status, error_message,
         metadata_json, created_at, deleted_at
       ) VALUES (?, ?, ?, ?, ?, 0, '', 'pending', NULL, ?, ?, NULL)
     `).run(
       id,
-      tenantId,
+      operatorId,
       input.backup_type,
       input.filename,
       input.relative_path,
@@ -59,19 +60,19 @@ export class BackupRepository {
   }
 
   public static getById(id: string): BackupRecord | null {
-    const tenantId = RequestContext.getTenantId();
+    const operatorId = RequestContext.getOperatorId();
     const db = getDatabase();
 
     const row = db.prepare(`
       SELECT * FROM backups
-      WHERE id = ? AND tenant_id = ? AND deleted_at IS NULL
-    `).get(id, tenantId) as unknown as BackupRecord | undefined;
+      WHERE id = ? AND operator_id = ? AND deleted_at IS NULL
+    `).get(id, operatorId) as unknown as BackupRecord | undefined;
 
     return row || null;
   }
 
   public static updateStatus(id: string, update: UpdateBackupStatusInput): BackupRecord | null {
-    const tenantId = RequestContext.getTenantId();
+    const operatorId = RequestContext.getOperatorId();
     const db = getDatabase();
 
     db.prepare(`
@@ -81,7 +82,7 @@ export class BackupRepository {
           checksum_sha256 = COALESCE(?, checksum_sha256),
           error_message = ?,
           metadata_json = COALESCE(?, metadata_json)
-      WHERE id = ? AND tenant_id = ? AND deleted_at IS NULL
+      WHERE id = ? AND operator_id = ? AND deleted_at IS NULL
     `).run(
       update.status,
       update.file_size_bytes ?? null,
@@ -89,27 +90,27 @@ export class BackupRepository {
       update.error_message ?? null,
       update.metadata_json ?? null,
       id,
-      tenantId
+      operatorId
     );
 
     return this.getById(id);
   }
 
   public static list(limit: number = 50, offset: number = 0): { items: BackupRecord[]; total: number } {
-    const tenantId = RequestContext.getTenantId();
+    const operatorId = RequestContext.getOperatorId();
     const db = getDatabase();
 
     const totalRow = db.prepare(`
       SELECT COUNT(*) as count FROM backups
-      WHERE tenant_id = ? AND deleted_at IS NULL
-    `).get(tenantId) as unknown as { count: number } | undefined;
+      WHERE operator_id = ? AND deleted_at IS NULL
+    `).get(operatorId) as unknown as { count: number } | undefined;
 
     const items = db.prepare(`
       SELECT * FROM backups
-      WHERE tenant_id = ? AND deleted_at IS NULL
+      WHERE operator_id = ? AND deleted_at IS NULL
       ORDER BY created_at DESC
       LIMIT ? OFFSET ?
-    `).all(tenantId, limit, offset) as unknown as BackupRecord[];
+    `).all(operatorId, limit, offset) as unknown as BackupRecord[];
 
     return {
       items,
@@ -118,27 +119,27 @@ export class BackupRepository {
   }
 
   public static softDelete(id: string): boolean {
-    const tenantId = RequestContext.getTenantId();
+    const operatorId = RequestContext.getOperatorId();
     const db = getDatabase();
 
     const result = db.prepare(`
       UPDATE backups
       SET deleted_at = ?
-      WHERE id = ? AND tenant_id = ? AND deleted_at IS NULL
-    `).run(Date.now(), id, tenantId);
+      WHERE id = ? AND operator_id = ? AND deleted_at IS NULL
+    `).run(Date.now(), id, operatorId);
 
     return (result as { changes: number }).changes > 0;
   }
 
   public static getOldBackups(retentionDays: number): BackupRecord[] {
-    const tenantId = RequestContext.getTenantId();
+    const operatorId = RequestContext.getOperatorId();
     const db = getDatabase();
     const thresholdMs = Date.now() - retentionDays * 24 * 60 * 60 * 1000;
 
     return db.prepare(`
       SELECT * FROM backups
-      WHERE tenant_id = ? AND created_at < ? AND deleted_at IS NULL
-    `).all(tenantId, thresholdMs) as unknown as BackupRecord[];
+      WHERE operator_id = ? AND created_at < ? AND deleted_at IS NULL
+    `).all(operatorId, thresholdMs) as unknown as BackupRecord[];
   }
 }
 

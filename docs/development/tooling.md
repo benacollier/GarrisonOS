@@ -27,7 +27,7 @@ This guide documents the development tooling, test reporter, and repository comp
   1. **Dependency Whitelist**: Enforces standard `node:*` and relative imports. Rejects prohibited npm packages (`express`, `zod`, `uuid`, etc.).
   2. **Strict Equality**: Enforces `===` and `!==` across all TypeScript and PHP source code.
   3. **Synchronous SQLite Invariant**: Flags any `await db.prepare` or `await db.exec` on `node:sqlite.DatabaseSync`.
-  4. **Tenant Isolation**: Flags `:tenant_id` appearing in API route paths or client request bodies/queries.
+  4. **Operator Isolation**: Flags `:operator_id` or `:tenant_id` appearing in API route paths or client request bodies/queries.
   5. **SQL Portability**: Enforces parameterized queries (`?`), PostgreSQL compatibility (rejects `AUTOINCREMENT`, `INSERT OR REPLACE/IGNORE`), and UTC timestamps (rejects SQLite `datetime` functions).
   6. **Fail-Closed Security**: Validates cryptographic SHA256 checksum verification and non-zero exit codes in installer scripts.
   7. **Host Path & Credential Hygiene**: Scans for host-specific absolute filesystem paths and exposed credentials or secrets.

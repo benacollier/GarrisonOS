@@ -1,7 +1,7 @@
 -- Single-entry cash-basis ledger aligned with IRS Schedule E
 CREATE TABLE IF NOT EXISTS transactions (
     id TEXT PRIMARY KEY,
-    tenant_id TEXT NOT NULL,
+    operator_id TEXT NOT NULL,
     transaction_type TEXT NOT NULL CHECK (transaction_type IN (
         'charge',           -- Invoiced amount owed by tenant
         'payment',          -- Inflow payment received from tenant
@@ -32,14 +32,14 @@ CREATE TABLE IF NOT EXISTS transactions (
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL,
     deleted_at INTEGER,
-    FOREIGN KEY (tenant_id) REFERENCES tenants(id),
+    FOREIGN KEY (operator_id) REFERENCES operators(id),
     FOREIGN KEY (property_id) REFERENCES properties(id),
     FOREIGN KEY (unit_id) REFERENCES units(id),
     FOREIGN KEY (lease_id) REFERENCES leases(id),
     FOREIGN KEY (payer_contact_id) REFERENCES contacts(id),
     FOREIGN KEY (payee_contact_id) REFERENCES contacts(id)
 );
-CREATE INDEX IF NOT EXISTS idx_tx_tenant_lease_date ON transactions(tenant_id, lease_id, transaction_date);
-CREATE INDEX IF NOT EXISTS idx_tx_tenant_property_date ON transactions(tenant_id, property_id, transaction_date);
-CREATE INDEX IF NOT EXISTS idx_tx_tenant_type_category ON transactions(tenant_id, transaction_type, category);
+CREATE INDEX IF NOT EXISTS idx_tx_operator_lease_date ON transactions(operator_id, lease_id, transaction_date);
+CREATE INDEX IF NOT EXISTS idx_tx_operator_property_date ON transactions(operator_id, property_id, transaction_date);
+CREATE INDEX IF NOT EXISTS idx_tx_operator_type_category ON transactions(operator_id, transaction_type, category);
 

@@ -143,7 +143,7 @@ describe('Accounting Module - Native Double-Entry Journal Service', () => {
       db.prepare(`
         UPDATE chart_of_accounts
         SET deleted_at = ?
-        WHERE id = ? AND tenant_id = ?
+        WHERE id = ? AND operator_id = ?
       `).run(Date.now(), bank.id, 'tenant-historical-reference-test');
 
       assert.throws(() => {
@@ -155,7 +155,7 @@ describe('Accounting Module - Native Double-Entry Journal Service', () => {
             { account_id: repairs.id, debit_cents: 0, credit_cents: 10000 }
           ]
         });
-      }, /Account '.*' does not exist or does not belong to the current tenant/);
+      }, /Account '.*' does not exist or does not belong to the current (?:operator|tenant)/);
 
       const entry = JournalService.postEntry({
         memo: 'Historical account reference permitted internally',
@@ -280,7 +280,7 @@ describe('Accounting Module - Native Double-Entry Journal Service', () => {
               { account_id: bRent.id, debit_cents: 0, credit_cents: 50000 }
             ]
           });
-        }, /does not exist or does not belong to the current tenant/);
+        }, /does not exist or does not belong to the current (?:operator|tenant)/);
       });
     });
   });

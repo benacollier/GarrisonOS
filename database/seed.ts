@@ -13,46 +13,46 @@ export async function seedDatabase(dbInstance?: DatabaseSync): Promise<void> {
   runMigrations(db);
 
   const now = Date.now();
-  const TENANT_ID = 'tenant-demo';
+  const OPERATOR_ID = 'operator-demo';
   const passwordHash = await hashPassword('Password123!');
 
   withTransaction((tx) => {
     // 1. Clean existing demo data if present
-    tx.prepare('DELETE FROM quickbooks_export_logs WHERE tenant_id = ?').run(TENANT_ID);
-    tx.prepare('DELETE FROM chart_of_accounts WHERE tenant_id = ?').run(TENANT_ID);
-    tx.prepare('DELETE FROM transactions WHERE tenant_id = ?').run(TENANT_ID);
-    tx.prepare('DELETE FROM work_orders WHERE tenant_id = ?').run(TENANT_ID);
-    tx.prepare('DELETE FROM lease_contacts WHERE tenant_id = ?').run(TENANT_ID);
-    tx.prepare('DELETE FROM leases WHERE tenant_id = ?').run(TENANT_ID);
-    tx.prepare('DELETE FROM units WHERE tenant_id = ?').run(TENANT_ID);
-    tx.prepare('DELETE FROM properties WHERE tenant_id = ?').run(TENANT_ID);
-    tx.prepare('DELETE FROM portfolios WHERE tenant_id = ?').run(TENANT_ID);
-    tx.prepare('DELETE FROM contacts WHERE tenant_id = ?').run(TENANT_ID);
-    tx.prepare('DELETE FROM audit_logs WHERE tenant_id = ?').run(TENANT_ID);
-    tx.prepare('DELETE FROM users WHERE tenant_id = ?').run(TENANT_ID);
-    tx.prepare('DELETE FROM tenants WHERE id = ?').run(TENANT_ID);
+    tx.prepare('DELETE FROM quickbooks_export_logs WHERE operator_id = ?').run(OPERATOR_ID);
+    tx.prepare('DELETE FROM chart_of_accounts WHERE operator_id = ?').run(OPERATOR_ID);
+    tx.prepare('DELETE FROM transactions WHERE operator_id = ?').run(OPERATOR_ID);
+    tx.prepare('DELETE FROM work_orders WHERE operator_id = ?').run(OPERATOR_ID);
+    tx.prepare('DELETE FROM lease_contacts WHERE operator_id = ?').run(OPERATOR_ID);
+    tx.prepare('DELETE FROM leases WHERE operator_id = ?').run(OPERATOR_ID);
+    tx.prepare('DELETE FROM units WHERE operator_id = ?').run(OPERATOR_ID);
+    tx.prepare('DELETE FROM properties WHERE operator_id = ?').run(OPERATOR_ID);
+    tx.prepare('DELETE FROM portfolios WHERE operator_id = ?').run(OPERATOR_ID);
+    tx.prepare('DELETE FROM contacts WHERE operator_id = ?').run(OPERATOR_ID);
+    tx.prepare('DELETE FROM audit_logs WHERE operator_id = ?').run(OPERATOR_ID);
+    tx.prepare('DELETE FROM users WHERE operator_id = ?').run(OPERATOR_ID);
+    tx.prepare('DELETE FROM operators WHERE id = ?').run(OPERATOR_ID);
 
-    // 2. Create Tenant Account
+    // 2. Create Operator Account
     tx.prepare(`
-      INSERT INTO tenants (id, name, subdomain, currency, created_at, updated_at)
+      INSERT INTO operators (id, name, subdomain, currency, created_at, updated_at)
       VALUES (?, ?, ?, 'USD', ?, ?)
-    `).run(TENANT_ID, 'Garrison Heritage Properties', 'demo', now, now);
+    `).run(OPERATOR_ID, 'Garrison Heritage Properties', 'demo', now, now);
 
     // 3. Create Operator User (Password: Password123!)
     const userId = generateUUIDv7();
     tx.prepare(`
-      INSERT INTO users (id, tenant_id, email, password_hash, first_name, last_name, role, token_version, created_at, updated_at)
+      INSERT INTO users (id, operator_id, email, password_hash, first_name, last_name, role, token_version, created_at, updated_at)
       VALUES (?, ?, 'operator@garrisonos.local', ?, 'Alexander', 'Garrison', 'owner', 1, ?, ?)
-    `).run(userId, TENANT_ID, passwordHash, now, now);
+    `).run(userId, OPERATOR_ID, passwordHash, now, now);
 
     // 4. Create Portfolios
     const portfolio1Id = generateUUIDv7();
     const portfolio2Id = generateUUIDv7();
     tx.prepare(`
-      INSERT INTO portfolios (id, tenant_id, name, tax_id, notes, created_at, updated_at)
+      INSERT INTO portfolios (id, operator_id, name, tax_id, notes, created_at, updated_at)
       VALUES (?, ?, 'Blue Ridge Residential LLC', 'XX-XXX4819', 'Single family residential holdings', ?, ?),
              (?, ?, 'Piedmont Multifamily Holdings', 'XX-XXX9201', 'Duplex and small multifamily portfolio', ?, ?)
-    `).run(portfolio1Id, TENANT_ID, now, now, portfolio2Id, TENANT_ID, now, now);
+    `).run(portfolio1Id, OPERATOR_ID, now, now, portfolio2Id, OPERATOR_ID, now, now);
 
     // 5. Create Vendors & Contacts
     const vendorPlumbingId = generateUUIDv7();
@@ -61,17 +61,17 @@ export async function seedDatabase(dbInstance?: DatabaseSync): Promise<void> {
     const vendorGeneralId = generateUUIDv7();
 
     tx.prepare(`
-      INSERT INTO contacts (id, tenant_id, contact_type, first_name, last_name, company_name, email, phone, vendor_specialty, created_at, updated_at)
+      INSERT INTO contacts (id, operator_id, contact_type, first_name, last_name, company_name, email, phone, vendor_specialty, created_at, updated_at)
       VALUES
         (?, ?, 'vendor', 'Marcus', 'Vance', 'Apex Plumbing Services', 'marcus@apexplumb.local', '(555) 301-4401', 'Plumbing', ?, ?),
         (?, ?, 'vendor', 'Elena', 'Reyes', 'CoolAir Climate Systems', 'elena@coolair.local', '(555) 301-4402', 'HVAC', ?, ?),
         (?, ?, 'vendor', 'David', 'Kowalski', 'VoltMaster Electric', 'david@voltmaster.local', '(555) 301-4403', 'Electrical', ?, ?),
         (?, ?, 'vendor', 'Sam', 'Hawkins', 'Hawkins General Repair', 'sam@hawkinsrepair.local', '(555) 301-4404', 'General Contractor', ?, ?)
     `).run(
-      vendorPlumbingId, TENANT_ID, now, now,
-      vendorHvacId, TENANT_ID, now, now,
-      vendorElectricId, TENANT_ID, now, now,
-      vendorGeneralId, TENANT_ID, now, now
+      vendorPlumbingId, OPERATOR_ID, now, now,
+      vendorHvacId, OPERATOR_ID, now, now,
+      vendorElectricId, OPERATOR_ID, now, now,
+      vendorGeneralId, OPERATOR_ID, now, now
     );
 
     // 6. Create Properties & 20 Units
@@ -102,15 +102,15 @@ export async function seedDatabase(dbInstance?: DatabaseSync): Promise<void> {
     for (const sfh of sfhSpecs) {
       const propId = generateUUIDv7();
       tx.prepare(`
-        INSERT INTO properties (id, tenant_id, portfolio_id, name, property_type, address_line1, city, state, postal_code, created_at, updated_at)
+        INSERT INTO properties (id, operator_id, portfolio_id, name, property_type, address_line1, city, state, postal_code, created_at, updated_at)
         VALUES (?, ?, ?, ?, 'single_family', ?, ?, ?, ?, ?, ?)
-      `).run(propId, TENANT_ID, portfolio1Id, sfh.name, sfh.addr, sfh.city, sfh.state, sfh.zip, now, now);
+      `).run(propId, OPERATOR_ID, portfolio1Id, sfh.name, sfh.addr, sfh.city, sfh.state, sfh.zip, now, now);
 
       const unitId = generateUUIDv7();
       tx.prepare(`
-        INSERT INTO units (id, tenant_id, property_id, unit_number, status, bedrooms, bathrooms, square_feet, market_rent_cents, target_deposit_cents, created_at, updated_at)
+        INSERT INTO units (id, operator_id, property_id, unit_number, status, bedrooms, bathrooms, square_feet, market_rent_cents, target_deposit_cents, created_at, updated_at)
         VALUES (?, ?, ?, 'Main', 'occupied', ?, ?, ?, ?, ?, ?, ?)
-      `).run(unitId, TENANT_ID, propId, sfh.bd, sfh.ba, sfh.sqft, sfh.rent, sfh.rent, now, now);
+      `).run(unitId, OPERATOR_ID, propId, sfh.bd, sfh.ba, sfh.sqft, sfh.rent, sfh.rent, now, now);
 
       createdUnits.push({ unitId, propertyId: propId, rentCents: sfh.rent, unitNumber: 'Main', propertyName: sfh.name });
     }
@@ -125,16 +125,16 @@ export async function seedDatabase(dbInstance?: DatabaseSync): Promise<void> {
     for (const dup of duplexSpecs) {
       const propId = generateUUIDv7();
       tx.prepare(`
-        INSERT INTO properties (id, tenant_id, portfolio_id, name, property_type, address_line1, city, state, postal_code, created_at, updated_at)
+        INSERT INTO properties (id, operator_id, portfolio_id, name, property_type, address_line1, city, state, postal_code, created_at, updated_at)
         VALUES (?, ?, ?, ?, 'multi_family', ?, ?, ?, ?, ?, ?)
-      `).run(propId, TENANT_ID, portfolio2Id, dup.name, dup.addr, dup.city, dup.state, dup.zip, now, now);
+      `).run(propId, OPERATOR_ID, portfolio2Id, dup.name, dup.addr, dup.city, dup.state, dup.zip, now, now);
 
       for (const [unitNum, rent] of [['A', dup.uA], ['B', dup.uB]] as const) {
         const unitId = generateUUIDv7();
         tx.prepare(`
-          INSERT INTO units (id, tenant_id, property_id, unit_number, status, bedrooms, bathrooms, square_feet, market_rent_cents, target_deposit_cents, created_at, updated_at)
+          INSERT INTO units (id, operator_id, property_id, unit_number, status, bedrooms, bathrooms, square_feet, market_rent_cents, target_deposit_cents, created_at, updated_at)
           VALUES (?, ?, ?, ?, 'occupied', 2, 1.5, 950, ?, ?, ?, ?)
-        `).run(unitId, TENANT_ID, propId, unitNum, rent, rent, now, now);
+        `).run(unitId, OPERATOR_ID, propId, unitNum, rent, rent, now, now);
         createdUnits.push({ unitId, propertyId: propId, rentCents: rent, unitNumber: unitNum, propertyName: dup.name });
       }
     }
@@ -142,9 +142,9 @@ export async function seedDatabase(dbInstance?: DatabaseSync): Promise<void> {
     // 1 4-Plex (4 units)
     const fourPlexPropId = generateUUIDv7();
     tx.prepare(`
-      INSERT INTO properties (id, tenant_id, portfolio_id, name, property_type, address_line1, city, state, postal_code, created_at, updated_at)
+      INSERT INTO properties (id, operator_id, portfolio_id, name, property_type, address_line1, city, state, postal_code, created_at, updated_at)
       VALUES (?, ?, ?, 'Broadview 4-Plex', 'multi_family', '512 Broadview Terrace', 'Asheville', 'NC', '28806', ?, ?)
-    `).run(fourPlexPropId, TENANT_ID, portfolio2Id, now, now);
+    `).run(fourPlexPropId, OPERATOR_ID, portfolio2Id, now, now);
 
     const fourPlexUnits = [
       { num: '101', rent: 125000, status: 'occupied' as const },
@@ -156,9 +156,9 @@ export async function seedDatabase(dbInstance?: DatabaseSync): Promise<void> {
     for (const fpu of fourPlexUnits) {
       const unitId = generateUUIDv7();
       tx.prepare(`
-        INSERT INTO units (id, tenant_id, property_id, unit_number, status, bedrooms, bathrooms, square_feet, market_rent_cents, target_deposit_cents, created_at, updated_at)
+        INSERT INTO units (id, operator_id, property_id, unit_number, status, bedrooms, bathrooms, square_feet, market_rent_cents, target_deposit_cents, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, 2, 1, 800, ?, ?, ?, ?)
-      `).run(unitId, TENANT_ID, fourPlexPropId, fpu.num, fpu.status, fpu.rent, fpu.rent, now, now);
+      `).run(unitId, OPERATOR_ID, fourPlexPropId, fpu.num, fpu.status, fpu.rent, fpu.rent, now, now);
       if (fpu.status === 'occupied') {
         createdUnits.push({ unitId, propertyId: fourPlexPropId, rentCents: fpu.rent, unitNumber: fpu.num, propertyName: 'Broadview 4-Plex' });
       }
@@ -184,11 +184,11 @@ export async function seedDatabase(dbInstance?: DatabaseSync): Promise<void> {
       const contactId = generateUUIDv7();
 
       tx.prepare(`
-        INSERT INTO contacts (id, tenant_id, contact_type, first_name, last_name, email, phone, created_at, updated_at)
+        INSERT INTO contacts (id, operator_id, contact_type, first_name, last_name, email, phone, created_at, updated_at)
         VALUES (?, ?, 'tenant', ?, ?, ?, ?, ?, ?)
       `).run(
         contactId,
-        TENANT_ID,
+        OPERATOR_ID,
         fName,
         lName,
         `${fName.toLowerCase()}.${lName.toLowerCase()}@example.com`,
@@ -213,14 +213,14 @@ export async function seedDatabase(dbInstance?: DatabaseSync): Promise<void> {
 
       tx.prepare(`
         INSERT INTO leases (
-          id, tenant_id, unit_id, status, start_date, end_date,
+          id, operator_id, unit_id, status, start_date, end_date,
           rent_amount_cents, security_deposit_cents, deposit_held_cents,
           rent_due_day, late_fee_grace_days, late_fee_amount_cents,
           created_at, updated_at
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 5, 5000, ?, ?)
       `).run(
         leaseId,
-        TENANT_ID,
+        OPERATOR_ID,
         unit.unitId,
         leaseStatus,
         yearStartMs,
@@ -233,20 +233,20 @@ export async function seedDatabase(dbInstance?: DatabaseSync): Promise<void> {
       );
 
       tx.prepare(`
-        INSERT INTO lease_contacts (id, tenant_id, lease_id, contact_id, role, is_financially_responsible, created_at)
+        INSERT INTO lease_contacts (id, operator_id, lease_id, contact_id, role, is_financially_responsible, created_at)
         VALUES (?, ?, ?, ?, 'primary_tenant', 1, ?)
-      `).run(generateUUIDv7(), TENANT_ID, leaseId, contactId, now);
+      `).run(generateUUIDv7(), OPERATOR_ID, leaseId, contactId, now);
 
       // Security deposit trust inflow
       tx.prepare(`
         INSERT INTO transactions (
-          id, tenant_id, transaction_type, category, amount_cents,
+          id, operator_id, transaction_type, category, amount_cents,
           transaction_date, description, property_id, unit_id, lease_id, payer_contact_id,
           created_at, updated_at
         ) VALUES (?, ?, 'deposit_inflow', 'security_deposit', ?, ?, 'Security Deposit Held in Trust', ?, ?, ?, ?, ?, ?)
       `).run(
         generateUUIDv7(),
-        TENANT_ID,
+        OPERATOR_ID,
         unit.rentCents,
         yearStartMs,
         unit.propertyId,
@@ -268,13 +268,13 @@ export async function seedDatabase(dbInstance?: DatabaseSync): Promise<void> {
         // Monthly charge
         tx.prepare(`
           INSERT INTO transactions (
-            id, tenant_id, transaction_type, category, amount_cents,
+            id, operator_id, transaction_type, category, amount_cents,
             transaction_date, description, reference_number,
             property_id, unit_id, lease_id, created_at, updated_at
           ) VALUES (?, ?, 'charge', 'rent', ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `).run(
           generateUUIDv7(),
-          TENANT_ID,
+          OPERATOR_ID,
           unit.rentCents,
           monthDueMs,
           `Monthly Rent – ${yyyyMm}`,
@@ -291,13 +291,13 @@ export async function seedDatabase(dbInstance?: DatabaseSync): Promise<void> {
           const payDateMs = Date.UTC(2026, m, 2);
           tx.prepare(`
             INSERT INTO transactions (
-              id, tenant_id, transaction_type, category, amount_cents,
+              id, operator_id, transaction_type, category, amount_cents,
               transaction_date, description, payment_method, reference_number,
               property_id, unit_id, lease_id, payer_contact_id, created_at, updated_at
             ) VALUES (?, ?, 'payment', 'rent', ?, ?, ?, 'ach', ?, ?, ?, ?, ?, ?, ?)
           `).run(
             generateUUIDv7(),
-            TENANT_ID,
+            OPERATOR_ID,
             unit.rentCents,
             payDateMs,
             `Rent Payment – ${yyyyMm}`,
@@ -313,12 +313,12 @@ export async function seedDatabase(dbInstance?: DatabaseSync): Promise<void> {
           // Add late fee charge for delinquent tenant
           tx.prepare(`
             INSERT INTO transactions (
-              id, tenant_id, transaction_type, category, amount_cents,
+              id, operator_id, transaction_type, category, amount_cents,
               transaction_date, description, property_id, unit_id, lease_id, created_at, updated_at
             ) VALUES (?, ?, 'charge', 'late_fee', 5000, ?, 'Late Fee – 5-Day Grace Period Expired', ?, ?, ?, ?, ?)
           `).run(
             generateUUIDv7(),
-            TENANT_ID,
+            OPERATOR_ID,
             Date.UTC(2026, m, 6),
             unit.propertyId,
             unit.unitId,
@@ -344,12 +344,12 @@ export async function seedDatabase(dbInstance?: DatabaseSync): Promise<void> {
     for (const exp of propertyExpenses) {
       tx.prepare(`
         INSERT INTO transactions (
-          id, tenant_id, transaction_type, category, amount_cents,
+          id, operator_id, transaction_type, category, amount_cents,
           transaction_date, description, property_id, payment_method, created_at, updated_at
         ) VALUES (?, ?, 'expense', ?, ?, ?, ?, ?, 'direct_deposit', ?, ?)
       `).run(
         generateUUIDv7(),
-        TENANT_ID,
+        OPERATOR_ID,
         exp.cat,
         exp.amount,
         Date.UTC(2026, 4, 15),
@@ -363,7 +363,7 @@ export async function seedDatabase(dbInstance?: DatabaseSync): Promise<void> {
     // 10. Create Work Orders (2 Open, 1 Emergency, 6 Completed)
     tx.prepare(`
       INSERT INTO work_orders (
-        id, tenant_id, property_id, unit_id, title, description,
+        id, operator_id, property_id, unit_id, title, description,
         status, priority, category, permission_to_enter, vendor_contact_id,
         estimated_cost_cents, actual_cost_cents, created_at, updated_at
       ) VALUES
@@ -371,9 +371,9 @@ export async function seedDatabase(dbInstance?: DatabaseSync): Promise<void> {
         (?, ?, ?, ?, 'HVAC AC Unit Making Buzzing Noise', 'Air conditioning compressor outside making loud vibrating noise when kicking on.', 'in_progress', 'high', 'hvac', 1, ?, 35000, 0, ?, ?),
         (?, ?, ?, ?, 'Garbage Disposal Jammed', 'Disposal jammed with citrus peel. Cleared flywheel and tested reset.', 'completed', 'medium', 'appliance', 1, ?, 12000, 12000, ?, ?)
     `).run(
-      generateUUIDv7(), TENANT_ID, createdUnits[0]!.propertyId, createdUnits[0]!.unitId, vendorPlumbingId, now - 3600000, now,
-      generateUUIDv7(), TENANT_ID, createdUnits[1]!.propertyId, createdUnits[1]!.unitId, vendorHvacId, now - 86400000, now,
-      generateUUIDv7(), TENANT_ID, createdUnits[2]!.propertyId, createdUnits[2]!.unitId, vendorGeneralId, now - (15 * 86400000), now
+      generateUUIDv7(), OPERATOR_ID, createdUnits[0]!.propertyId, createdUnits[0]!.unitId, vendorPlumbingId, now - 3600000, now,
+      generateUUIDv7(), OPERATOR_ID, createdUnits[1]!.propertyId, createdUnits[1]!.unitId, vendorHvacId, now - 86400000, now,
+      generateUUIDv7(), OPERATOR_ID, createdUnits[2]!.propertyId, createdUnits[2]!.unitId, vendorGeneralId, now - (15 * 86400000), now
     );
   }, db);
 }

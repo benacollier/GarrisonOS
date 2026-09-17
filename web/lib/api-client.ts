@@ -15,6 +15,7 @@ export class ApiException extends Error {
 
 export interface ApiClientOptions {
   baseUrl?: string;
+  operatorId?: string;
   tenantId?: string;
   authToken?: string | null;
   userId?: string | null;
@@ -22,6 +23,7 @@ export interface ApiClientOptions {
 
 export class ApiClient {
   private baseUrl: string;
+  private operatorId: string;
   private tenantId: string;
   private authToken: string | null;
   private userId: string | null;
@@ -30,7 +32,8 @@ export class ApiClient {
     const port = process.env['PORT'] || '3000';
     const host = process.env['HOST'] || '127.0.0.1';
     this.baseUrl = (options?.baseUrl || process.env['API_URL'] || `http://${host}:${port}`).replace(/\/$/, '');
-    this.tenantId = options?.tenantId || 'tenant-demo';
+    this.operatorId = options?.operatorId || options?.tenantId || 'operator-demo';
+    this.tenantId = this.operatorId;
     this.authToken = options?.authToken ?? null;
     this.userId = options?.userId ?? null;
   }
@@ -51,7 +54,8 @@ export class ApiClient {
 
     const headers: Record<string, string> = {
       'Accept': 'application/json',
-      'X-Tenant-ID': this.tenantId
+      'X-Operator-ID': this.operatorId,
+      'X-Tenant-ID': this.operatorId
     };
 
     if (this.authToken) {

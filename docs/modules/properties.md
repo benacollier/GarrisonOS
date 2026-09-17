@@ -11,7 +11,7 @@ The **Properties** module (`modules/properties/`) manages physical real estate p
 Represents ownership entities (such as an LLC, holding company, or individual trust).
 
 * `id` (UUIDv7): Primary key
-* `tenant_id` (UUIDv7): Owning tenant
+* `operator_id` (UUIDv7): Owning operator instance
 * `name` (TEXT): Entity name (e.g., "Maple Ridge Holdings LLC")
 * `tax_id` (TEXT): Employer Identification Number (EIN) or SSN last 4
 
@@ -20,7 +20,7 @@ Represents ownership entities (such as an LLC, holding company, or individual tr
 Represents physical physical locations, buildings, or parcels.
 
 * `id` (UUIDv7): Primary key
-* `tenant_id` (UUIDv7): Owning tenant
+* `operator_id` (UUIDv7): Owning operator instance
 * `portfolio_id` (UUIDv7): Parent ownership portfolio
 * `name` (TEXT): Building/Property name
 * `property_type` (TEXT): `single_family`, `multi_family`, `condo`, `townhouse`, `commercial`
@@ -32,7 +32,7 @@ Represents physical physical locations, buildings, or parcels.
 Represents distinct rentable living or commercial units within a property.
 
 * `id` (UUIDv7): Primary key
-* `tenant_id` (UUIDv7): Owning tenant
+* `operator_id` (UUIDv7): Owning operator instance
 * `property_id` (UUIDv7): Parent physical property
 * `unit_number` (TEXT): e.g. "101", "Unit A", "Main"
 * `status` (TEXT): `vacant`, `occupied`, `notice_given`, `turnover`, `maintenance_hold`

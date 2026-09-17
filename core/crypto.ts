@@ -108,7 +108,8 @@ export function generateRandomToken(bytes = 32): string {
 
 export interface TokenPayload {
   sub: string;
-  tid: string;
+  opid?: string;
+  tid?: string;
   role: string;
   iat: number;
   exp: number;
@@ -118,7 +119,8 @@ export interface TokenPayload {
 
 export interface TokenInput {
   sub: string;
-  tid: string;
+  opid?: string;
+  tid?: string;
   role: string;
   exp: number;
   tv?: number;

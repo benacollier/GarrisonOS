@@ -70,7 +70,7 @@ describe('Backup Module - Snapshots, Exports, and Integrity Verification', () =>
       // Seed a sample record in a tenant table
       const db = getDatabase();
       db.prepare(`
-        INSERT INTO audit_logs (id, tenant_id, user_id, entity_type, entity_id, action, changes_json, ip_address, created_at)
+        INSERT INTO audit_logs (id, operator_id, user_id, entity_type, entity_id, action, changes_json, ip_address, created_at)
         VALUES ('log-1', ?, 'user-1', 'test', 'item-1', 'create', '{}', '127.0.0.1', ?)
       `).run(testTenant, Date.now());
 
@@ -95,7 +95,7 @@ describe('Backup Module - Snapshots, Exports, and Integrity Verification', () =>
       const parsed = JSON.parse(decompressed);
 
       assert.ok(parsed._export_metadata);
-      assert.equal(parsed._export_metadata[0].tenant_id, testTenant);
+      assert.equal(parsed._export_metadata[0].operator_id || parsed._export_metadata[0].tenant_id, testTenant);
       assert.ok(Array.isArray(parsed.audit_logs));
       assert.ok(parsed.audit_logs.some((r: any) => r.id === 'log-1'));
     });
@@ -107,7 +107,7 @@ describe('Backup Module - Snapshots, Exports, and Integrity Verification', () =>
 
       // 1. Establish initial state
       db.prepare(`
-        INSERT INTO audit_logs (id, tenant_id, user_id, entity_type, entity_id, action, changes_json, ip_address, created_at)
+        INSERT INTO audit_logs (id, operator_id, user_id, entity_type, entity_id, action, changes_json, ip_address, created_at)
         VALUES ('log-snap-1', ?, 'user-1', 'test', 'item-snap', 'create', '{"version":1}', '127.0.0.1', ?)
       `).run(testTenant, Date.now());
 
@@ -116,7 +116,7 @@ describe('Backup Module - Snapshots, Exports, and Integrity Verification', () =>
 
       // 2. Mutate state: add new log and modify initial record
       db.prepare(`
-        INSERT INTO audit_logs (id, tenant_id, user_id, entity_type, entity_id, action, changes_json, ip_address, created_at)
+        INSERT INTO audit_logs (id, operator_id, user_id, entity_type, entity_id, action, changes_json, ip_address, created_at)
         VALUES ('log-new-2', ?, 'user-1', 'test', 'item-new', 'create', '{"version":2}', '127.0.0.1', ?)
       `).run(testTenant, Date.now());
 
@@ -128,7 +128,7 @@ describe('Backup Module - Snapshots, Exports, and Integrity Verification', () =>
       assert.equal(mergeResult.success, true);
       assert.equal(mergeResult.mode, 'merge');
 
-      const logsAfterMerge = db.prepare('SELECT id FROM audit_logs WHERE tenant_id = ?').all(testTenant) as { id: string }[];
+      const logsAfterMerge = db.prepare('SELECT id FROM audit_logs WHERE operator_id = ?').all(testTenant) as { id: string }[];
       const logIdsAfterMerge = logsAfterMerge.map((l) => l.id);
       assert.ok(logIdsAfterMerge.includes('log-snap-1'));
       assert.ok(logIdsAfterMerge.includes('log-new-2')); // preserved
@@ -141,7 +141,7 @@ describe('Backup Module - Snapshots, Exports, and Integrity Verification', () =>
       assert.equal(cleanResult.success, true);
       assert.equal(cleanResult.mode, 'clean_slate');
 
-      const logsAfterClean = db.prepare('SELECT id FROM audit_logs WHERE tenant_id = ?').all(testTenant) as { id: string }[];
+      const logsAfterClean = db.prepare('SELECT id FROM audit_logs WHERE operator_id = ?').all(testTenant) as { id: string }[];
       const logIdsAfterClean = logsAfterClean.map((l) => l.id);
       assert.ok(logIdsAfterClean.includes('log-snap-1'));
       assert.equal(logIdsAfterClean.includes('log-new-2'), false); // wiped clean
@@ -155,28 +155,28 @@ describe('Backup Module - Snapshots, Exports, and Integrity Verification', () =>
 
       // Seed property, unit, contact, and lease for foreign keys
       db.prepare(`
-        INSERT INTO properties (id, tenant_id, name, property_type, address_line1, city, state, postal_code, created_at, updated_at)
+        INSERT INTO properties (id, operator_id, name, property_type, address_line1, city, state, postal_code, created_at, updated_at)
         VALUES ('prop-u1', ?, 'Prop', 'single_family', '123 St', 'City', 'ST', '12345', ?, ?)
       `).run(testTenant, now, now);
 
       db.prepare(`
-        INSERT INTO units (id, tenant_id, property_id, unit_number, status, market_rent_cents, created_at, updated_at)
+        INSERT INTO units (id, operator_id, property_id, unit_number, status, market_rent_cents, created_at, updated_at)
         VALUES ('unit-u1', ?, 'prop-u1', '101', 'occupied', 100000, ?, ?)
       `).run(testTenant, now, now);
 
       db.prepare(`
-        INSERT INTO contacts (id, tenant_id, contact_type, first_name, last_name, created_at, updated_at)
+        INSERT INTO contacts (id, operator_id, contact_type, first_name, last_name, created_at, updated_at)
         VALUES ('cont-u1', ?, 'tenant', 'Alice', 'Smith', ?, ?)
       `).run(testTenant, now, now);
 
       db.prepare(`
-        INSERT INTO leases (id, tenant_id, unit_id, status, start_date, end_date, rent_amount_cents, created_at, updated_at)
+        INSERT INTO leases (id, operator_id, unit_id, status, start_date, end_date, rent_amount_cents, created_at, updated_at)
         VALUES ('lease-u1', ?, 'unit-u1', 'active', ?, ?, 100000, ?, ?)
       `).run(testTenant, now, now + 86400000, now, now);
 
       // Add a lease contact row in the snapshot
       db.prepare(`
-        INSERT INTO lease_contacts (id, tenant_id, lease_id, contact_id, role, created_at)
+        INSERT INTO lease_contacts (id, operator_id, lease_id, contact_id, role, created_at)
         VALUES ('lc-orig-id', ?, 'lease-u1', 'cont-u1', 'primary_tenant', ?)
       `).run(testTenant, now);
 
@@ -186,7 +186,7 @@ describe('Backup Module - Snapshots, Exports, and Integrity Verification', () =>
       // Re-create the same association under a DIFFERENT row ID
       db.prepare('DELETE FROM lease_contacts WHERE id = ?').run('lc-orig-id');
       db.prepare(`
-        INSERT INTO lease_contacts (id, tenant_id, lease_id, contact_id, role, created_at)
+        INSERT INTO lease_contacts (id, operator_id, lease_id, contact_id, role, created_at)
         VALUES ('lc-different-id', ?, 'lease-u1', 'cont-u1', 'primary_tenant', ?)
       `).run(testTenant, now);
 
@@ -197,7 +197,7 @@ describe('Backup Module - Snapshots, Exports, and Integrity Verification', () =>
       );
       assert.equal(mergeRes.success, true);
 
-      const rows = db.prepare('SELECT id, role FROM lease_contacts WHERE tenant_id = ? AND lease_id = ? AND contact_id = ?')
+      const rows = db.prepare('SELECT id, role FROM lease_contacts WHERE operator_id = ? AND lease_id = ? AND contact_id = ?')
         .all(testTenant, 'lease-u1', 'cont-u1') as { id: string; role: string }[];
       assert.equal(rows.length, 1);
       assert.equal(rows[0]?.id, 'lc-orig-id');

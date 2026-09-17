@@ -4,7 +4,8 @@ import { generateUUIDv7 } from '../../../core/crypto.js';
 
 export interface WorkOrder {
   id: string;
-  tenant_id: string;
+  operator_id: string;
+  tenant_id?: string;
   property_id: string;
   unit_id?: string | null;
   title: string;
@@ -39,7 +40,7 @@ export class MaintenanceRepository {
     property_id?: string;
     unit_id?: string;
   }): WorkOrderWithDetails[] {
-    const tenantId = RequestContext.getTenantId();
+    const operatorId = RequestContext.getOperatorId();
     const db = getDatabase();
 
     let sql = `
@@ -54,9 +55,9 @@ export class MaintenanceRepository {
       LEFT JOIN units u ON w.unit_id = u.id
       LEFT JOIN contacts v ON w.vendor_contact_id = v.id
       LEFT JOIN contacts r ON w.requested_by_contact_id = r.id
-      WHERE w.tenant_id = ? AND w.deleted_at IS NULL
+      WHERE w.operator_id = ? AND w.deleted_at IS NULL
     `;
-    const params: any[] = [tenantId];
+    const params: any[] = [operatorId];
 
     if (filter?.status) {
       sql += ' AND w.status = ?';
@@ -81,7 +82,7 @@ export class MaintenanceRepository {
   }
 
   public static getWorkOrderById(id: string): WorkOrderWithDetails | null {
-    const tenantId = RequestContext.getTenantId();
+    const operatorId = RequestContext.getOperatorId();
     const db = getDatabase();
 
     const row = db.prepare(`
@@ -96,8 +97,8 @@ export class MaintenanceRepository {
       LEFT JOIN units u ON w.unit_id = u.id
       LEFT JOIN contacts v ON w.vendor_contact_id = v.id
       LEFT JOIN contacts r ON w.requested_by_contact_id = r.id
-      WHERE w.id = ? AND w.tenant_id = ? AND w.deleted_at IS NULL
-    `).get(id, tenantId) as WorkOrderWithDetails | undefined;
+      WHERE w.id = ? AND w.operator_id = ? AND w.deleted_at IS NULL
+    `).get(id, operatorId) as WorkOrderWithDetails | undefined;
 
     return row || null;
   }
@@ -118,21 +119,21 @@ export class MaintenanceRepository {
     estimated_cost_cents?: number;
     actual_cost_cents?: number;
   }): WorkOrderWithDetails {
-    const tenantId = RequestContext.getTenantId();
+    const operatorId = RequestContext.getOperatorId();
     const db = getDatabase();
     const id = generateUUIDv7();
     const now = Date.now();
 
     db.prepare(`
       INSERT INTO work_orders (
-        id, tenant_id, property_id, unit_id, title, description,
+        id, operator_id, property_id, unit_id, title, description,
         status, priority, category, permission_to_enter, entry_instructions,
         requested_by_contact_id, vendor_contact_id, scheduled_date,
         estimated_cost_cents, actual_cost_cents, created_at, updated_at
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       id,
-      tenantId,
+      operatorId,
       data.property_id,
       data.unit_id || null,
       data.title,
@@ -154,11 +155,11 @@ export class MaintenanceRepository {
     return MaintenanceRepository.getWorkOrderById(id)!;
   }
 
-  public static updateWorkOrder(id: string, data: Partial<Omit<WorkOrder, 'id' | 'tenant_id' | 'created_at' | 'updated_at' | 'deleted_at'>>): WorkOrderWithDetails | null {
+  public static updateWorkOrder(id: string, data: Partial<Omit<WorkOrder, 'id' | 'operator_id' | 'created_at' | 'updated_at' | 'deleted_at'>>): WorkOrderWithDetails | null {
     const existing = MaintenanceRepository.getWorkOrderById(id);
     if (!existing) return null;
 
-    const tenantId = RequestContext.getTenantId();
+    const operatorId = RequestContext.getOperatorId();
     const db = getDatabase();
     const now = Date.now();
     const updated = { ...existing, ...data, updated_at: now };
@@ -170,7 +171,7 @@ export class MaintenanceRepository {
         entry_instructions = ?, requested_by_contact_id = ?, vendor_contact_id = ?,
         scheduled_date = ?, completed_date = ?, estimated_cost_cents = ?,
         actual_cost_cents = ?, updated_at = ?
-      WHERE id = ? AND tenant_id = ? AND deleted_at IS NULL
+      WHERE id = ? AND operator_id = ? AND deleted_at IS NULL
     `).run(
       updated.property_id,
       updated.unit_id || null,
@@ -189,7 +190,7 @@ export class MaintenanceRepository {
       updated.actual_cost_cents,
       now,
       id,
-      tenantId
+      operatorId
     );
 
     return MaintenanceRepository.getWorkOrderById(id);
@@ -199,7 +200,7 @@ export class MaintenanceRepository {
     const existing = MaintenanceRepository.getWorkOrderById(id);
     if (!existing) return null;
 
-    const tenantId = RequestContext.getTenantId();
+    const operatorId = RequestContext.getOperatorId();
     const db = getDatabase();
     const now = Date.now();
     const finalCost = actualCostCents !== undefined ? actualCostCents : existing.actual_cost_cents;
@@ -210,20 +211,20 @@ export class MaintenanceRepository {
         completed_date = ?,
         actual_cost_cents = ?,
         updated_at = ?
-      WHERE id = ? AND tenant_id = ? AND deleted_at IS NULL
-    `).run(now, finalCost, now, id, tenantId);
+      WHERE id = ? AND operator_id = ? AND deleted_at IS NULL
+    `).run(now, finalCost, now, id, operatorId);
 
     return MaintenanceRepository.getWorkOrderById(id);
   }
 
   public static deleteWorkOrder(id: string): boolean {
-    const tenantId = RequestContext.getTenantId();
+    const operatorId = RequestContext.getOperatorId();
     const db = getDatabase();
     const now = Date.now();
     const info = db.prepare(`
       UPDATE work_orders SET deleted_at = ?
-      WHERE id = ? AND tenant_id = ? AND deleted_at IS NULL
-    `).run(now, id, tenantId);
+      WHERE id = ? AND operator_id = ? AND deleted_at IS NULL
+    `).run(now, id, operatorId);
     return info.changes > 0;
   }
 

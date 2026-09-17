@@ -8,7 +8,8 @@ The GarrisonOS REST API is exposed by the headless Node.js backend (`api/server.
 
 | Header | Required | Description |
 | :--- | :--- | :--- |
-| `X-Tenant-ID` | **Yes\*** | UUIDv7 of the active tenant context (\*except public endpoints; ignored for authenticated batch identity) |
+| `X-Operator-ID` | **Yes\*** | UUIDv7 of the active operator context (\*except public endpoints; preferred header) |
+| `X-Tenant-ID` | Optional | Legacy alias for `X-Operator-ID` supported for backward compatibility |
 | `Authorization` | Optional | `Bearer <signed_hmac_token>` for authenticated endpoints |
 | `X-Request-ID` | Optional | Client correlation ID (generated automatically if omitted) |
 | `Content-Type` | Optional | `application/json` for state-modifying requests |

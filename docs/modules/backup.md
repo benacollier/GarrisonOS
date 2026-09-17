@@ -21,8 +21,8 @@ The **Backup & Disaster Recovery Module** (`modules/backup/`) provides zero-depe
 ```sql
 CREATE TABLE IF NOT EXISTS backups (
     id TEXT PRIMARY KEY,
-    tenant_id TEXT NOT NULL,
-    backup_type TEXT NOT NULL, -- 'full_system' | 'tenant_data'
+    operator_id TEXT NOT NULL,
+    backup_type TEXT NOT NULL, -- 'full_system' | 'operator_data'
     filename TEXT NOT NULL,
     relative_path TEXT NOT NULL,
     file_size_bytes INTEGER NOT NULL DEFAULT 0,
@@ -32,30 +32,30 @@ CREATE TABLE IF NOT EXISTS backups (
     metadata_json TEXT,
     created_at INTEGER NOT NULL,
     deleted_at INTEGER,
-    FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE
+    FOREIGN KEY (operator_id) REFERENCES operators(id) ON DELETE CASCADE
 );
 
-CREATE INDEX IF NOT EXISTS idx_backups_tenant_created 
-ON backups (tenant_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_backups_operator_created 
+ON backups (operator_id, created_at DESC);
 
-CREATE INDEX IF NOT EXISTS idx_backups_tenant_status 
-ON backups (tenant_id, status);
+CREATE INDEX IF NOT EXISTS idx_backups_operator_status 
+ON backups (operator_id, status);
 ```
 
 ---
 
 ## 3. REST API Endpoints
 
-All endpoints require standard `X-Tenant-ID` header and authentication tokens.
+All endpoints require standard `X-Operator-ID` (or `X-Tenant-ID`) header and authentication tokens.
 
 | Method | Endpoint | Description |
 | :--- | :--- | :--- |
-| `GET` | `/api/v1/backups` | List backups for the active tenant context (paginated) |
-| `POST` | `/api/v1/backups` | Trigger new backup (`{ "type": "tenant_data" \| "full_system" }`) |
+| `GET` | `/api/v1/backups` | List backups for the active operator context (paginated) |
+| `POST` | `/api/v1/backups` | Trigger new backup (`{ "type": "operator_data" \| "full_system" }`) |
 | `GET` | `/api/v1/backups/:id` | Get backup metadata, size, checksum, and status |
 | `GET` | `/api/v1/backups/:id/download` | Stream download backup archive with path-traversal guard |
 | `POST` | `/api/v1/backups/:id/verify` | Run SHA-256 integrity verification against the physical file |
-| `POST` | `/api/v1/backups/:id/restore` | Restore tenant data (`{ "mode": "clean_slate" \| "merge" }`) |
+| `POST` | `/api/v1/backups/:id/restore` | Restore operator data (`{ "mode": "clean_slate" \| "merge" }`) |
 | `DELETE` | `/api/v1/backups/:id` | Soft-delete record and unlink physical archive from storage |
 | `GET` | `/api/v1/backups/scheduler/status` | Get background scheduler running state, intervals, next runs, and metrics |
 | `POST` | `/api/v1/backups/scheduler/trigger` | Owner-only trigger for an immediate scheduled backup or vacuum (`{ "action": "vacuum" }`) |

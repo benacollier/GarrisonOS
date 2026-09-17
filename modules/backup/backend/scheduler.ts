@@ -111,13 +111,13 @@ export class BackupScheduler {
   }
 
   /**
-   * Resolve an existing tenant ID for system background jobs,
-   * falling back to querying the first available tenant in the database.
+   * Resolve an existing operator ID for system background jobs,
+   * falling back to querying the first available operator in the database.
    */
-  private resolveSystemTenantId(): string {
+  private resolveSystemOperatorId(): string {
     try {
       const db = getDatabase();
-      const row = db.prepare('SELECT id FROM tenants WHERE deleted_at IS NULL ORDER BY created_at ASC LIMIT 1').get() as { id: string } | undefined;
+      const row = db.prepare('SELECT id FROM operators WHERE deleted_at IS NULL ORDER BY created_at ASC LIMIT 1').get() as { id: string } | undefined;
       if (row?.id) {
         return row.id;
       }
@@ -125,6 +125,10 @@ export class BackupScheduler {
       // Database might be uninitialized during setup/test
     }
     return 'system';
+  }
+
+  private resolveSystemTenantId(): string {
+    return this.resolveSystemOperatorId();
   }
 
   /**
@@ -221,12 +225,13 @@ export class BackupScheduler {
    * @returns The completed backup record.
    */
   private async runScheduledBackup(): Promise<BackupRecord | null> {
-    const tenantId = this.resolveSystemTenantId();
+    const operatorId = this.resolveSystemOperatorId();
     const correlationId = generateUUIDv7();
 
     return RequestContext.run(
       {
-        tenantId,
+        operatorId,
+        tenantId: operatorId,
         correlationId
       },
       async () => {
@@ -264,7 +269,8 @@ export class BackupScheduler {
 
         eventBus.publish('backup.scheduled.completed', {
           backupId: record.id,
-          tenantId: record.tenant_id,
+          operatorId: record.operator_id,
+          tenantId: record.operator_id,
           filename: record.filename,
           fileSizeBytes: record.file_size_bytes,
           checksumSha256: record.checksum_sha256,
@@ -307,12 +313,13 @@ export class BackupScheduler {
    * @returns Performance and duration metrics from the maintenance worker.
    */
   private async runScheduledVacuum(): Promise<{ durationMs: number; checkpointResult: string }> {
-    const tenantId = this.resolveSystemTenantId();
+    const operatorId = this.resolveSystemOperatorId();
     const correlationId = generateUUIDv7();
 
     return RequestContext.run(
       {
-        tenantId,
+        operatorId,
+        tenantId: operatorId,
         correlationId
       },
       async () => {

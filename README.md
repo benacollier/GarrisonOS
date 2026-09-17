@@ -62,10 +62,11 @@ The GarrisonOS MVP is focused strictly on delivering a self-hosted property mana
 1. **Zero External Runtime Dependencies**:
    * **Backend Engine**: Built exclusively on native Node.js standard modules (`node:http`, `node:sqlite`, `node:crypto`, `node:async_hooks`, `node:events`, `node:fs`, `node:path`, `node:test`, `node:assert`). No npm packages at runtime (no Express, Fastify, Prisma, TypeORM, Zod, uuid, or bcrypt).
    * **Frontend Presentation**: Built exclusively on native TypeScript SSR with Node.js standard modules (`node:http`, `node:crypto`, `node:fs`, `node:path`), automatic XSS-safe tagged template HTML (`html` in `web/lib/html.ts`), and semantic HTML5 with vanilla CSS Custom Properties. Zero runtime npm dependencies, no PHP, no frontend frameworks, and no client bundlers.
-2. **Strict Multi-Tenancy & Row-Level Isolation**:
-   * Every operational database table includes a `tenant_id TEXT NOT NULL` column referencing `tenants(id)`.
-   * Tenant context is extracted from request headers (`X-Tenant-ID`) or authenticated session tokens and propagated down the execution stack using `AsyncLocalStorage`.
-   * Repositories and business logic resolve `tenant_id` implicitly from execution context—never from untrusted request bodies or URL parameters.
+2. **Strict Multi-Operator Isolation & Row-Level Protection**:
+   * Every operational database table includes an `operator_id TEXT NOT NULL` column referencing `operators(id)` (with backward-compatible `tenants` view).
+   * Eliminates domain confusion by distinguishing between system multi-tenancy (**Operator**) and real-estate rental occupants (**Tenants**), reserving **Organization** for commercial property portfolios.
+   * Operator context is extracted from request headers (`X-Operator-ID` or `X-Tenant-ID`) or authenticated session tokens and propagated down the execution stack using `AsyncLocalStorage`.
+   * Repositories and business logic resolve `operator_id` implicitly from execution context—never from untrusted request bodies or URL parameters.
 3. **Financial Precision & Tax Alignment**:
    * All currency values are strictly stored and calculated as **INTEGER cents** (e.g., $1,450.00 is stored as `145000`). Floating-point arithmetic for currency is strictly prohibited.
    * **Native Double-Entry General Ledger**: Immutable, append-only bookkeeping engine (`journal_entries` and `journal_lines`) requiring every transaction to satisfy $\sum \text{Debits} \equiv \sum \text{Credits} > 0$. Corrections are posted exclusively via explicit reversal entries.

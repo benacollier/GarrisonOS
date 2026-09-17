@@ -141,12 +141,12 @@ describe('Token Revocation with Database Backing', () => {
 
     const now = Date.now();
     db.prepare(`
-      INSERT INTO tenants (id, name, subdomain, currency, created_at, updated_at)
+      INSERT INTO operators (id, name, subdomain, currency, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?)
     `).run('tenant-rev-test', 'Revocation Test Tenant', 'rev-test', 'USD', now, now);
 
     db.prepare(`
-      INSERT INTO users (id, tenant_id, email, password_hash, first_name, last_name, role, token_version, created_at, updated_at)
+      INSERT INTO users (id, operator_id, email, password_hash, first_name, last_name, role, token_version, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run('user-rev-test', 'tenant-rev-test', 'test@rev.local', '$scrypt$dummy', 'Test', 'User', 'owner', 1, now, now);
   });

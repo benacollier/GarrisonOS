@@ -71,7 +71,7 @@ describe('Security middleware CORS policy', () => {
     assert.equal(response.headers['access-control-allow-methods'], 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
     assert.equal(
       response.headers['access-control-allow-headers'],
-      'Content-Type, Authorization, X-Tenant-ID, X-Request-ID, X-User-ID'
+      'Content-Type, Authorization, X-Operator-ID, X-Tenant-ID, X-Request-ID, X-User-ID'
     );
     assert.equal(response.headers['access-control-allow-credentials'], 'true');
   });
@@ -95,12 +95,12 @@ describe('Tenant context & authentication middleware', () => {
     db = createTestDb();
     const now = Date.now();
     db.prepare(`
-      INSERT INTO tenants (id, name, subdomain, currency, created_at, updated_at)
+      INSERT INTO operators (id, name, subdomain, currency, created_at, updated_at)
       VALUES ('tenant-auth-1', 'Auth Test Tenant', 'authtest', 'USD', ?, ?)
     `).run(now, now);
 
     db.prepare(`
-      INSERT INTO users (id, tenant_id, email, password_hash, first_name, last_name, role, token_version, created_at, updated_at)
+      INSERT INTO users (id, operator_id, email, password_hash, first_name, last_name, role, token_version, created_at, updated_at)
       VALUES
         ('user-owner-1', 'tenant-auth-1', 'owner@auth.local', '$scrypt$dummy', 'Owner', 'User', 'owner', 1, ?, ?),
         ('user-manager-1', 'tenant-auth-1', 'manager@auth.local', '$scrypt$dummy', 'Manager', 'User', 'manager', 1, ?, ?)
@@ -133,7 +133,7 @@ describe('Tenant context & authentication middleware', () => {
     assert.equal(res.statusCode, 401);
     const body = JSON.parse(res.body);
     assert.equal(body.error.code, 'UNAUTHORIZED');
-    assert.match(body.error.message, /Tenant identity does not match/);
+    assert.match(body.error.message, /(?:Operator|Tenant) identity does not match/);
   });
 
   it('rejects request when X-User-ID header does not match token sub', async () => {

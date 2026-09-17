@@ -9,7 +9,8 @@ export interface LayoutOptions {
   title?: string;
   content: SafeHtml | string;
   user: SessionUser | null;
-  tenantId: string;
+  operatorId?: string;
+  tenantId?: string;
   navItems: NavigationItem[];
   flashMessages?: FlashMessage[];
   currentPath: string;
@@ -18,7 +19,7 @@ export interface LayoutOptions {
 export function renderLayout(options: LayoutOptions): string {
   const pageTitle = options.title ? `${options.title} – GarrisonOS` : 'GarrisonOS Property Management';
   const sidebar = renderSidebar(options.navItems, options.currentPath);
-  const header = renderHeader(options.user, options.tenantId);
+  const header = renderHeader(options.user, options.operatorId || options.tenantId || 'operator-demo');
   const flash = renderFlash(options.flashMessages || []);
   const bodyContent = typeof options.content === 'string' ? raw(options.content) : options.content;
 

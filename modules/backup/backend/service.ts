@@ -10,15 +10,19 @@ import { RequestContext } from '../../../core/context.js';
 import { getApplicationVersion } from '../../../core/version.js';
 import { BackupRecord, BackupRepository } from './repository.js';
 
-export interface RestoreTenantOptions {
+export interface RestoreOperatorOptions {
   mode: 'clean_slate' | 'merge';
 }
 
-export interface RestoreTenantResult {
+export type RestoreTenantOptions = RestoreOperatorOptions;
+
+export interface RestoreOperatorResult {
   success: boolean;
   restoredTables: { [tableName: string]: number };
   mode: 'clean_slate' | 'merge';
 }
+
+export type RestoreTenantResult = RestoreOperatorResult;
 
 export class BackupService {
   public static getBackupDir(): string {
@@ -49,7 +53,7 @@ export class BackupService {
   }
 
   public static async createFullDatabaseBackup(): Promise<BackupRecord> {
-    const tenantId = RequestContext.getTenantId();
+    const operatorId = RequestContext.getOperatorId();
     const timestamp = Date.now();
     const filename = `garrison-db-${timestamp}.sqlite.gz`;
     const relativePath = filename;
@@ -61,7 +65,7 @@ export class BackupService {
       backup_type: 'full_system',
       filename,
       relative_path: relativePath,
-      metadata_json: JSON.stringify({ tenant_id: tenantId, mode: 'full_sqlite_snapshot' })
+      metadata_json: JSON.stringify({ operator_id: operatorId, tenant_id: operatorId, mode: 'full_sqlite_snapshot' })
     });
 
     try {
@@ -106,50 +110,56 @@ export class BackupService {
 
       BackupRepository.updateStatus(record.id, {
         status: 'failed',
-        error_message: err.message || 'Backup creation failed'
+        error_message: err.message || 'Full database backup failed'
       });
 
       throw err;
     }
   }
 
-  public static async createTenantExport(): Promise<BackupRecord> {
-    const tenantId = RequestContext.getTenantId();
+  public static async createOperatorExport(): Promise<BackupRecord> {
+    const operatorId = RequestContext.getOperatorId();
     const timestamp = Date.now();
-    const filename = `tenant-${tenantId}-export-${timestamp}.json.gz`;
+    const filename = `operator-${operatorId}-export-${timestamp}.json.gz`;
     const relativePath = filename;
     const backupDir = this.getBackupDir();
     const targetPath = path.join(backupDir, filename);
 
     const record = BackupRepository.create({
-      backup_type: 'tenant_data',
+      backup_type: 'operator_data',
       filename,
       relative_path: relativePath,
-      metadata_json: JSON.stringify({ tenant_id: tenantId, mode: 'tenant_data_export' })
+      metadata_json: JSON.stringify({ operator_id: operatorId, tenant_id: operatorId, mode: 'operator_data_export' })
     });
 
     try {
       const db = getDatabase();
       
-      // Discover tenant-scoped tables dynamically
+      // Discover operator-scoped tables dynamically
       const tables = db.prepare(`
-        SELECT DISTINCT m.name as table_name
+        SELECT DISTINCT m.name as table_name,
+          SUM(CASE WHEN p.name = 'operator_id' THEN 1 ELSE 0 END) as has_operator_id,
+          SUM(CASE WHEN p.name = 'tenant_id' THEN 1 ELSE 0 END) as has_tenant_id
         FROM sqlite_master m
         JOIN pragma_table_info(m.name) p
-        WHERE m.type = 'table' AND p.name = 'tenant_id' AND m.name <> 'backups'
-      `).all() as { table_name: string }[];
+        WHERE m.type = 'table' AND (p.name = 'operator_id' OR p.name = 'tenant_id')
+          AND m.name <> 'backups' AND m.name <> 'tenants'
+        GROUP BY m.name
+      `).all() as { table_name: string; has_operator_id: number; has_tenant_id: number }[];
 
       const exportData: Record<string, any[]> = {
         _export_metadata: [{
-          tenant_id: tenantId,
+          operator_id: operatorId,
+          tenant_id: operatorId,
           exported_at: timestamp,
           version: getApplicationVersion()
         }]
       };
 
-      for (const { table_name } of tables) {
+      for (const { table_name, has_operator_id } of tables) {
+        const idCol = has_operator_id > 0 ? 'operator_id' : 'tenant_id';
         // hygiene-exempt: dynamic table identifier from sqlite_master whitelist
-        const rows = db.prepare(`SELECT * FROM "${table_name}" WHERE tenant_id = ?`).all(tenantId);
+        const rows = db.prepare(`SELECT * FROM "${table_name}" WHERE "${idCol}" = ?`).all(operatorId);
         exportData[table_name] = rows;
       }
 
@@ -165,8 +175,9 @@ export class BackupService {
         file_size_bytes: stats.size,
         checksum_sha256: checksum,
         metadata_json: JSON.stringify({
-          tenant_id: tenantId,
-          mode: 'tenant_data_export',
+          operator_id: operatorId,
+          tenant_id: operatorId,
+          mode: 'operator_data_export',
           tables_count: tables.length,
           tables: tables.map((t) => t.table_name)
         })
@@ -180,11 +191,15 @@ export class BackupService {
 
       BackupRepository.updateStatus(record.id, {
         status: 'failed',
-        error_message: err.message || 'Tenant export failed'
+        error_message: err.message || 'Operator export failed'
       });
 
       throw err;
     }
+  }
+
+  public static async createTenantExport(): Promise<BackupRecord> {
+    return this.createOperatorExport();
   }
 
   public static async verifyBackupIntegrity(backupId: string): Promise<{ valid: boolean; calculatedSha256: string; record: BackupRecord }> {
@@ -289,16 +304,16 @@ export class BackupService {
   }
 
   /**
-   * Restore tenant data from a backup archive buffer or on-disk backup ID.
+   * Restore operator data from a backup archive buffer or on-disk backup ID.
    * Options:
-   *  - clean_slate: Replaces all tenant records in the backed up tables before inserting.
-   *  - merge: Inserts or replaces records without deleting unmentioned tenant records.
+   *  - clean_slate: Replaces all operator records in the backed up tables before inserting.
+   *  - merge: Inserts or replaces records without deleting unmentioned operator records.
    */
-  public static async restoreTenantData(
+  public static async restoreOperatorData(
     source: { backupId?: string; compressedBuffer?: Buffer },
-    options: RestoreTenantOptions = { mode: 'clean_slate' }
-  ): Promise<RestoreTenantResult> {
-    const tenantId = RequestContext.getTenantId();
+    options: RestoreOperatorOptions = { mode: 'clean_slate' }
+  ): Promise<RestoreOperatorResult> {
+    const operatorId = RequestContext.getOperatorId();
 
     let rawBuffer: Buffer;
     if (source.backupId) {
@@ -306,8 +321,8 @@ export class BackupService {
       if (!record) {
         throw new Error(`Backup record not found: ${source.backupId}`);
       }
-      if (record.backup_type !== 'tenant_data') {
-        throw new Error(`Only tenant_data backups can be restored into an active tenant session`);
+      if (record.backup_type !== 'operator_data' && record.backup_type !== 'tenant_data') {
+        throw new Error(`Only operator_data backups can be restored into an active operator session`);
       }
       const fullPath = this.resolveSafeBackupPath(record.relative_path);
       if (!fs.existsSync(fullPath)) {
@@ -329,11 +344,12 @@ export class BackupService {
       throw new Error(`Failed to decompress and parse backup archive: ${err.message}`);
     }
 
-    // Verify tenant isolation metadata
+    // Verify operator isolation metadata
     const metadata = exportData['_export_metadata'];
-    if (!Array.isArray(metadata) || metadata.length === 0 || metadata[0]?.tenant_id !== tenantId) {
+    const metaOpId = metadata?.[0]?.operator_id || metadata?.[0]?.tenant_id;
+    if (!Array.isArray(metadata) || metadata.length === 0 || metaOpId !== operatorId) {
       throw new Error(
-        `Cross-tenant restore prohibited: archive tenant_id '${metadata?.[0]?.tenant_id}' does not match active tenant_id '${tenantId}'`
+        `Cross-operator restore prohibited: archive operator_id '${metaOpId}' does not match active operator_id '${operatorId}'`
       );
     }
 
@@ -341,47 +357,60 @@ export class BackupService {
 
     // Execute atomic transaction for safe rollback
     withTransaction((tx) => {
-      // Find all operational tenant-scoped tables that are safe to restore
+      // Find all operational operator-scoped tables that are safe to restore
       const dbTables = tx.prepare(`
-        SELECT DISTINCT m.name as table_name
+        SELECT DISTINCT m.name as table_name,
+          SUM(CASE WHEN p.name = 'operator_id' THEN 1 ELSE 0 END) as has_operator_id,
+          SUM(CASE WHEN p.name = 'tenant_id' THEN 1 ELSE 0 END) as has_tenant_id
         FROM sqlite_master m
         JOIN pragma_table_info(m.name) p
-        WHERE m.type = 'table' AND p.name = 'tenant_id' AND m.name <> 'backups'
-      `).all() as { table_name: string }[];
+        WHERE m.type = 'table' AND (p.name = 'operator_id' OR p.name = 'tenant_id')
+          AND m.name <> 'backups' AND m.name <> 'tenants'
+        GROUP BY m.name
+      `).all() as { table_name: string; has_operator_id: number; has_tenant_id: number }[];
 
-      const validTableNames = new Set(dbTables.map((t) => t.table_name));
+      const tableInfoMap = new Map(dbTables.map((t) => [t.table_name, t]));
 
-      // 1. If clean_slate mode, delete existing tenant records from tables in reverse order
+      // 1. If clean_slate mode, delete existing operator records from tables in reverse order
       if (options.mode === 'clean_slate') {
         for (const tableName of Object.keys(exportData)) {
-          if (tableName === '_export_metadata' || !validTableNames.has(tableName)) continue;
-          tx.prepare(`DELETE FROM "${tableName}" WHERE tenant_id = ?`).run(tenantId);
+          if (tableName === '_export_metadata' || !tableInfoMap.has(tableName)) continue;
+          const info = tableInfoMap.get(tableName)!;
+          const idCol = info.has_operator_id > 0 ? 'operator_id' : 'tenant_id';
+          tx.prepare(`DELETE FROM "${tableName}" WHERE "${idCol}" = ?`).run(operatorId);
         }
       }
 
-      // Tables with tenant-scoped natural / compound unique constraints:
+      // Tables with operator-scoped natural / compound unique constraints:
       // In merge mode, if a row in the backup shares the natural key with an existing target row having a different id,
       // resolve the conflict beforehand so the backup's record replaces it cleanly.
       const naturalKeyLookups: Record<string, string[]> = {
-        users: ['tenant_id', 'email'],
-        lease_contacts: ['tenant_id', 'lease_id', 'contact_id'],
-        journal_entries: ['tenant_id', 'entry_number']
+        users: ['operator_id', 'email'],
+        lease_contacts: ['operator_id', 'lease_id', 'contact_id'],
+        journal_entries: ['operator_id', 'entry_number']
       };
 
       // 2. Insert records table by table
       for (const [tableName, rows] of Object.entries(exportData)) {
-        if (tableName === '_export_metadata' || !validTableNames.has(tableName) || !Array.isArray(rows)) {
+        if (tableName === '_export_metadata' || !tableInfoMap.has(tableName) || !Array.isArray(rows)) {
           continue;
         }
 
+        const tableInfo = tableInfoMap.get(tableName)!;
         const naturalKeys = naturalKeyLookups[tableName];
 
         let insertedCount = 0;
         for (const row of rows) {
           if (typeof row !== 'object' || row === null) continue;
 
-          // Enforce tenant_id matches active context
-          const sanitizedRow = { ...row, tenant_id: tenantId };
+          // Enforce operator_id matches active context
+          const sanitizedRow = { ...row };
+          if (tableInfo.has_operator_id > 0) {
+            sanitizedRow['operator_id'] = operatorId;
+          }
+          if (tableInfo.has_tenant_id > 0) {
+            sanitizedRow['tenant_id'] = operatorId;
+          }
           const cols = Object.keys(sanitizedRow);
           if (cols.length === 0) continue;
 
@@ -417,6 +446,13 @@ export class BackupService {
       restoredTables,
       mode: options.mode
     };
+  }
+
+  public static async restoreTenantData(
+    source: { backupId?: string; compressedBuffer?: Buffer },
+    options: RestoreTenantOptions = { mode: 'clean_slate' }
+  ): Promise<RestoreTenantResult> {
+    return this.restoreOperatorData(source, options);
   }
 
   /**

@@ -4,12 +4,12 @@ This document outlines the high-level roadmap to MVP for **GarrisonOS**, structu
 
 ---
 
-## Phase 1: Core Engine & Multi-Tenant Foundation
+## Phase 1: Core Engine & Multi-Operator Foundation
 >
 > *Establishing runtime infrastructure, database primitives, security boundaries, and cross-cutting subsystems.*
 
 * Hardening zero-dependency Node.js HTTP/SQLite engine (`node:http`, `node:sqlite`, `node:crypto`).
-* Context propagation, tenant isolation (`AsyncLocalStorage`, `X-Tenant-ID`), and tenant lifecycle management.
+* Context propagation, operator isolation (`AsyncLocalStorage`, `X-Operator-ID`), and operator lifecycle management.
 * Unified auth, session/token management, and rate-limiting infrastructure.
 * In-process `EventBus` pub/sub backbone and base repository patterns.
 
@@ -155,7 +155,7 @@ To bridge high-level architectural phases with practical development velocity, G
 
 | Work Stream | Key Deliverables | Target Phase |
 | :--- | :--- | :---: |
-| **Commercial Leases & CAM** | Implement Triple Net (NNN) lease contracts, Common Area Maintenance (CAM) reconciliations, and administrative expense pool allocations. | Post-MVP |
+| **Commercial Leases & CAM** | Implement Commercial Organizations (reserving `organization` entity), Triple Net (NNN) lease contracts, Common Area Maintenance (CAM) reconciliations, and administrative expense pool allocations. | Post-MVP |
 | **CPI Lease Escalations** | Add automated annual Consumer Price Index (CPI) and fixed percentage lease rate escalation calculation engines. | Post-MVP |
 | **Bank Feed Ingestion** | Build native OFX, QBO, and CSV bank statement import parser with heuristic transaction matching against general ledger entries. | Post-MVP |
 | **Tenant Payment Rails** | Add payment gateway webhook ingestion and automated settlement journal entries for external payment processors. | Post-MVP |

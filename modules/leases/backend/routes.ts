@@ -48,7 +48,8 @@ export function registerRoutes(router: Router): void {
     eventBus.publish('lease.activated', {
       leaseId: lease.id,
       unitId: lease.unit_id,
-      tenantId: RequestContext.getTenantId(),
+      operatorId: RequestContext.getOperatorId(),
+      tenantId: RequestContext.getOperatorId(),
       rentAmountCents: lease.rent_amount_cents
     });
 
@@ -65,7 +66,8 @@ export function registerRoutes(router: Router): void {
     eventBus.publish('lease.terminated', {
       leaseId: lease.id,
       unitId: lease.unit_id,
-      tenantId: RequestContext.getTenantId()
+      operatorId: RequestContext.getOperatorId(),
+      tenantId: RequestContext.getOperatorId()
     });
 
     successResponse(res, { lease, status: 'terminated' });

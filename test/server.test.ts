@@ -56,7 +56,7 @@ before(() => {
   const db = getDatabase({ inMemory: true });
   runMigrations(db);
   const now = Date.now();
-  db.prepare('INSERT INTO tenants (id, name, created_at, updated_at) VALUES (?, ?, ?, ?)').run(
+  db.prepare('INSERT INTO operators (id, name, created_at, updated_at) VALUES (?, ?, ?, ?)').run(
     'tenant-test',
     'Batch Test Tenant',
     now,
@@ -64,7 +64,7 @@ before(() => {
   );
   db.prepare(`
     INSERT INTO users (
-      id, tenant_id, email, password_hash, first_name, last_name, role,
+      id, operator_id, email, password_hash, first_name, last_name, role,
       token_version, created_at, updated_at
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(

@@ -4,7 +4,8 @@ import { generateUUIDv7 } from '../../../core/crypto.js';
 
 export interface Contact {
   id: string;
-  tenant_id: string;
+  operator_id: string;
+  tenant_id?: string;
   contact_type: 'tenant' | 'owner' | 'vendor' | 'guarantor' | 'prospect' | 'emergency';
   first_name: string;
   last_name: string;
@@ -22,10 +23,10 @@ export interface Contact {
 
 export class ContactsRepository {
   public static listContacts(filter?: { contact_type?: string; query?: string }): Contact[] {
-    const tenantId = RequestContext.getTenantId();
+    const operatorId = RequestContext.getOperatorId();
     const db = getDatabase();
-    let sql = 'SELECT * FROM contacts WHERE tenant_id = ? AND deleted_at IS NULL';
-    const params: any[] = [tenantId];
+    let sql = 'SELECT * FROM contacts WHERE operator_id = ? AND deleted_at IS NULL';
+    const params: any[] = [operatorId];
 
     if (filter?.contact_type) {
       sql += ' AND contact_type = ?';
@@ -43,12 +44,12 @@ export class ContactsRepository {
   }
 
   public static getContactById(id: string): Contact | null {
-    const tenantId = RequestContext.getTenantId();
+    const operatorId = RequestContext.getOperatorId();
     const db = getDatabase();
     const row = db.prepare(`
       SELECT * FROM contacts
-      WHERE id = ? AND tenant_id = ? AND deleted_at IS NULL
-    `).get(id, tenantId) as Contact | undefined;
+      WHERE id = ? AND operator_id = ? AND deleted_at IS NULL
+    `).get(id, operatorId) as Contact | undefined;
     return row || null;
   }
 
@@ -64,20 +65,20 @@ export class ContactsRepository {
     vendor_specialty?: string;
     notes?: string;
   }): Contact {
-    const tenantId = RequestContext.getTenantId();
+    const operatorId = RequestContext.getOperatorId();
     const db = getDatabase();
     const id = generateUUIDv7();
     const now = Date.now();
 
     db.prepare(`
       INSERT INTO contacts (
-        id, tenant_id, contact_type, first_name, last_name,
+        id, operator_id, contact_type, first_name, last_name,
         company_name, email, phone, secondary_phone,
         tax_id_last4, vendor_specialty, notes, created_at, updated_at
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       id,
-      tenantId,
+      operatorId,
       data.contact_type,
       data.first_name,
       data.last_name,
@@ -95,11 +96,11 @@ export class ContactsRepository {
     return ContactsRepository.getContactById(id)!;
   }
 
-  public static updateContact(id: string, data: Partial<Omit<Contact, 'id' | 'tenant_id' | 'created_at' | 'updated_at' | 'deleted_at'>>): Contact | null {
+  public static updateContact(id: string, data: Partial<Omit<Contact, 'id' | 'operator_id' | 'tenant_id' | 'created_at' | 'updated_at' | 'deleted_at'>>): Contact | null {
     const existing = ContactsRepository.getContactById(id);
     if (!existing) return null;
 
-    const tenantId = RequestContext.getTenantId();
+    const operatorId = RequestContext.getOperatorId();
     const db = getDatabase();
     const now = Date.now();
     const updated = { ...existing, ...data, updated_at: now };
@@ -109,7 +110,7 @@ export class ContactsRepository {
         contact_type = ?, first_name = ?, last_name = ?,
         company_name = ?, email = ?, phone = ?, secondary_phone = ?,
         tax_id_last4 = ?, vendor_specialty = ?, notes = ?, updated_at = ?
-      WHERE id = ? AND tenant_id = ? AND deleted_at IS NULL
+      WHERE id = ? AND operator_id = ? AND deleted_at IS NULL
     `).run(
       updated.contact_type,
       updated.first_name,
@@ -123,20 +124,20 @@ export class ContactsRepository {
       updated.notes || null,
       now,
       id,
-      tenantId
+      operatorId
     );
 
     return ContactsRepository.getContactById(id);
   }
 
   public static deleteContact(id: string): boolean {
-    const tenantId = RequestContext.getTenantId();
+    const operatorId = RequestContext.getOperatorId();
     const db = getDatabase();
     const now = Date.now();
     const info = db.prepare(`
       UPDATE contacts SET deleted_at = ?
-      WHERE id = ? AND tenant_id = ? AND deleted_at IS NULL
-    `).run(now, id, tenantId);
+      WHERE id = ? AND operator_id = ? AND deleted_at IS NULL
+    `).run(now, id, operatorId);
     return info.changes > 0;
   }
 }

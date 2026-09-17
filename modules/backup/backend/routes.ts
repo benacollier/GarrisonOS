@@ -68,22 +68,23 @@ export function registerRoutes(router: Router): void {
     }
   });
 
-  // Create backup (full_system or tenant_data)
+  // Create backup (full_system or operator_data)
   router.post('/api/v1/backups', async (req, res) => {
     try {
       const { type } = (req as any).body || {};
-      const backupType = type === 'full_system' ? 'full_system' : 'tenant_data';
+      const backupType = type === 'full_system' ? 'full_system' : 'operator_data';
 
       let record;
       if (backupType === 'full_system') {
         record = await BackupService.createFullDatabaseBackup();
       } else {
-        record = await BackupService.createTenantExport();
+        record = await BackupService.createOperatorExport();
       }
 
       eventBus.publish('backup.created', {
         backupId: record.id,
-        tenantId: record.tenant_id,
+        operatorId: record.operator_id,
+        tenantId: record.operator_id,
         backupType: record.backup_type
       });
 
@@ -159,14 +160,14 @@ export function registerRoutes(router: Router): void {
     }
   });
 
-  // Restore tenant data from an existing backup ID
+  // Restore operator data from an existing backup ID
   router.post('/api/v1/backups/:id/restore', async (req, res) => {
     try {
       const { id } = (req as any).params;
       const body = (req as any).body || {};
       const mode = body.mode === 'merge' ? 'merge' : 'clean_slate';
 
-      const result = await BackupService.restoreTenantData(
+      const result = await BackupService.restoreOperatorData(
         { backupId: id },
         { mode }
       );
@@ -178,7 +179,7 @@ export function registerRoutes(router: Router): void {
       });
 
       successResponse(res, {
-        message: `Tenant data restored successfully in ${mode} mode`,
+        message: `Operator data restored successfully in ${mode} mode`,
         ...result
       });
     } catch (err: any) {

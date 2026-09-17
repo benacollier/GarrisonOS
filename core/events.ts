@@ -3,7 +3,8 @@ import { RequestContext } from './context.js';
 import { generateUUIDv7 } from './crypto.js';
 
 export interface BaseEventPayload {
-  tenantId: string;
+  operatorId?: string;
+  tenantId?: string;
 }
 
 export interface LeaseActivatedEvent extends BaseEventPayload {
@@ -49,18 +50,18 @@ export class EventBus {
   public publish<K extends keyof EventMap>(event: K, payload: EventMap[K]): void;
   public publish<T>(event: string, payload: T): void;
   public publish(event: string, payload: unknown): void {
-    // Extract tenantId from payload if available (all BaseEventPayload have it)
-    const basePayload = payload as { tenantId?: string };
+    // Extract operatorId from payload if available
+    const basePayload = payload as { operatorId?: string; tenantId?: string };
     const currentContext = RequestContext.tryGet();
-    const tenantId = basePayload.tenantId || currentContext?.tenantId || 'system';
+    const operatorId = basePayload.operatorId || basePayload.tenantId || currentContext?.operatorId || currentContext?.tenantId || 'system';
     const correlationId = currentContext?.correlationId || generateUUIDv7();
     const userId = currentContext?.userId;
 
     // Dispatch asynchronously on next tick to decouple producer from consumers
-    // Wrap emission in RequestContext to preserve tenant isolation
+    // Wrap emission in RequestContext to preserve operator isolation
     setImmediate(() => {
       RequestContext.run(
-        { tenantId, correlationId, userId },
+        { operatorId, tenantId: operatorId, correlationId, userId },
         () => this.emitter.emit(event, payload)
       );
     });

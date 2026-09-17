@@ -7,6 +7,7 @@ export interface ApiRequest extends IncomingMessage {
   query: Record<string, string>;
   body: any;
   path: string;
+  operatorId?: string;
   tenantId?: string;
   userId?: string;
   correlationId?: string;
@@ -202,7 +203,7 @@ export class Router {
         if (method === 'OPTIONS') {
           res.writeHead(204, {
             'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
-            'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Tenant-ID, X-Request-ID, X-User-ID'
+            'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Operator-ID, X-Tenant-ID, X-Request-ID, X-User-ID'
           });
           res.end();
           return;

@@ -1,7 +1,7 @@
 -- Chart of Accounts and QuickBooks Compatibility Schema
 CREATE TABLE IF NOT EXISTS chart_of_accounts (
     id TEXT PRIMARY KEY,
-    tenant_id TEXT NOT NULL,
+    operator_id TEXT NOT NULL,
     account_number TEXT,
     account_name TEXT NOT NULL,
     account_type TEXT NOT NULL CHECK (account_type IN (
@@ -23,26 +23,26 @@ CREATE TABLE IF NOT EXISTS chart_of_accounts (
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL,
     deleted_at INTEGER,
-    FOREIGN KEY (tenant_id) REFERENCES tenants(id)
+    FOREIGN KEY (operator_id) REFERENCES operators(id)
 );
 
-CREATE INDEX IF NOT EXISTS idx_coa_tenant_active ON chart_of_accounts(tenant_id, is_active);
-CREATE INDEX IF NOT EXISTS idx_coa_tenant_mapping ON chart_of_accounts(tenant_id, category_mapping);
+CREATE INDEX IF NOT EXISTS idx_coa_operator_active ON chart_of_accounts(operator_id, is_active);
+CREATE INDEX IF NOT EXISTS idx_coa_operator_mapping ON chart_of_accounts(operator_id, category_mapping);
 
 -- QuickBooks Export & Sync Audit Logs
 CREATE TABLE IF NOT EXISTS quickbooks_export_logs (
     id TEXT PRIMARY KEY,
-    tenant_id TEXT NOT NULL,
+    operator_id TEXT NOT NULL,
     export_type TEXT NOT NULL CHECK (export_type IN ('qbo_csv', 'iif', 'ofx')),
     transaction_count INTEGER NOT NULL,
     total_debit_cents INTEGER NOT NULL,
     total_credit_cents INTEGER NOT NULL,
     exported_by_user_id TEXT,
     created_at INTEGER NOT NULL,
-    FOREIGN KEY (tenant_id) REFERENCES tenants(id)
+    FOREIGN KEY (operator_id) REFERENCES operators(id)
 );
 
-CREATE INDEX IF NOT EXISTS idx_qb_export_tenant_created ON quickbooks_export_logs(tenant_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_qb_export_operator_created ON quickbooks_export_logs(operator_id, created_at);
 
 -- QuickBooks Metadata and Sync Status on Transactions
 -- (Alter table safe check / columns if not existing)

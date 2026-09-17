@@ -1,7 +1,7 @@
 -- Work Orders and Repair Tracking
 CREATE TABLE IF NOT EXISTS work_orders (
     id TEXT PRIMARY KEY,
-    tenant_id TEXT NOT NULL,
+    operator_id TEXT NOT NULL,
     property_id TEXT NOT NULL,
     unit_id TEXT,
     title TEXT NOT NULL,
@@ -20,12 +20,12 @@ CREATE TABLE IF NOT EXISTS work_orders (
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL,
     deleted_at INTEGER,
-    FOREIGN KEY (tenant_id) REFERENCES tenants(id),
+    FOREIGN KEY (operator_id) REFERENCES operators(id),
     FOREIGN KEY (property_id) REFERENCES properties(id),
     FOREIGN KEY (unit_id) REFERENCES units(id),
     FOREIGN KEY (requested_by_contact_id) REFERENCES contacts(id),
     FOREIGN KEY (vendor_contact_id) REFERENCES contacts(id)
 );
-CREATE INDEX IF NOT EXISTS idx_work_orders_tenant_status ON work_orders(tenant_id, status);
-CREATE INDEX IF NOT EXISTS idx_work_orders_tenant_property ON work_orders(tenant_id, property_id, unit_id);
+CREATE INDEX IF NOT EXISTS idx_work_orders_operator_status ON work_orders(operator_id, status);
+CREATE INDEX IF NOT EXISTS idx_work_orders_operator_property ON work_orders(operator_id, property_id, unit_id);
 

@@ -23,7 +23,7 @@ describe('Accounting Module - Migration 0003 & Backfill Verification', () => {
       // Insert legacy single-entry transactions without journal_entry_id
       db.prepare(`
         INSERT INTO transactions (
-          id, tenant_id, transaction_type, category, amount_cents,
+          id, operator_id, transaction_type, category, amount_cents,
           transaction_date, description, created_at, updated_at
         ) VALUES
           ('tx-legacy-1', 'tenant-backfill-test', 'charge', 'rent', 180000, ?, 'Monthly Rent Legacy', ?, ?),
@@ -74,7 +74,7 @@ describe('Accounting Module - Migration 0003 & Backfill Verification', () => {
       // Insert soft-deleted legacy transaction (deleted_at is set)
       db.prepare(`
         INSERT INTO transactions (
-          id, tenant_id, transaction_type, category, amount_cents,
+          id, operator_id, transaction_type, category, amount_cents,
           transaction_date, description, created_at, updated_at, deleted_at
         ) VALUES ('tx-legacy-deleted', 'tenant-backfill-deleted-test', 'charge', 'rent', 120000, ?, 'Deleted Rent', ?, ?, ?)
       `).run(now - 1000, now - 1000, now - 1000, now);

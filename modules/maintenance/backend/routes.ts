@@ -59,7 +59,8 @@ export function registerRoutes(router: Router): void {
       propertyId: workOrder.property_id,
       unitId: workOrder.unit_id || undefined,
       actualCostCents: workOrder.actual_cost_cents,
-      tenantId: RequestContext.getTenantId()
+      operatorId: RequestContext.getOperatorId(),
+      tenantId: RequestContext.getOperatorId()
     });
 
     successResponse(res, { workOrder });

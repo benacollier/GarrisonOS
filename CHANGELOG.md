@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **Multi-Operator Architecture & Real-Estate Domain Tenant Clarification**:
+  - Replaced ambiguous, conflicting usage of "tenant" for software infrastructure isolation with **Operator** (`operators` table, `operator_id` foreign keys, `RequestContext.getOperatorId()`, and `X-Operator-ID` HTTP headers).
+  - Reserved **Organization** for commercial property portfolios and future commercial entity support.
+  - Strictly preserved real-estate domain terminology for human occupants and rental mechanics: `contact_type = 'tenant'`, `role = 'primary_tenant' | 'co_tenant'`, `Tenant Ledger`, `calculateTenantBalance()`, `Account 2100 Tenant Security Deposits Held Liability`, and "Leases & Tenants" navigation.
+  - Maintained backward compatibility via an ANSI SQLite SQL view (`CREATE VIEW tenants AS SELECT * FROM operators`) with `INSTEAD OF` triggers, aliases for `RequestContext.getTenantId()`, dual-header support (`X-Operator-ID` and `X-Tenant-ID`), and fallback session getters.
+  - Updated all migrations, database seeders, API middleware, repositories, services, web presentation templates, hygiene scanners (`scripts/check-hygiene.js`), and test suites across all modules.
 - Synchronized project documentation across `docs/ROADMAP.md`, `docs/LLMREVIEW20260915.md`, `docs/architecture/technical-debt.md`, and `README.md` to establish the comprehensive execution roadmap for all planned sprints (Sprints 1 through 6) through MVP v0.1.0 GA and post-MVP releases.
 - Hardened presentation-layer validation, error handling, session and API transport security, multipart upload preservation, and filtered accounting exports.
 - **Complete Rebase to 100% Pure TypeScript**: Eliminated all 39 legacy PHP files (4,318 lines of code) across `web/` and all domain modules (`modules/*/frontend/`), transitioning the entire presentation layer to a native Server-Side Rendered (SSR) TypeScript architecture.

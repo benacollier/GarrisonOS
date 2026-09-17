@@ -22,7 +22,7 @@ Every contact entity (`contacts`) is classified by role:
 ## 2. Schema Definition (`contacts`)
 
 * `id` (UUIDv7): Primary key
-* `tenant_id` (UUIDv7): Owning tenant
+* `operator_id` (UUIDv7): Owning operator instance
 * `contact_type` (TEXT): Role category
 * `first_name` (TEXT), `last_name` (TEXT)
 * `company_name` (TEXT): For vendors or commercial entities

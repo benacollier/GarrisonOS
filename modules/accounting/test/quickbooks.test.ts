@@ -192,7 +192,7 @@ describe('Accounting Module - QuickBooks Compatibility & Double-Entry GL', () =>
       db.prepare(`
         UPDATE chart_of_accounts
         SET is_active = 0
-        WHERE tenant_id = ? AND category_mapping IN ('trust_bank', 'accounts_receivable', 'security_deposit')
+        WHERE operator_id = ? AND category_mapping IN ('trust_bank', 'accounts_receivable', 'security_deposit')
       `).run(tenantId);
 
       assert.doesNotThrow(() => {

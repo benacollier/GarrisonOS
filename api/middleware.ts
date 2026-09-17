@@ -53,7 +53,7 @@ export const securityHeadersMiddleware: Middleware = async (req, res, next) => {
     res.setHeader('Vary', 'Origin');
   }
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Tenant-ID, X-Request-ID, X-User-ID');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Operator-ID, X-Tenant-ID, X-Request-ID, X-User-ID');
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   await next();
 };
@@ -101,9 +101,9 @@ export const rateLimitMiddleware: Middleware = async (req, res, next) => {
 };
 
 /**
- * Multi-tenant resolution and AsyncLocalStorage context execution wrapper.
+ * Multi-operator resolution and AsyncLocalStorage context execution wrapper.
  */
-export const tenantContextMiddleware: Middleware = async (req, res, next) => {
+export const operatorContextMiddleware: Middleware = async (req, res, next) => {
   const isBatchRoute = req.path === '/api/v1/batch' || req.path === '/api/v1/batch/';
   const isAdministratorRoute = (
     req.path === '/api/v1/system/backup' ||
@@ -118,7 +118,7 @@ export const tenantContextMiddleware: Middleware = async (req, res, next) => {
     req.path === '/api/v1/system/restore'
   );
 
-  let tenantId = isBatchRoute ? '' : ((req.headers['x-tenant-id'] as string) || '');
+  let operatorId = isBatchRoute ? '' : ((req.headers['x-operator-id'] as string) || (req.headers['x-tenant-id'] as string) || '');
   const headerUserId = isBatchRoute ? undefined : ((req.headers['x-user-id'] as string) || undefined);
   let userId: string | undefined = undefined;
   let batchAuthenticated = false;
@@ -139,16 +139,17 @@ export const tenantContextMiddleware: Middleware = async (req, res, next) => {
     }
 
     if (payload) {
+      const tokenOpId = typeof payload.opid === 'string' ? payload.opid : (typeof payload.tid === 'string' ? payload.tid : '');
       if (isBatchRoute) {
-        tenantId = typeof payload.tid === 'string' ? payload.tid : '';
+        operatorId = tokenOpId;
         userId = typeof payload.sub === 'string' ? payload.sub : undefined;
-        batchAuthenticated = tenantId.length > 0 && typeof userId === 'string' && userId.length > 0;
+        batchAuthenticated = operatorId.length > 0 && typeof userId === 'string' && userId.length > 0;
       } else {
-        if (!isPublicRoute && tenantId && payload.tid !== tenantId) {
+        if (!isPublicRoute && operatorId && tokenOpId && tokenOpId !== operatorId) {
           return errorResponse(
             res,
             'UNAUTHORIZED',
-            'Tenant identity does not match the authentication token',
+            'Operator identity does not match the authentication token',
             401
           );
         }
@@ -160,7 +161,7 @@ export const tenantContextMiddleware: Middleware = async (req, res, next) => {
             401
           );
         }
-        if (!tenantId) tenantId = payload.tid;
+        if (!operatorId) operatorId = tokenOpId;
         userId = typeof payload.sub === 'string' ? payload.sub : undefined;
       }
     } else if (authHeader && !isPublicRoute) {
@@ -182,14 +183,15 @@ export const tenantContextMiddleware: Middleware = async (req, res, next) => {
     );
   }
 
-  req.tenantId = tenantId;
+  req.operatorId = operatorId;
+  req.tenantId = operatorId; // Alias
   req.userId = userId;
 
-  if (!isPublicRoute && !tenantId) {
+  if (!isPublicRoute && !operatorId) {
     return errorResponse(
       res,
-      'TENANT_REQUIRED',
-      'The X-Tenant-ID header is required for this operational endpoint',
+      'OPERATOR_REQUIRED',
+      'The X-Operator-ID header is required for this operational endpoint',
       400
     );
   }
@@ -198,8 +200,8 @@ export const tenantContextMiddleware: Middleware = async (req, res, next) => {
     const db = getDatabase();
     const administrator = userId
       ? db.prepare(
-        'SELECT 1 FROM users WHERE id = ? AND tenant_id = ? AND role = ? AND deleted_at IS NULL'
-      ).get(userId, tenantId, 'owner')
+        'SELECT 1 FROM users WHERE id = ? AND operator_id = ? AND role = ? AND deleted_at IS NULL'
+      ).get(userId, operatorId, 'owner')
       : undefined;
     if (!administrator) {
       return errorResponse(
@@ -214,7 +216,8 @@ export const tenantContextMiddleware: Middleware = async (req, res, next) => {
   // Wrap downstream execution inside RequestContext
   await RequestContext.run(
     {
-      tenantId: tenantId || 'system',
+      operatorId: operatorId || 'system',
+      tenantId: operatorId || 'system',
       userId,
       correlationId: req.correlationId || generateUUIDv7()
     },
@@ -223,3 +226,8 @@ export const tenantContextMiddleware: Middleware = async (req, res, next) => {
     }
   );
 };
+
+/**
+ * Backward-compatible alias for operatorContextMiddleware.
+ */
+export const tenantContextMiddleware = operatorContextMiddleware;

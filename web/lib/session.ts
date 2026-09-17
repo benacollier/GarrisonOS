@@ -7,7 +7,8 @@ export interface SessionUser {
   first_name: string;
   last_name: string;
   role: string;
-  tenant_id: string;
+  operator_id: string;
+  tenant_id?: string;
 }
 
 export interface FlashMessage {
@@ -18,6 +19,7 @@ export interface FlashMessage {
 export interface SessionData {
   user?: SessionUser | null;
   authToken?: string | null;
+  operatorId?: string | null;
   tenantId?: string | null;
   csrfToken?: string;
   flashMessages?: FlashMessage[];
@@ -139,13 +141,22 @@ export class Session {
     this.isModified = true;
   }
 
+  public get operatorId(): string {
+    return this.data.operatorId || this.data.user?.operator_id || this.data.tenantId || this.data.user?.tenant_id || 'operator-demo';
+  }
+
+  public set operatorId(val: string) {
+    this.data.operatorId = val;
+    this.data.tenantId = val;
+    this.isModified = true;
+  }
+
   public get tenantId(): string {
-    return this.data.tenantId || this.data.user?.tenant_id || 'tenant-demo';
+    return this.operatorId;
   }
 
   public set tenantId(val: string) {
-    this.data.tenantId = val;
-    this.isModified = true;
+    this.operatorId = val;
   }
 
   public getCsrfToken(): string {

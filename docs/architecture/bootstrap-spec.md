@@ -10,18 +10,19 @@ This document serves as the canonical architectural blueprint, engineering stand
 
 1. **Zero External Runtime Dependencies:**
    - **Backend Engine:** Relies exclusively on the Node.js standard library (`node:http`, `node:sqlite`, `node:crypto`, `node:async_hooks`, `node:events`, `node:fs`, `node:path`, `node:test`, `node:assert`). No npm runtime packages (no Express, Fastify, Drizzle, Prisma, TypeORM, Zod, or external UUID libraries). Only compile-time `@types/node` and `typescript` are permitted as development dependencies.
-   - **Frontend Presentation:** Relies exclusively on native PHP (standard extensions: `pdo_sqlite`, `curl`, `session`, `filter`) and semantic HTML5 with vanilla CSS Custom Properties. No Composer packages, Tailwind build steps, Webpack/Vite bundles, or client-side JavaScript frameworks.
+   - **Frontend Presentation:** Relies exclusively on native TypeScript SSR with Node.js standard modules (`node:http`, `node:crypto`, `node:fs`, `node:path`), automatic XSS-safe tagged template HTML (`html` in `web/lib/html.ts`), and semantic HTML5 with vanilla CSS Custom Properties. No external runtime npm packages, bundlers, or client-side JavaScript frameworks.
 
 2. **Code Attribution & Quality:**
    - Write clean, concise, idiomatic, professional human-grade code.
    - Forbid generic placeholder comments (e.g., `// TODO: Implement your logic here`).
    - Commit messages must follow standard conventional commit syntax (e.g., `feat(core): add request context store`).
 
-3. **Strict Multi-Tenancy & Row-Level Isolation:**
-   - Every operational database table MUST include a `tenant_id TEXT NOT NULL` column.
-   - Tenant context must be resolved via `AsyncLocalStorage` from the `X-Tenant-ID` header.
-   - Business services and repositories must NEVER accept `tenant_id` from request bodies or URL parameters; it must always be pulled implicitly from the request execution context.
-   - All database queries must enforce tenant isolation in `WHERE` clauses, supported by compound indexes `(tenant_id, ...)`.
+3. **Strict Multi-Operator Isolation & Row-Level Protection:**
+   - Every operational database table MUST include an `operator_id TEXT NOT NULL` column (with backward-compatible `tenants` view).
+   - Distinguishes software system multi-tenancy (**Operator**) from real-estate rental occupants (**Tenants**), reserving **Organization** for commercial property portfolios.
+   - Operator context must be resolved via `AsyncLocalStorage` from the `X-Operator-ID` (or legacy `X-Tenant-ID`) header.
+   - Business services and repositories must NEVER accept `operator_id` or `tenant_id` from request bodies or URL parameters; it must always be pulled implicitly from the request execution context.
+   - All database queries must enforce operator isolation in `WHERE` clauses, supported by compound indexes `(operator_id, ...)`.
 
 4. **Identity & Data Representation Standards:**
    - **Primary Keys:** RFC 9562 **UUIDv7** (time-sortable, 48-bit UNIX timestamp + sub-millisecond precision + random bits) generated natively via `node:crypto.randomBytes()`.
@@ -35,11 +36,11 @@ This document serves as the canonical architectural blueprint, engineering stand
    - Multi-step operations (e.g., lease signing with deposits, move-out disposition, recurring rent generation) must execute inside atomic transactions using a native `db.transaction((tx) => ...)` wrapper.
 
 6. **Decoupled API-First Architecture:**
-   - The PHP presentation layer MUST NOT connect directly to the SQLite database.
-   - The PHP frontend communicates with the Core Engine purely via internal HTTP REST calls, forwarding session authentication, user context, and the active `X-Tenant-ID`.
+   - The web presentation layer MUST NOT connect directly to the SQLite database.
+   - The web frontend communicates with the Core Engine purely via internal HTTP REST calls, forwarding session authentication, user context, and the active `X-Operator-ID` (or `X-Tenant-ID`).
 
 7. **Security & Session Hygiene:**
-   - State-modifying requests submitted from the PHP presentation layer require cryptographically secure session CSRF tokens (`$_SESSION['csrf_token']`).
+   - State-modifying requests submitted from the web presentation layer require cryptographically secure session CSRF tokens (`validateCsrf()`).
    - Public authentication endpoints enforce sliding-window in-memory rate limiting against brute-force attacks.
    - Passwords hashed using native `node:crypto.scrypt` with a 16-byte random salt and verified via `node:crypto.timingSafeEqual`.
 

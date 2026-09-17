@@ -16,7 +16,7 @@ flowchart TD
     
     subgraph Backend ["Core Engine (Node.js 22+)"]
         ApiServer["api/server.ts (HTTP Server :3000)"]
-        Middleware["api/middleware.ts (Tenant, Auth, Rate Limit)"]
+        Middleware["api/middleware.ts (Operator, Auth, Rate Limit)"]
         Context["core/context.ts (AsyncLocalStorage)"]
         ApiRouter["api/router.ts (Zero-Dep Regex Router)"]
         
@@ -61,7 +61,7 @@ The entire system relies exclusively on Node.js standard libraries:
 * `node:http`: REST API server, SSR presentation server, and HTTP client.
 * `node:sqlite`: High-speed embedded database client with WAL mode and atomic transaction management.
 * `node:crypto`: RFC 9562 UUIDv7 generation, scrypt password hashing, timing-safe CSRF comparisons, and HMAC-SHA256 session token verification.
-* `node:async_hooks`: `AsyncLocalStorage` for implicit tenant isolation context propagation.
+* `node:async_hooks`: `AsyncLocalStorage` for implicit operator isolation context propagation.
 * `node:events`: In-process asynchronous EventBus for loosely coupled cross-module domain messaging.
 * `node:fs` & `node:path`: File storage driver and dynamic module discovery.
 * `node:test` & `node:assert`: Integrated testing framework.
@@ -86,7 +86,7 @@ The frontend communicates with the backend exclusively via internal loopback HTT
 
 | Layer | Primary Location | Key Responsibilities |
 | :--- | :--- | :--- |
-| **Context Store** | [`core/context.ts`](file:///e:/projects/GarrisonOS/core/context.ts) | Stores tenant ID, user ID, and correlation ID using `AsyncLocalStorage`. |
+| **Context Store** | [`core/context.ts`](file:///e:/projects/GarrisonOS/core/context.ts) | Stores operator ID, user ID, and correlation ID using `AsyncLocalStorage`. |
 | **Cryptography** | [`core/crypto.ts`](file:///e:/projects/GarrisonOS/core/crypto.ts) | Generates RFC 9562 UUIDv7 identifiers, scrypt hashes, and HMAC tokens. |
 | **Event Bus** | [`core/events.ts`](file:///e:/projects/GarrisonOS/core/events.ts) | Handles asynchronous domain event publication and subscriptions. |
 | **Storage Driver** | [`core/storage.ts`](file:///e:/projects/GarrisonOS/core/storage.ts) | Manages local disk uploads with path traversal sanitization. |

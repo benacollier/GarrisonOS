@@ -62,10 +62,10 @@ describe('Backup Module - Automated Scheduler, Vacuum & Retention Daemon', () =>
     getDatabase({ inMemory: true });
     createTestDb();
 
-    // Seed test tenant in database so resolveSystemTenantId finds it
+    // Seed test operator in database so resolveSystemOperatorId finds it
     const db = getDatabase();
     db.prepare(`
-      INSERT INTO tenants (id, name, created_at, updated_at)
+      INSERT INTO operators (id, name, created_at, updated_at)
       VALUES (?, 'Scheduler Test Property Group', ?, ?)
       ON CONFLICT (id) DO NOTHING
     `).run(testTenant, Date.now(), Date.now());
@@ -199,6 +199,7 @@ describe('Backup Module - Automated Scheduler, Vacuum & Retention Daemon', () =>
     const originalPruneBackups = BackupService.pruneOldBackups;
     const completedRecord = {
       id: 'guarded-backup',
+      operator_id: testTenant,
       tenant_id: testTenant,
       backup_type: 'full_system' as const,
       filename: 'guarded.sqlite.gz',
@@ -248,6 +249,7 @@ describe('Backup Module - Automated Scheduler, Vacuum & Retention Daemon', () =>
     const originalPruneBackups = BackupService.pruneOldBackups;
     const completedRecord = {
       id: 'completed-before-pruning',
+      operator_id: testTenant,
       tenant_id: testTenant,
       backup_type: 'full_system' as const,
       filename: 'completed.sqlite.gz',
@@ -293,7 +295,7 @@ describe('Backup Module - Automated Scheduler, Vacuum & Retention Daemon', () =>
 
     db.prepare(`
       INSERT INTO backups (
-        id, tenant_id, backup_type, filename, relative_path,
+        id, operator_id, backup_type, filename, relative_path,
         file_size_bytes, checksum_sha256, status, created_at
       ) VALUES ('old-backup-id', ?, 'full_system', ?, ?, 24, 'dummy', 'completed', ?)
     `).run(testTenant, oldFilename, oldFilename, oldTimestamp);
