@@ -193,7 +193,7 @@ GarrisonOS is intentionally architected with **zero external runtime package dep
 
 ## Project Milestones
 
-For a comprehensive phase-by-phase implementation plan, milestone deliverables, and technical task breakdowns, see the [GarrisonOS MVP Roadmap](docs/ROADMAP.md). The progress below is tracked by topic so that implemented prototype code is not confused with completed MVP or production-ready work.
+For a comprehensive phase-by-phase implementation plan, milestone deliverables, two-week sprint execution schedule (Sprints 1–6), and technical task breakdowns, see the [GarrisonOS MVP Roadmap](docs/ROADMAP.md). The progress below is tracked by topic so that implemented prototype code is not confused with completed MVP or production-ready work.
 
 **Progress key:** ✅ Implemented and covered | 🟡 Partial or needs verification | ⬜ Not implemented
 
@@ -201,14 +201,14 @@ For a comprehensive phase-by-phase implementation plan, milestone deliverables, 
 |:---|:---|:---:|:---|
 |**1. Core Engine & Multi-Tenant Foundation**|Node.js HTTP/SQLite engine and native dependency boundary|✅|Implemented with standard-library runtime, WAL mode, and core test coverage.|
 ||AsyncLocalStorage context propagation and `X-Tenant-ID` isolation|✅|Implemented across HTTP middleware and EventBus async boundaries; covered by isolation tests.|
-||Tenant lifecycle management|⬜|No complete tenant administration or tenant onboarding lifecycle workflow is exposed.|
-||Authentication, sessions, tokens, and role-based access|🟡|HMAC tokens, scrypt hashing, spoofing prevention, and backup owner-role gates implemented; rate limiting across all routes remains.|
+||Tenant lifecycle management|⬜|No complete tenant administration or tenant onboarding lifecycle workflow is exposed (scheduled for Sprint 3).|
+||Authentication, sessions, tokens, and role-based access|🟡|HMAC tokens, scrypt hashing, spoofing prevention, and backup owner-role gates implemented; rate limiting across all routes remains (Sprint 3).|
 ||EventBus and base repository patterns|✅|EventBus pub/sub with synchronous context inheritance and base repository patterns fully operational.|
-|**2. Base Entity & Inventory Management**|Properties, portfolios, units, and inventory routes|🟡|Module repositories, routes, migrations, and tests exist; full UI coverage and vacant-unit turn workflows remain.|
-||Multi-role contacts directory|🟡|Unified directory and tests exist; vendor specialization profiles and W-9 tax flags need full integration.|
+|**2. Base Entity & Inventory Management**|Properties, portfolios, units, and inventory routes|🟡|Module repositories, routes, migrations, and tests exist; vacant-unit turn workflows in UI scheduled for Sprint 2.|
+||Multi-role contacts directory|🟡|Unified directory and tests exist; vendor specialization profiles and W-9 tax flags in UI scheduled for Sprint 2.|
 ||Validation, entity relationships, and REST CRUD completeness|🟡|Basic validation and CRUD paths exist; centralized declarative schema validation remains ongoing.|
-|**3. Core Property Operations**|Leasing lifecycle & statutory compliance|🟡|Lease routes, state transitions, and atomic deposit disposition exist; statutory notice periods and late-fee caps remain.|
-||Maintenance and work-order workflow|🟡|Ticket lifecycle, priority triage, vendor assignment, and test suites exist; dispatch notifications need completion.|
+|**3. Core Property Operations**|Leasing lifecycle & statutory compliance|🟡|Lease routes, state transitions, and atomic deposit disposition exist; statutory notice periods and renewal UI actions scheduled for Sprint 2.|
+||Maintenance and work-order workflow|🟡|Ticket lifecycle, priority triage, vendor assignment, and test suites exist; dispatch notifications scheduled for Sprint 2.|
 ||Cross-module operational events|✅|EventBus context propagation resolved; operational triggers (`lease.created`, `maintenance.completed`) implemented and tested.|
 |**4. Financial Ledger & Trust Accounting**|Immutable double-entry journal and integer-cents ledger|✅|Journal/ledger engine (`journal_entries`/`lines`), zero-sum debit/credit proofs, and reversal accounting implemented.|
 ||Statutory trust accounting & operating fund segregation|✅|Chart of Accounts separates `1010 Operating` and `1020 Trust`; strict non-commingling validation and deposit routing enforced.|
@@ -224,9 +224,9 @@ For a comprehensive phase-by-phase implementation plan, milestone deliverables, 
 ||Disaster-recovery restore|✅|CLI restore tooling (`scripts/restore.js`) with header validation, WAL cache cleanup, and migration execution.|
 ||Scheduled backups, monitoring, and vacuum routines|✅|In-process `BackupScheduler` daemon executing automated snapshots, online vacuum/optimize, and retention pruning.|
 |**7. MVP Verification, Hardening & Self-Hosting**|Unit/module tests and tenant-isolation regression coverage|✅|Core and module test suites pass with zero dependencies; deterministic event listeners replace legacy timer sleeps.|
-||Security review and production hardening|🟡|Token spoofing prevention and Actions SHA-pinning complete; comprehensive third-party audit planned for Tranche 4.|
+||Security review and production hardening|🟡|Token spoofing prevention and Actions SHA-pinning complete; comprehensive third-party audit planned for Sprint 3.|
 ||Secure release packaging (Method 2) & checksum verification|✅|Pre-packaged release archives with cryptographic SHA-256 verification implemented across installer tooling.|
-||Production daemon supervision & containerization|⬜|Turnkey Docker Compose bundle and Systemd service packaging scheduled for release hardening.|
+||Production daemon supervision & containerization|⬜|Turnkey Docker Compose bundle and Systemd service packaging scheduled for Sprint 2.|
 
 ---
 

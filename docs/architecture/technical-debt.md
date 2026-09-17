@@ -63,23 +63,19 @@ This document provides a technical critique of the GarrisonOS architecture, runt
 
 ---
 
-## 4. Polyglot Architecture & Presentation Layer Efficiency
+## 4. Presentation Layer Architecture & Efficiency
 
 ### Current State
 
-* Headless TypeScript backend engine (`node:http`, `node:sqlite`).
-* Server-rendered frontend presentation layer built in native PHP 8.2+ with semantic HTML5 and vanilla CSS custom properties.
-* Presentation layer communicates with the backend exclusively via HTTP/cURL loopback requests (`web/lib/api.php`).
+* Presentation layer completely rebased to **100% pure TypeScript SSR** (`web/lib/html.ts`, `web/server.ts`, `node:http`), entirely eliminating legacy PHP runtime dependencies.
+* Server-rendered HTML templates with automatic contextual XSS escaping (`html` tagged template).
+* HMAC-SHA256 signed cookie sessions and timing-safe CSRF validation.
+* Presentation layer communicates with the API engine via local loopback or shared in-process utilities.
 
-### Identified Risks & Limitations
+### Resolution & Evolution
 
-* **Dual-Runtime Operational Complexity**: Deploying GarrisonOS requires provisioning and supervising two runtime environments (Node.js 22+ and PHP 8.2+ with standard extensions `curl`, `pdo_sqlite`, `session`), requiring a process manager (e.g., systemd, supervisord, or multi-container Docker compose).
-* **Sequential Loopback Latency on Composite Views**: On composite pages (such as the main KPI dashboard rendered via `web/lib/hooks.php`), multiple module card callbacks fire sequentially. Each executes an independent cURL HTTP request against `127.0.0.1:3000`, multiplying request overhead and increasing Time to First Byte (TTFB).
-
-### Recommendations
-
-1. Provide a standard multi-container `docker-compose.yml` and unified production containerfile.
-2. Continue extending the batch endpoint (`POST /api/v1/batch`) as new dashboard data requirements emerge.
+* **Dual-Runtime Elimination**: The operational complexity of maintaining dual runtimes (Node.js and PHP) has been completely eliminated. GarrisonOS now deploys as a single, unified Node.js application.
+* **Batch Endpoint Hydration**: Sequential overhead has been mitigated with the implementation of `/api/v1/batch` (Sprint 1). Further aggregation into direct shared controller execution is planned for post-MVP.
 
 ---
 
@@ -87,20 +83,15 @@ This document provides a technical critique of the GarrisonOS architecture, runt
 
 ### Current State
 
-* Single-entry cash-basis ledger stored in `transactions` with integer cents precision.
-* Tax categorization directly aligned with IRS Schedule E expense lines.
-* Automated recurring rent generation with mid-month proration and idempotency keys (`rent_charge:{lease_id}:{YYYY_MM}`).
-* Double-entry General Ledger translation through customizable Chart of Accounts (`chart_of_accounts`), supporting export to QuickBooks Online (CSV), QuickBooks Desktop (IIF), and Web Connect (.QBO).
+* Native double-entry general ledger (`journal_entries` and `journal_lines`) enforcing strict zero-sum debit/credit balance proofs across all transactions.
+* Statutory fiduciary trust accounting segregating operating funds (`1010 Operating Checking`) from tenant security deposits (`1020 Security Deposit Trust Checking` and `2100 Tenant Security Deposits Held Liability`).
+* Automated Three-Way Bank Reconciliation verification schedules proving parity across bank statements, general ledger trust accounts, and active lease deposit liabilities.
+* Tax categorization directly aligned with IRS Schedule E expense lines and QuickBooks compatibility (QBO, IIF, OFX).
+* Automated monthly rent generation with mid-month proration and idempotency keys (`rent_charge:{lease_id}:{YYYY_MM}`).
 
-### Identified Risks & Limitations
+### Remaining Optimizations
 
-* **Security Deposit Trust Liability vs. Operating Funds**: Single-entry ledger tracking combines operating revenue and tenant security deposit trust liabilities within the same transaction table. The QuickBooks integration maps these to dedicated accounts (1010 Operating Checking vs 1020 Trust Checking, and 2100 Tenant Security Deposits Held), but statutory trust banking reconciliation reports remain an ongoing enhancement.
-* **Running Balance Performance**: Tenant running balances are calculated on-the-fly by aggregating all historical transactions for a given lease. While performant for small unit portfolios (<50 units), large transaction histories will require periodic snapshotting or indexed materialization.
-
-### Recommendations
-
-1. Provide automated trust bank account reconciliation reports comparing ledger deposit balances with bank balances.
-2. Introduce balance caching or periodic ledger checkpointing for long-running tenancies.
+* **Running Balance Checkpointing**: Tenant running balances are calculated dynamically across lease transaction histories. While optimal for small portfolios (<50 units), periodic balance snapshotting/checkpointing is scheduled for Sprint 4.
 
 ---
 
@@ -109,29 +100,29 @@ This document provides a technical critique of the GarrisonOS architecture, runt
 ### Current State
 
 * Password hashing using native `node:crypto.scrypt` with random 16-byte salt and constant-time verification (`timingSafeEqual`).
-* Stateless HMAC-SHA256 session tokens.
-* CSRF validation for all state-modifying requests in the PHP layer.
+* Stateless HMAC-SHA256 session tokens with `token_version` tracking in the database for instant revocation.
+* CSRF validation for all state-modifying requests in the TypeScript presentation layer.
 * Sliding-window in-memory rate limiting on authentication routes.
+* Fail-closed `APP_SECRET` verification on startup outside development and test environments.
 
-### Identified Risks & Limitations
+### Evolution & Action Items
 
-* **Legacy Token Invalidation**: New session tokens include a `token_version` claim and database-backed verification rejects mismatched versions or deleted users. Legacy tokens without a `tv` claim remain accepted for compatibility and cannot be revoked through the version check.
-* **Default Secret Fallbacks**: Non-development server startup now requires an explicit `APP_SECRET`.
-
-### Recommendations
-
-1. Decide when to remove support for legacy tokens without `tv`; after a documented compatibility window, reject them so every token is revocable through `token_version`.
-2. Keep deployment checks and environment documentation aligned with the explicit `APP_SECRET` startup requirement.
+* **Legacy Token Invalidation**: Support for legacy unversioned tokens without a `tv` claim is scheduled for formal deprecation and removal in Sprint 2, ensuring 100% of tokens are revocable through `token_version`.
+* **Global Rate Limiting**: Expanding sliding-window rate limiting across all operational routes is scheduled for Sprint 3.
 
 ---
 
 ## 7. Action Plan & Prioritized Matrix
 
-| Priority | Subsystem | Issue | Action Item | Status |
-| :--- | :--- | :--- | :--- | :--- |
-| **High** | **Context & Events** | Context loss in async event handlers | Auto-propagate `RequestContext` in `EventBus.publish()` | **Resolved** |
-| **High** | **Database Migrator** | Alphabetical migration execution | Topological sort migrations by `dependencies` in `module.json` | **Resolved** |
-| **Medium** | **Frontend API** | Sequential cURL overhead on composite pages | Provide composite/batch API endpoint for dashboard hydration | **Resolved** |
-| **Medium** | **HTTP Router** | Linear regex matching order sensitivity | Introduce static-first segment precedence in route dispatcher | Backlog |
-| **Medium** | **Security** | Legacy HMAC tokens without `tv` cannot be revoked | Define and document a compatibility window before rejecting legacy tokens | Planned |
-| **Low** | **Accounting** | Statutory trust reconciliation reporting | Add dedicated escrow/trust statutory compliance reports | Backlog |
+| Priority | Subsystem | Issue | Action Item | Scheduled Sprint | Status |
+| :--- | :--- | :--- | :--- | :---: | :--- |
+| **High** | **Context & Events** | Context loss in async event handlers | Auto-propagate `RequestContext` in `EventBus.publish()` | Sprint 1 | **Resolved** (PR #17) |
+| **High** | **Database Migrator** | Alphabetical migration execution | Topological sort migrations by `dependencies` in `module.json` | Sprint 1 | **Resolved** (PR #17) |
+| **High** | **Accounting** | Statutory trust reconciliation reporting | Implement non-commingling rules and 3-way bank rec | Sprint 1 | **Resolved** (PR #20) |
+| **High** | **Presentation Layer** | Dual-runtime operational complexity | Rebase to 100% pure TypeScript SSR | Sprint 1 | **Resolved** (PR #24) |
+| **Medium** | **Frontend API** | Sequential overhead on composite pages | Provide composite/batch API endpoint (`/api/v1/batch`) | Sprint 1 | **Resolved** (PR #19) |
+| **Medium** | **Packaging** | Lack of production supervision & containerization | Add Systemd service unit, Dockerfile & docker-compose | Sprint 2 | **In Planning** |
+| **Medium** | **HTTP Router** | Linear regex matching order sensitivity | Introduce static-first segment precedence in route dispatcher | Sprint 2 | **In Planning** |
+| **Medium** | **Security** | Legacy HMAC tokens without `tv` cannot be revoked | Enforce `token_version` requirement across all tokens | Sprint 2 | **In Planning** |
+| **Medium** | **Multi-Tenancy** | Tenant lifecycle governance | Add tenant provisioning, deactivation & storage quotas | Sprint 3 | **Planned** |
+| **Low** | **Accounting** | Ledger running balance performance | Introduce periodic balance snapshotting / checkpointing | Sprint 4 | **Planned** |

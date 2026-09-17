@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Synchronized project documentation across `docs/ROADMAP.md`, `docs/LLMREVIEW20260915.md`, `docs/architecture/technical-debt.md`, and `README.md` to establish the comprehensive execution roadmap for all planned sprints (Sprints 1 through 6) through MVP v0.1.0 GA and post-MVP releases.
 - Hardened presentation-layer validation, error handling, session and API transport security, multipart upload preservation, and filtered accounting exports.
 - **Complete Rebase to 100% Pure TypeScript**: Eliminated all 39 legacy PHP files (4,318 lines of code) across `web/` and all domain modules (`modules/*/frontend/`), transitioning the entire presentation layer to a native Server-Side Rendered (SSR) TypeScript architecture.
 - **Zero-Dependency Presentation Subsystem**: Implemented native TypeScript web presentation server (`web/server.ts`), front controller and router (`web/router.ts`), safe HTML tagged template system with automatic contextual XSS escaping (`web/lib/html.ts`), HMAC-SHA256 signed cookie session manager (`web/lib/session.ts`), timing-safe constant-time CSRF guard (`web/lib/csrf.ts`), dynamic UI hook registry (`web/lib/hooks.ts`), and static asset streaming handler with directory traversal guards (`web/static.ts`).

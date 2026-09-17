@@ -184,43 +184,89 @@ GarrisonOS is a **zero-dependency property management system** built on native N
 
 ---
 
-## Recommended 4-Week MVP Completion Plan
+---
 
-### Week 1-2: Foundation Hardening (Sprint 1)
+## Sprint Execution Roadmap: All Planned Sprints
 
-| Priority | Task | Effort | Impact |
-| ---------- | ------ | -------- | -------- |
-| 1 | Fix EventBus context propagation | 4h | Critical |
-| 2 | Implement topological migration sorting | 8h | Critical |
-| 3 | Add token revocation system | 6h | Critical |
-| 4 | Harden security (CORS, secrets) | 4h | High |
-| 5 | Implement batch API endpoint | 4h | Medium |
+### Sprint 1 (Weeks 1–2): Core Foundation & Architecture Hardening
+> **Status**: Completed (2026-09-17) | **Effort**: 32 hours | **Outcome**: Core stability established; 100% pure TypeScript presentation rebase
 
-**Sprint 1 Total**: ~26 hours | **Outcome**: Core stability established
+| Priority | Task | Effort | Impact | Status |
+| ---------- | ------ | -------- | -------- | :---: |
+| 1 | Fix EventBus context propagation (`RequestContext.run()`) | 4h | Critical | ✅ Resolved (PR #17) |
+| 2 | Implement topological migration sorting by dependencies | 8h | Critical | ✅ Resolved (PR #17) |
+| 3 | Add token revocation system (`token_version` column) | 6h | Critical | ✅ Resolved (PR #17) |
+| 4 | Harden security (CORS whitelist, fail-closed `APP_SECRET`) | 4h | High | ✅ Resolved (PR #18, #19) |
+| 5 | Implement batch API endpoint (`POST /api/v1/batch`) | 4h | Medium | ✅ Resolved (PR #19) |
+| 6 | Statutory trust accounting & 3-way reconciliation | 12h | Critical | ✅ Resolved (PR #20) |
+| 7 | Automated backup scheduler daemon (`BackupScheduler`) | 8h | High | ✅ Resolved (PR #22, #23) |
+| 8 | Pure TypeScript SSR presentation rebase (removed PHP) | 16h | High | ✅ Resolved (PR #24) |
 
-### Week 3-4: Production Readiness (Sprint 2)
+### Sprint 2 (Weeks 3–4): Production Readiness, Operator Workflows & Release Candidate
+> **Status**: In Planning / Next Sprint | **Target**: v0.1.0-RC1 | **Effort**: ~42 hours | **Outcome**: Turnkey deployment & verified E2E user journeys
 
-| Priority | Task | Effort | Impact |
-| ---------- | ------ | -------- | -------- |
-| 6 | Production packaging (systemd, supervisord) | 8h | High |
-| 7 | Automated backup scheduling | 6h | Medium |
-| 8 | Complete authentication integration | 8h | High |
-| 9 | Finish UI coverage | 16h | High |
-| 10 | Create E2E test suite | 12h | Medium |
+| Priority | Task | Effort | Impact | Status |
+| ---------- | ------ | -------- | -------- | :---: |
+| 9 | Production packaging (Systemd, Docker Compose, Caddy/Nginx) | 8h | High | Planned |
+| 10 | Interactive operator workflows in TS SSR (unit turns, lease actions) | 12h | High | Planned |
+| 11 | Vendor specialization badges & W-9 verification flags in UI | 4h | Medium | Planned |
+| 12 | HTTP Router static segment precedence over parameterized wildcards | 4h | Medium | Planned |
+| 13 | Comprehensive End-to-End (E2E) integration test suite | 14h | High | Planned |
 
-**Sprint 2 Total**: ~50 hours | **Outcome**: MVP production-ready
+### Sprint 3 (Weeks 5–6): Tenant Lifecycle, Security Audit & General Availability
+> **Status**: Planned | **Target**: v0.1.0 (MVP GA) | **Effort**: ~36 hours | **Outcome**: Production-ready self-hosted GA release
+
+| Priority | Task | Effort | Impact | Status |
+| ---------- | ------ | -------- | -------- | :---: |
+| 14 | Tenant lifecycle administration API & organization provisioning | 8h | High | Planned |
+| 15 | Global sliding-window rate limiting across all operational routes | 6h | High | Planned |
+| 16 | Formal pre-release security review & penetration audit | 8h | Critical | Planned |
+| 17 | Automated GitHub Actions release pipeline with SHA-256 signatures | 6h | High | Planned |
+| 18 | Self-Hosting Administrator Handbook & deployment runbooks | 8h | Medium | Planned |
+
+### Sprint 4 (Weeks 7–8): Tenant Self-Service, Preventative Maintenance & Communications
+> **Status**: Planned | **Target**: v0.2.0 | **Effort**: ~38 hours | **Outcome**: Enhanced self-service & automated notifications
+
+| Priority | Task | Effort | Impact | Status |
+| ---------- | ------ | -------- | -------- | :---: |
+| 19 | Magic-link authenticated Tenant Self-Service Portal | 12h | High | Planned |
+| 20 | Zero-dependency notification dispatcher (SMTP / webhook) | 8h | High | Planned |
+| 21 | Move-in / move-out condition inspection checklists | 8h | Medium | Planned |
+| 22 | Recurring preventative maintenance scheduling engine | 6h | Medium | Planned |
+| 23 | Periodic balance snapshotting & checkpointing for long tenancies | 4h | Medium | Planned |
+
+### Sprint 5 (Weeks 9–10): Dual-Engine Architecture & Native PostgreSQL Integration
+> **Status**: Planned | **Target**: v0.3.0 | **Effort**: ~44 hours | **Outcome**: Enterprise database backend & horizontal scalability
+
+| Priority | Task | Effort | Impact | Status |
+| ---------- | ------ | -------- | -------- | :---: |
+| 24 | Native PostgreSQL driver adapter implementing zero-dependency boundary | 16h | High | Planned |
+| 25 | Dual-engine migration validation harness (SQLite & PostgreSQL) | 10h | High | Planned |
+| 26 | Multi-instance clustering support behind load balancers | 10h | Medium | Planned |
+| 27 | S3-compatible shared object storage driver | 8h | Medium | Planned |
+
+### Sprint 6 (Weeks 11–12): Commercial Real Estate (CRE) & Integrated Banking Rails
+> **Status**: Planned | **Target**: v0.4.0 | **Effort**: ~40 hours | **Outcome**: Commercial leases & automated bank feed ingestion
+
+| Priority | Task | Effort | Impact | Status |
+| ---------- | ------ | -------- | -------- | :---: |
+| 28 | Triple Net (NNN) leases & Common Area Maintenance (CAM) engine | 14h | High | Planned |
+| 29 | CPI-indexed and fixed-percentage annual lease escalation schedules | 8h | Medium | Planned |
+| 30 | Direct OFX/QBO bank statement import parser & reconciliation engine | 12h | High | Planned |
+| 31 | Payment processor webhook ingestion & settlement journal entries | 6h | Medium | Planned |
 
 ---
 
 ## Risk Matrix
 
-| Risk | Likelihood | Impact | Severity | Mitigation |
-| ------ | ------------ | -------- | ---------- | ------------ |
-| EventBus context loss | Medium | Critical | High | Fix Week 1 |
-| FK migration violations | Medium | Critical | High | Fix Week 1 |
-| Stateless token vulnerability | Medium | Critical | High | Fix Week 1 |
-| Production packaging delay | High | High | High | Address Week 3 |
-| Missing UI blocks workflows | High | Medium | Medium | Address Week 4 |
+| Risk | Likelihood | Impact | Severity | Mitigation & Status |
+| ------ | ------------ | -------- | ---------- | -------------------- |
+| EventBus context loss | Medium | Critical | High | Resolved in Sprint 1 (`RequestContext.run()`) |
+| FK migration violations | Medium | Critical | High | Resolved in Sprint 1 (Topological dependency sort) |
+| Stateless token vulnerability | Medium | Critical | High | Resolved in Sprint 1 (`token_version` revocation) |
+| Production packaging delay | High | High | High | Scheduled in Sprint 2 (Systemd, Docker Compose) |
+| Missing UI operator workflows | Medium | Medium | Medium | Scheduled in Sprint 2 (Turnover state machine, renewals) |
+| Multi-tenant lifecycle governance | Medium | High | Medium | Scheduled in Sprint 3 (Tenant admin APIs & quotas) |
 
 ---
 
@@ -342,29 +388,35 @@ npm run check:hygiene   # Secret scanning
 - Documentation is comprehensive and accurate
 - Security fundamentals are strong
 
-### What Needs Attention
+### What Needs Attention (Sprint 2 & 3 Focus)
 
-- **Event-driven workflows are broken** (context loss in EventBus)
-- **Migration ordering is unreliable** (alphabetical vs dependency-based)
-- **Token security has gaps** (stateless revocation missing)
-- **Production deployment is incomplete** (no systemd/supervisord configs)
-- **UI coverage is uneven** (some modules have incomplete frontend)
-- **E2E testing is missing** (no comprehensive user journey tests)
+- **Resolved in Sprint 1**:
+  - Event-driven workflows context loss fixed (`RequestContext.run()` in EventBus).
+  - Migration ordering fixed with topological dependency sorting.
+  - Token stateless revocation fixed with `token_version` tracking.
+  - Presentation layer unified with 100% pure TypeScript SSR rebase.
+- **Active Focus for Sprint 2**:
+  - Production deployment packaging (systemd service unit, turnkey docker-compose).
+  - Operator UI workflow actions (vacant-unit turns, lease renewals/terminations).
+  - Comprehensive E2E test suite (`test/e2e/lifecycle.test.ts`).
+- **Active Focus for Sprint 3**:
+  - Multi-tenant organization administration API and lifecycle workflows.
+  - Pre-release third-party security verification and signed release automation.
 
 ---
 
 ## Success Metrics for MVP
 
-- [ ] All P0 critical issues resolved
-- [ ] All P1 high priority issues resolved
-- [ ] All MVP features functional and tested
-- [ ] Production packaging complete
-- [ ] Security review passed
-- [ ] E2E tests passing
-- [ ] Documentation complete
-- [ ] Deployment procedures documented
+- [x] All P0 critical issues resolved (Sprint 1 - PR #17)
+- [x] All P1 high priority issues resolved (Sprint 1 - PR #18, #19)
+- [ ] All MVP features functional and tested (Sprint 2)
+- [ ] Production packaging complete (Sprint 2)
+- [ ] E2E tests passing (Sprint 2)
+- [ ] Tenant lifecycle administration complete (Sprint 3)
+- [ ] Security review passed (Sprint 3)
+- [ ] Documentation complete & deployment runbooks published (Sprint 3)
 
-**Estimated Time to MVP**: 4-6 weeks with focused effort on critical path
+**Estimated Time to MVP**: 2-4 weeks remaining across Sprints 2 & 3
 
 ---
 
