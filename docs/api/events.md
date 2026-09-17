@@ -83,3 +83,15 @@ interface WorkOrderCompletedEvent {
   vendorContactId?: string;
 }
 ```
+
+### `backup.retention.failed`
+
+Fired when a completed scheduled backup is retained successfully but pruning older archives fails independently.
+
+```typescript
+interface BackupRetentionFailedEvent {
+  backupId: string;
+  error: string;
+  timestamp: number;
+}
+```

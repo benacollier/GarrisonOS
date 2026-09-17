@@ -26,6 +26,17 @@ const APP_SECRET = process.env['APP_SECRET'] || (
 const PORT = parseInt(process.env['PORT'] || '3000', 10);
 const HOST = process.env['HOST'] || '127.0.0.1';
 
+type BackupSchedulerReadiness = 'not-mounted' | 'disabled' | 'running' | 'failed';
+
+interface BackupSchedulerHandle {
+  start(): void;
+  stop(): Promise<void>;
+  getStatus(): { enabled: boolean; running: boolean };
+}
+
+let activeBackupScheduler: BackupSchedulerHandle | null = null;
+let backupSchedulerReadiness: BackupSchedulerReadiness = 'not-mounted';
+
 /**
  * Validate that deployments outside local development use a strong HMAC secret.
  *
@@ -76,6 +87,7 @@ export function createRouter(serverPort: number = PORT): Router {
       successResponse(res, {
         status: 'ready',
         database: 'connected',
+        backupScheduler: backupSchedulerReadiness,
         timestamp: Date.now()
       });
     } catch (err: any) {
@@ -523,6 +535,42 @@ export async function startServer(
   // Load all functional modules dynamically
   await loadModules(router, eventBus);
 
+  activeBackupScheduler = null;
+  backupSchedulerReadiness = 'not-mounted';
+
+  // Initialize the scheduler only when the optional backup module is mounted.
+  const backupModuleMounted = getLoadedModules().some((module) => module.manifest.id === 'backup');
+  if (backupModuleMounted) {
+    const configuredEnabled = process.env['BACKUP_SCHEDULE_ENABLED'];
+    const backupsRequired = configuredEnabled === undefined || (
+      configuredEnabled !== 'false' && configuredEnabled !== '0'
+    );
+
+    try {
+      const schedulerMod = await import('../modules/backup/backend/scheduler.js');
+      if (!schedulerMod.BackupScheduler) {
+        throw new Error('Mounted backup module does not export BackupScheduler');
+      }
+
+      const scheduler = schedulerMod.BackupScheduler.getInstance();
+      activeBackupScheduler = scheduler;
+      if (scheduler.getStatus().enabled) {
+        scheduler.start();
+        backupSchedulerReadiness = 'running';
+      } else {
+        backupSchedulerReadiness = 'disabled';
+      }
+    } catch (err) {
+      backupSchedulerReadiness = backupsRequired ? 'failed' : 'disabled';
+      if (backupsRequired) {
+        throw err;
+      }
+      process.stderr.write(
+        `[BackupScheduler] Scheduler is disabled after initialization failed: ${String(err)}\n`
+      );
+    }
+  }
+
   const server = createHttpServer((req: IncomingMessage, res: ServerResponse) => {
     router.handle(req, res);
   });
@@ -548,7 +596,8 @@ if (isDirectExecution) {
     process.exit(1);
   });
 
-  const cleanup = () => {
+  const cleanup = async () => {
+    await activeBackupScheduler?.stop();
     closeDatabase();
     process.exit(0);
   };

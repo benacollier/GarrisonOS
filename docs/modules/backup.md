@@ -57,10 +57,39 @@ All endpoints require standard `X-Tenant-ID` header and authentication tokens.
 | `POST` | `/api/v1/backups/:id/verify` | Run SHA-256 integrity verification against the physical file |
 | `POST` | `/api/v1/backups/:id/restore` | Restore tenant data (`{ "mode": "clean_slate" \| "merge" }`) |
 | `DELETE` | `/api/v1/backups/:id` | Soft-delete record and unlink physical archive from storage |
+| `GET` | `/api/v1/backups/scheduler/status` | Get background scheduler running state, intervals, next runs, and metrics |
+| `POST` | `/api/v1/backups/scheduler/trigger` | Owner-only trigger for an immediate scheduled backup or vacuum (`{ "action": "vacuum" }`) |
 
 ---
 
-## 4. Restoration Modes
+## 4. Automated Background Scheduler & Maintenance Daemon
+
+The module includes an in-process, zero-dependency background daemon (`BackupScheduler` in `modules/backup/backend/scheduler.ts`) managing recurring system resilience routines without external cron requirements.
+
+### Capabilities & Schedules
+
+1. **Automated Point-in-Time Snapshots**:
+   - Executes periodic WAL checkpoints (`PRAGMA wal_checkpoint(TRUNCATE);`) and compressed database backups (`garrison-db-<timestamp>.sqlite.gz`).
+   - Computes SHA-256 integrity checksums and records backups in the audit registry.
+   - Emits `backup.scheduled.completed` or `backup.scheduled.failed` events over `EventBus`.
+2. **Database Maintenance & Vacuuming**:
+   - Runs periodic WAL truncation, query optimizer statistics updates (`PRAGMA optimize;`), and disk page reclamation (`VACUUM;`) on a dedicated worker thread so synchronous SQLite maintenance does not block the server event loop.
+   - Emits `database.vacuumed` events with duration and checkpoint metrics.
+3. **Retention Policy Pruning**:
+   - Automatically unlinks and soft-deletes backup archives exceeding `BACKUP_RETENTION_DAYS`.
+
+### Configuration Knobs
+
+| Environment Variable | Default | Description |
+| :--- | :---: | :--- |
+| `BACKUP_SCHEDULE_ENABLED` | `true` | Enable or disable the in-process background scheduler. |
+| `BACKUP_INTERVAL_HOURS` | `24` | Hours between automated full system database snapshots (greater than 0, at most 596). |
+| `BACKUP_RETENTION_DAYS` | `30` | Days to retain backup archives before automated pruning. |
+| `BACKUP_VACUUM_INTERVAL_HOURS` | `168` | Hours between database vacuum and page reclamation routines (greater than 0, at most 596; default: 7 days). |
+
+---
+
+## 5. Restoration Modes
 
 ### Tenant-Level Restoration (`tenant_data`)
 
