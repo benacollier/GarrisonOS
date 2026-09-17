@@ -280,11 +280,7 @@ Before submitting any pull request or committing changes, contributors and agent
 
 ## 7. Agent Tool & Context Hygiene Directives
 
-To safeguard token quotas and maintain fast execution:
+To safeguard context windows and maintain fast, reliable execution:
 
 1. **Tool Slicing Mandate**: Agents must use `StartLine` and `EndLine` on `view_file` to read only the pertinent 50–120 lines. Dumping entire files larger than 100 lines into context is prohibited.
 2. **Mechanical Verification First**: Run `npm.cmd run check:hygiene` and `npm.cmd test` rather than reading raw files to inspect whole-repo compliance.
-3. **Multi-Tier Context Offloading**: For multi-file reconnaissance, agents must invoke `llm_worker_read`:
-   * **Tier 1 (Cloud Primary)**: Direct NVIDIA NIM Nemotron 3 Super (9s latency, 42 tok/s, 0 Gemini tokens, 0 local VRAM).
-   * **Tier 2 (Offline Backup)**: Local Ollama Qwen 2.5 Coder 14B (single-shot for inputs $\le 24\text{k}$ tokens, 0 Gemini tokens).
-   * **Tier 3 (Final Fallback)**: Gemini 3.8 Flash (Low) direct inspection, strictly governed by targeted line-range slicing.

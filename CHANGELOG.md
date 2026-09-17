@@ -23,8 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Multi-tier LLM worker reconnaissance architecture (NVIDIA NIM Nemotron 3 Super primary with local Ollama Qwen 2.5 Coder 14B fallback and guarded Gemini line-slicing) protecting API quotas.
-- Development tooling and background AI worker architecture guide (`docs/development/tooling.md`) and unified root acknowledgements and attributions registry (`ATTRIBUTIONS.md`).
+- Development tooling and repository verification guide (`docs/development/tooling.md`) and unified root acknowledgements and attributions registry (`ATTRIBUTIONS.md`).
 - Low-token test runner reporter in `scripts/test.js` outputting single-line pass summaries and emitting full diagnostic output only on failure.
 - Unified architectural and compliance validation scanner in `scripts/check-hygiene.js` enforcing zero runtime dependencies, strict equality, synchronous SQLite, parameterized SQL, tenant parameter isolation, and fail-closed scripts in <150ms.
 - Section 7 Agent Tool & Context Hygiene Directives in `AGENTS.md` mandating line-range slicing on `view_file` and mechanical test/hygiene verification over raw context ingestion.

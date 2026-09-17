@@ -1,42 +1,10 @@
-# Development Tooling & AI Worker Architecture
+# Development Tooling & Verification Guide
 
-This guide documents the development tooling, multi-tier background AI worker architecture, test reporter, and repository compliance scanner utilized across the GarrisonOS developer environment. For complete open-source attributions and third-party notices, see [ATTRIBUTIONS.md](../../ATTRIBUTIONS.md).
-
----
-
-## 1. Multi-Tier Background Reconnaissance Architecture
-
-To minimize primary model context consumption and safeguard API quotas (e.g. Gemini 3.8 Flash Low RPM/TPM limits), GarrisonOS developers and coding agents utilize a tiered background worker system via the `llm-worker-tools` Model Context Protocol (MCP) server:
-
-```text
-[Tier 1: Cloud Primary] ──► Direct NVIDIA NIM (Nemotron 3 Super)
-       │ (if network down, 429, or timeout)
-       ▼
-[Tier 2: Zero-Cost Local] ──► Local Ollama (Qwen 2.5 Coder 14B, <= 24k tokens)
-       │ (if Ollama stopped, OOM, or model missing)
-       ▼
-[Tier 3: Guarded Fallback] ──► Primary Agent (Targeted Line Slices Only)
-```
-
-### Tier Specifications
-
-* **Tier 1 (Cloud Primary - High Throughput & Massive Context)**:
-  * **Engine**: [NVIDIA NIM (Inference Microservices)](https://build.nvidia.com/)
-  * **Model**: `nvidia/nemotron-3-super-120b-a12b`
-  * **Characteristics**: ~42 tokens/sec throughput, ~9.8s latency, 128k+ context ceiling, 0 local GPU VRAM consumption.
-  * **Configuration**: Configured via `LLM_BACKEND_BASE_URL=https://integrate.api.nvidia.com/v1` and personal NVIDIA developer API keys in `~/.llm-worker-tools/.env`.
-* **Tier 2 (Offline Backup - Zero API Cost, Local Sovereignty)**:
-  * **Engine**: [Ollama](https://ollama.com/) *(MIT License)*
-  * **Model**: [Qwen 2.5 Coder 14B](https://github.com/QwenLM/Qwen2.5-Coder) by Alibaba Cloud *(Apache-2.0 License)*
-  * **Characteristics**: Runs locally on host hardware. Governed by a strict $\le 24\text{k}$ token single-shot ceiling guard to prevent VRAM exhaustion or multi-chunk turn delays.
-  * **Configuration**: `LLM_FALLBACK_BASE_URL=http://localhost:11434/v1`.
-* **Tier 3 (Guarded Primary Fallback)**:
-  * Triggered only if both Tier 1 and Tier 2 are unavailable.
-  * Strictly governed by Section 7 of [AGENTS.md](../../AGENTS.md) (mandatory line-range slicing with `StartLine`/`EndLine`, max 80–120 lines; whole-file dumping is prohibited).
+This guide documents the development tooling, test reporter, and repository compliance scanner utilized across the GarrisonOS developer environment. For complete open-source attributions and third-party notices, see [ATTRIBUTIONS.md](../../ATTRIBUTIONS.md).
 
 ---
 
-## 2. Low-Token Test Reporter
+## 1. Test Reporter & Diagnostic Harness
 
 * **Script**: `scripts/test.js`
 * **Default Behavior**: Buffers `node:test` execution and outputs a single succinct line on success:
@@ -45,13 +13,13 @@ To minimize primary model context consumption and safeguard API quotas (e.g. Gem
   ✔ All test suites passed (21 suites in 1.29s, 0 failures).
   ```
 
-  *(Reduces token consumption from ~2,500 tokens down to ~12 tokens per run).*
+  *(Maintains a clean terminal output while preserving context).*
 * **Failure Mode**: Immediately dumps full stdout/stderr, failed assertions, and stack traces on any failure.
 * **Diagnostic Flag**: Supports `--verbose` or `-v` (`npm test -- --verbose` or `node scripts/test.js --verbose`) for manual full TAP/spec logs.
 
 ---
 
-## 3. Comprehensive Repository Compliance Scanner
+## 2. Comprehensive Repository Compliance Scanner
 
 * **Script**: `scripts/check-hygiene.js`
 * **Execution**: `npm run check:hygiene` or `npm run check` (runs in <150ms with zero runtime dependencies).
@@ -63,4 +31,3 @@ To minimize primary model context consumption and safeguard API quotas (e.g. Gem
   5. **SQL Portability**: Enforces parameterized queries (`?`), PostgreSQL compatibility (rejects `AUTOINCREMENT`, `INSERT OR REPLACE/IGNORE`), and UTC timestamps (rejects SQLite `datetime` functions).
   6. **Fail-Closed Security**: Validates cryptographic SHA256 checksum verification and non-zero exit codes in installer scripts.
   7. **Host Path & Credential Hygiene**: Scans for host-specific absolute filesystem paths and exposed credentials or secrets.
-

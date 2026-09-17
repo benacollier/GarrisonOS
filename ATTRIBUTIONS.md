@@ -20,14 +20,10 @@ GarrisonOS is built on and inspired by foundational open-source software, standa
 
 ---
 
-## 3. Development Tooling & AI Worker Infrastructure
+## 3. Development Tooling & Quality Assurance
 
 * **[TypeScript](https://www.typescriptlang.org/)** *(Apache-2.0 License)*: Static type checking and compiler utilized exclusively at development and build time.
 * **[@types/node](https://github.com/DefinitelyTyped/DefinitelyTyped)** *(MIT License)*: Type definitions for the Node.js standard library utilized exclusively during build-time compilation.
-* **[LLM Worker Tools](https://github.com/thevahidal/llm-worker-tools)** *(MIT License)*: Model Context Protocol (MCP) server offloading repetitive code analysis and scaffolding to background backends.
-* **[NVIDIA NIM & Nemotron 3 Super](https://build.nvidia.com/)** *(NVIDIA Community License)*: Hosted microservice API used in development for high-throughput, context-isolated code reconnaissance and token quota preservation.
-* **[Ollama](https://ollama.com/)** *(MIT License)*: Local lightweight inference engine powering offline backup background worker tasks.
-* **[Qwen 2.5 Coder](https://github.com/QwenLM/Qwen2.5-Coder)** *(Apache-2.0 License)*: Open-weights coding model powering local offline worker extraction tasks.
 * **[Betterleaks](https://github.com/betterleaks/betterleaks)** *(Apache-2.0 License)*: High-speed repository secret and sensitive credential scanning used across our continuous integration and security pipelines.
 * **[markdownlint](https://github.com/DavidAnson/markdownlint)** *(MIT License)*: Static style and syntax analysis rules powering repository documentation quality and lint standards.
 
