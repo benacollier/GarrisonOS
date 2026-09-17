@@ -12,7 +12,6 @@ const args = process.argv.slice(2);
 const isHelp = args.includes('--help') || args.includes('-h');
 const shouldSeed = args.includes('--seed');
 const skipBuild = args.includes('--skip-build');
-const skipPhpCheck = args.includes('--skip-php-check') || args.includes('--force');
 const isQuiet = args.includes('--quiet') || args.includes('-q');
 
 function log(msg) {
@@ -35,8 +34,6 @@ Usage:
 Options:
   --seed             Seed the database with a realistic demo portfolio after migration
   --skip-build       Skip TypeScript compilation (useful if pre-built distribution is present)
-  --skip-php-check   Bypass PHP runtime and extension preflight checks
-  --force            Alias for --skip-php-check
   --quiet, -q        Suppress non-essential progress output
   --help, -h         Display this help message
 \n`);
@@ -48,7 +45,7 @@ log('  GarrisonOS Installation & Setup Tool  ');
 log('========================================\n');
 
 // 1. Check Node.js Version & node:sqlite capability
-log('[1/5] Checking Node.js runtime environment...');
+log('[1/4] Checking Node.js runtime environment...');
 const [nodeMajor, nodeMinor] = process.versions.node.split('.').map(Number);
 if (nodeMajor < 22 || (nodeMajor === 22 && nodeMinor < 5)) {
   error(`❌ Node.js 22.5.0 or higher is required. Detected version: v${process.versions.node}`);
@@ -64,51 +61,8 @@ try {
   process.exit(1);
 }
 
-// 2. Check PHP Runtime & Required Extensions
-if (!skipPhpCheck) {
-  log('[2/5] Checking PHP presentation layer requirements...');
-  const phpVersionCheck = spawnSync('php', ['-v'], { encoding: 'utf8' });
-  if (phpVersionCheck.error) {
-    error('❌ PHP CLI was not found in PATH.');
-    error('   PHP 8.2+ with curl, session, filter, and pdo_sqlite extensions is required.');
-    error('   Please install PHP: https://www.php.net/downloads');
-    error('   (Or run setup with --skip-php-check to bypass)');
-    process.exit(1);
-  }
-
-  const phpVersionMatch = phpVersionCheck.stdout.match(/PHP\s+([0-9]+)\.([0-9]+)/i);
-  if (phpVersionMatch) {
-    const phpMajor = parseInt(phpVersionMatch[1], 10);
-    const phpMinor = parseInt(phpVersionMatch[2], 10);
-    if (phpMajor < 8 || (phpMajor === 8 && phpMinor < 2)) {
-      error(`❌ PHP 8.2 or higher is required. Detected version: ${phpMajor}.${phpMinor}`);
-      process.exit(1);
-    }
-  }
-
-  const phpModulesCheck = spawnSync('php', ['-m'], { encoding: 'utf8' });
-  if (phpModulesCheck.stdout) {
-    const installedModules = phpModulesCheck.stdout.toLowerCase().split(/\r?\n/).map(s => s.trim());
-    const requiredExtensions = ['curl', 'session', 'filter', 'pdo_sqlite'];
-    const missingExtensions = requiredExtensions.filter(ext => !installedModules.includes(ext));
-
-    if (missingExtensions.length > 0) {
-      error(`❌ Missing required PHP extensions: ${missingExtensions.join(', ')}`);
-      error('   Please enable them in your php.ini:');
-      for (const ext of missingExtensions) {
-        error(`     extension=${ext}`);
-      }
-      error('   (Or run setup with --skip-php-check to bypass)');
-      process.exit(1);
-    }
-    log('  ✔ PHP 8.2+ detected with all required extensions (curl, session, filter, pdo_sqlite)');
-  }
-} else {
-  log('[2/5] Skipping PHP presentation layer checks (--skip-php-check)');
-}
-
-// 3. Setup .env & Cryptographic Secret
-log('[3/5] Configuring environment & security secrets...');
+// 2. Setup .env & Cryptographic Secret
+log('[2/4] Configuring environment & security secrets...');
 const envPath = path.join(rootDir, '.env');
 const envExamplePath = path.join(rootDir, '.env.example');
 
@@ -145,8 +99,8 @@ const storageDir = path.join(rootDir, 'storage', 'uploads');
 mkdirSync(storageDir, { recursive: true });
 log(`  ✔ File storage directory verified (${path.relative(rootDir, storageDir)})`);
 
-// 4. Compile TypeScript (if building from source)
-log('[4/5] Preparing backend runtime build...');
+// 3. Compile TypeScript (if building from source)
+log('[3/4] Preparing backend runtime build...');
 const distServerPath = path.join(rootDir, 'dist', 'api', 'server.js');
 const tsconfigPath = path.join(rootDir, 'tsconfig.json');
 
@@ -168,8 +122,8 @@ if (!skipBuild && existsSync(tsconfigPath)) {
   process.exit(1);
 }
 
-// 5. Run Database Migrations
-log('[5/5] Executing database migrations...');
+// 4. Run Database Migrations
+log('[4/4] Executing database migrations...');
 try {
   const migratorPath = path.join(rootDir, 'dist', 'database', 'migrator.js');
   execSync(`node "${migratorPath}"`, { cwd: rootDir, stdio: 'inherit' });

@@ -24,13 +24,13 @@
     "api/**/*",
     "database/**/*",
     "modules/**/*",
-    "test/**/*"
+    "test/**/*",
+    "web/**/*"
   ],
   "exclude": [
     "node_modules",
     "dist",
-    "storage",
-    "web"
+    "storage"
   ]
 }
 

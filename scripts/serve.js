@@ -254,28 +254,26 @@ async function main() {
     process.exit(1);
   }
 
-  // 3. Spawn PHP Built-in Web Server
-  process.stdout.write(`[frontend] Launching PHP Presentation Layer on http://${webHost}:${webPort}...\n`);
+  // 3. Spawn TypeScript Web Presentation Server
+  process.stdout.write(`[frontend] Launching TypeScript Presentation Layer on http://${webHost}:${webPort}...\n`);
 
-  const phpEnv = {
+  const webEnv = {
     ...process.env,
     API_URL: `http://${apiHost}:${apiPort}`,
+    WEB_PORT: String(webPort),
+    WEB_HOST: webHost,
     PORT: String(apiPort)
   };
 
-  const phpProc = spawn('php', [
-    '-S', `${webHost}:${webPort}`,
-    '-t', 'web',
-    'web/index.php'
-  ], {
+  const webProc = spawn(process.execPath, [path.join('dist', 'web', 'server.js')], {
     cwd: rootDir,
-    env: phpEnv,
+    env: webEnv,
     stdio: ['pipe', 'pipe', 'pipe']
   });
 
-  runningProcesses.push(phpProc);
+  runningProcesses.push(webProc);
 
-  phpProc.stdout.on('data', (data) => {
+  webProc.stdout.on('data', (data) => {
     const text = data.toString().trim();
     if (text) {
       for (const line of text.split(/\r?\n/)) {
@@ -284,19 +282,18 @@ async function main() {
     }
   });
 
-  phpProc.stderr.on('data', (data) => {
+  webProc.stderr.on('data', (data) => {
     const text = data.toString().trim();
     if (text) {
-      // Filter standard PHP server request logs if desired or show cleanly
       for (const line of text.split(/\r?\n/)) {
-        process.stdout.write(`[frontend] ${line}\n`);
+        process.stderr.write(`[frontend] ${line}\n`);
       }
     }
   });
 
-  phpProc.on('exit', (code) => {
+  webProc.on('exit', (code) => {
     if (code !== null && code !== 0) {
-      process.stderr.write(`[frontend] PHP server exited with code ${code}\n`);
+      process.stderr.write(`[frontend] Web server exited with code ${code}\n`);
       terminateAll();
       process.exit(code);
     }
