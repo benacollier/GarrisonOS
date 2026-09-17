@@ -27,7 +27,7 @@ jobs:
           path-to-signatures: 'signatures/version1/cla.json'
           path-to-document: 'https://github.com/${{ github.repository }}/blob/main/docs/legal/CLA.md'
           branch: 'main'
-          allowlist: 'bot*|*bot,garrison-bot'
+          allowlist: 'bot*|*bot,garrison-bot,coderabbitai[bot],coderabbitai'
           custom-notsigned-prcomment: |
             Thank you for your contribution to GarrisonOS! 🏰
 
