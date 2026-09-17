@@ -7,6 +7,8 @@ import { createTestDb, runInTenantContext } from '../../../test/helpers.js';
 import { BackupRepository } from '../backend/repository.js';
 import { BackupService } from '../backend/service.js';
 import { closeDatabase, getDatabase } from '../../../database/client.js';
+import { Router } from '../../../api/router.js';
+import { registerRoutes } from '../backend/routes.js';
 
 describe('Backup Module - Snapshots, Exports, and Integrity Verification', () => {
   const testTenant = 'tenant-backup-test';
@@ -238,5 +240,83 @@ describe('Backup Module - Snapshots, Exports, and Integrity Verification', () =>
       // Physically removed from disk
       assert.equal(fs.existsSync(filePath), false);
     });
+  });
+
+  it('validates query parameters defensively on backup listing route', async () => {
+    const router = new Router();
+    registerRoutes(router);
+
+    const dispatch = async (query: string): Promise<{ status: number; body: any }> => {
+      return runInTenantContext(testTenant, async () => {
+        let statusCode = 200;
+        let responseBody = '';
+
+        const req: any = {
+          method: 'GET',
+          url: `/api/v1/backups${query}`,
+          headers: { host: '127.0.0.1:3000' },
+          socket: { remoteAddress: '127.0.0.1' },
+          on: () => {},
+          once: () => {},
+          emit: () => false
+        };
+
+        const res: any = {
+          statusCode: 200,
+          setHeader: () => {},
+          writeHead: (code: number) => {
+            statusCode = code;
+          },
+          end: (chunk?: string) => {
+            if (chunk) responseBody += chunk;
+          }
+        };
+
+        await router.handle(req, res);
+        return {
+          status: statusCode,
+          body: responseBody ? JSON.parse(responseBody) : null
+        };
+      });
+    };
+
+    // Valid requests
+    const validDefault = await dispatch('');
+    assert.equal(validDefault.status, 200);
+    assert.equal(validDefault.body.success, true);
+
+    const validParams = await dispatch('?limit=10&offset=0');
+    assert.equal(validParams.status, 200);
+    assert.equal(validParams.body.success, true);
+
+    // Negative limit
+    const negLimit = await dispatch('?limit=-5');
+    assert.equal(negLimit.status, 400);
+    assert.equal(negLimit.body.error.code, 'VALIDATION_ERROR');
+
+    // Limit out of bounds (> 100)
+    const bigLimit = await dispatch('?limit=250');
+    assert.equal(bigLimit.status, 400);
+    assert.equal(bigLimit.body.error.code, 'VALIDATION_ERROR');
+
+    // Non-integer limit
+    const floatLimit = await dispatch('?limit=10.5');
+    assert.equal(floatLimit.status, 400);
+    assert.equal(floatLimit.body.error.code, 'VALIDATION_ERROR');
+
+    // Non-numeric limit (NaN)
+    const nanLimit = await dispatch('?limit=invalid');
+    assert.equal(nanLimit.status, 400);
+    assert.equal(nanLimit.body.error.code, 'VALIDATION_ERROR');
+
+    // Negative offset
+    const negOffset = await dispatch('?offset=-1');
+    assert.equal(negOffset.status, 400);
+    assert.equal(negOffset.body.error.code, 'VALIDATION_ERROR');
+
+    // Non-integer offset
+    const nanOffset = await dispatch('?offset=foo');
+    assert.equal(nanOffset.status, 400);
+    assert.equal(nanOffset.body.error.code, 'VALIDATION_ERROR');
   });
 });
