@@ -107,6 +107,18 @@ describe('Web Presentation - WebRouter Subsystem', () => {
     assert.ok(getOutput().includes('Page Not Found'));
   });
 
+  for (const inheritedPath of ['/constructor', '/toString', '/valueOf']) {
+    it(`renders 404 for inherited object member ${inheritedPath}`, async () => {
+      const { ctx, res, getOutput } = createMockContext(inheritedPath, {
+        user: { id: 'u1', email: 'test@garrison.local', first_name: 'Test', last_name: 'User', role: 'admin', tenant_id: 't1' }
+      });
+      await WebRouter.dispatch(ctx);
+
+      assert.equal(res.statusCode, 404);
+      assert.ok(getOutput().includes('Page Not Found'));
+    });
+  }
+
   it('redirects to /setup when system is not configured', async () => {
     const { ctx, res } = createMockContext('/login', { isConfigured: false });
     await WebRouter.dispatch(ctx);

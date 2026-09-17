@@ -16,11 +16,11 @@ export async function handle(ctx: PageContext): Promise<PageResult> {
   let properties: any[] = [];
   let error: string | null = null;
 
-  try {
-    const params = new URLSearchParams();
-    params.set('year', String(selectedYear));
-    if (selectedProperty) params.set('property_id', selectedProperty);
+  const params = new URLSearchParams();
+  params.set('year', String(selectedYear));
+  if (selectedProperty) params.set('property_id', selectedProperty);
 
+  try {
     const res = await ctx.api.get(`/api/v1/accounting/schedule-e?${params.toString()}`);
     report = res?.data?.report ?? null;
 
@@ -161,7 +161,7 @@ export async function handle(ctx: PageContext): Promise<PageResult> {
         <p class="page-subtitle">Cash-basis net operating income, rental income, and categorized operating expenses.</p>
       </div>
       <div class="btn-group">
-        <a href="/api/v1/accounting/export/schedule-e.csv?year=${selectedYear}" class="btn btn-secondary" target="_blank">Export Schedule E CSV</a>
+        <a href="/api/v1/accounting/export/schedule-e.csv?${params.toString()}" class="btn btn-secondary" target="_blank">Export Schedule E CSV</a>
       </div>
     </div>
 

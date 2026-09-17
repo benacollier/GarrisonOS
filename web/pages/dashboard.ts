@@ -21,7 +21,9 @@ export interface DashboardPageOptions {
 
 function formatDate(epochMs: number): string {
   try {
+    if (!Number.isFinite(epochMs)) return '';
     const d = new Date(epochMs);
+    if (!Number.isFinite(d.getTime())) return '';
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     return `${months[d.getUTCMonth()]} ${d.getUTCDate()}`;
   } catch {
@@ -195,4 +197,3 @@ export async function handle(ctx: PageContext): Promise<PageResult> {
     content,
   };
 }
-

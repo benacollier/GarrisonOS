@@ -82,8 +82,11 @@ garrison.yourdomain.com {
 
 ```nginx
 server {
-    listen 80;
+    listen 443 ssl;
     server_name garrison.yourdomain.com;
+
+    ssl_certificate /etc/letsencrypt/live/garrison.yourdomain.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/garrison.yourdomain.com/privkey.pem;
 
     location / {
         proxy_pass http://127.0.0.1:8080;
@@ -92,6 +95,13 @@ server {
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
     }
+}
+
+server {
+    listen 80;
+    server_name garrison.yourdomain.com;
+
+    return 301 https://$host$request_uri;
 }
 ```
 

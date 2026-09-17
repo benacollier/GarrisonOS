@@ -1,4 +1,5 @@
 import http from 'node:http';
+import https from 'node:https';
 
 export class ApiException extends Error {
   constructor(
@@ -41,6 +42,12 @@ export class ApiClient {
   ): Promise<T> {
     const cleanPath = path.startsWith('/') ? path : `/${path}`;
     const url = new URL(this.baseUrl + cleanPath);
+    const isHttps = url.protocol === 'https:';
+    const isLoopback = url.hostname === 'localhost' || url.hostname === '127.0.0.1' || url.hostname === '[::1]';
+
+    if (this.authToken && url.protocol === 'http:' && !isLoopback) {
+      throw new ApiException('Refusing to send authentication over non-loopback HTTP', 'INSECURE_TRANSPORT', 400);
+    }
 
     const headers: Record<string, string> = {
       'Accept': 'application/json',
@@ -62,10 +69,10 @@ export class ApiClient {
     }
 
     return new Promise((resolve, reject) => {
-      const req = http.request(
+      const req = (isHttps ? https : http).request(
         {
           hostname: url.hostname,
-          port: url.port || 80,
+          port: url.port || (isHttps ? 443 : 80),
           path: url.pathname + url.search,
           method,
           headers,

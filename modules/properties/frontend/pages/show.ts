@@ -21,8 +21,8 @@ export async function handle(ctx: PageContext): Promise<PageResult> {
     }
 
     try {
-      const marketRent = parseFloat(ctx.body['market_rent'] ?? '0');
-      const targetDeposit = parseFloat(ctx.body['target_deposit'] ?? '0');
+      const marketRent = parseFloat(ctx.body['market_rent'] || '0') || 0;
+      const targetDeposit = parseFloat(ctx.body['target_deposit'] || '0') || 0;
 
       await ctx.api.post('/api/v1/properties/units', {
         property_id: id,

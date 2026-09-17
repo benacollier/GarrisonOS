@@ -47,7 +47,8 @@ function parseRequestBody(req: http.IncomingMessage): Promise<Record<string, any
         return;
       }
 
-      const bodyStr = buffer.toString('utf8');
+      const isMultipart = contentType.includes('multipart/form-data');
+      const bodyStr = buffer.toString(isMultipart ? 'latin1' : 'utf8');
 
       if (contentType.includes('application/json')) {
         try {
@@ -72,7 +73,7 @@ function parseRequestBody(req: http.IncomingMessage): Promise<Record<string, any
         return;
       }
 
-      if (contentType.includes('multipart/form-data')) {
+      if (isMultipart) {
         try {
           const match = contentType.match(/boundary=(?:"([^"]+)"|([^;]+))/i);
           if (!match) {
@@ -101,9 +102,9 @@ function parseRequestBody(req: http.IncomingMessage): Promise<Record<string, any
               const filename = filenameMatch[1];
               result['filename'] = filename;
               // Encode uploaded binary as base64
-              result['backup_data'] = Buffer.from(contentSection, 'binary').toString('base64');
+              result['backup_data'] = Buffer.from(contentSection, 'latin1').toString('base64');
             } else {
-              result[fieldName] = contentSection;
+              result[fieldName] = Buffer.from(contentSection, 'latin1').toString('utf8');
             }
           }
           resolve(result);

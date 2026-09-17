@@ -33,6 +33,9 @@ export async function handle(ctx: PageContext): Promise<PageResult> {
 
     try {
       const amountCents = Math.round(parseFloat(ctx.body['amount'] ?? '0') * 100);
+      if (!Number.isFinite(amountCents) || amountCents <= 0) {
+        throw new Error('Amount must be greater than zero.');
+      }
       const txDate = new Date(ctx.body['transaction_date'] ?? Date.now()).getTime();
 
       await ctx.api.post('/api/v1/accounting/transactions', {

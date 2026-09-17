@@ -13,8 +13,20 @@ export async function handle(ctx: PageContext): Promise<PageResult> {
   try {
     const res = await ctx.api.get(`/api/v1/contacts/${encodeURIComponent(id)}`);
     contact = res?.data?.contact ?? null;
-  } catch (err: any) {
-    error = err.message;
+  } catch (err) {
+    process.stderr.write(`[contacts] Failed to load contact: ${String(err)}\n`);
+    error = 'Unable to load contact details.';
+  }
+
+  if (error) {
+    return {
+      title: 'Contact Error',
+      status: 502,
+      content: html`
+        <div class="alert alert-danger">${error}</div>
+        <p><a href="/contacts" class="btn btn-secondary">← Back to Contacts</a></p>
+      `
+    };
   }
 
   if (!contact) {
@@ -32,7 +44,7 @@ export async function handle(ctx: PageContext): Promise<PageResult> {
     : '';
 
   const notesHtml = contact.notes
-    ? raw(contact.notes.replace(/\r?\n/g, '<br>'))
+    ? raw(String(contact.notes).split(/\r?\n/).map((line) => html`${line}`.toString()).join('<br>'))
     : html`<span class="text-muted">No notes recorded for this contact.</span>`;
 
   const content = html`

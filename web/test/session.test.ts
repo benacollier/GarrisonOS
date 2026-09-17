@@ -2,7 +2,10 @@ import { describe, it } from 'node:test';
 import * as assert from 'node:assert/strict';
 import { IncomingMessage, ServerResponse } from 'node:http';
 import { Socket } from 'node:net';
-import { Session, getSession, commitSession, clearSession } from '../lib/session.js';
+import { spawnSync } from 'node:child_process';
+import { pathToFileURL } from 'node:url';
+import { resolve } from 'node:path';
+import { Session, getSession, commitSession, clearSession, parseCookies } from '../lib/session.js';
 
 describe('Web Presentation - Cookie Session Management', () => {
   it('creates an empty session with fresh CSRF token when none provided', () => {
@@ -79,6 +82,29 @@ describe('Web Presentation - Cookie Session Management', () => {
     const session = getSession(req, secret);
     assert.equal(session.user, null);
     assert.equal(session.authToken, null);
+  });
+
+  it('skips malformed cookie encodings and continues parsing valid cookies', () => {
+    const socket = new Socket();
+    const req = new IncomingMessage(socket);
+    req.headers['cookie'] = 'malformed=%E0%A4%A; valid=hello%20world';
+
+    assert.deepEqual(parseCookies(req), { valid: 'hello world' });
+    assert.equal(getSession(req, 'super-secret-key-for-testing-12345').user, null);
+  });
+
+  it('fails module initialization without APP_SECRET in production', () => {
+    const sessionModuleUrl = pathToFileURL(resolve('dist/web/lib/session.js')).href;
+    const env: NodeJS.ProcessEnv = { ...process.env, NODE_ENV: 'production' };
+    delete env['APP_SECRET'];
+
+    const result = spawnSync(process.execPath, ['--input-type=module', '--eval', `import(${JSON.stringify(sessionModuleUrl)})`], {
+      env,
+      encoding: 'utf8'
+    });
+
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /APP_SECRET is required for production session signing/);
   });
 
   it('sets Max-Age=0 on clearSession', () => {

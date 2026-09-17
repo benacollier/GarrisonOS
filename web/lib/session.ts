@@ -25,7 +25,15 @@ export interface SessionData {
 }
 
 const SESSION_COOKIE_NAME = 'garrison_session';
-const DEFAULT_SECRET = process.env['APP_SECRET'] || 'garrison-os-development-secret';
+const NODE_ENV = process.env['NODE_ENV'] || 'development';
+const TEST_ONLY_SECRET = 'garrison-os-test-only-secret';
+const DEFAULT_SECRET = process.env['APP_SECRET'] || (
+  NODE_ENV === 'test' ? TEST_ONLY_SECRET : 'garrison-os-development-secret'
+);
+
+if (NODE_ENV === 'production' && !process.env['APP_SECRET']) {
+  throw new Error('APP_SECRET is required for production session signing');
+}
 
 /**
  * Sign a string with HMAC-SHA256.
@@ -75,7 +83,12 @@ export function parseCookies(req: IncomingMessage): Record<string, string> {
     if (eqIdx !== -1) {
       const key = trimmed.slice(0, eqIdx).trim();
       const val = trimmed.slice(eqIdx + 1).trim();
-      cookies[key] = decodeURIComponent(val);
+      try {
+        cookies[key] = decodeURIComponent(val);
+      } catch (err) {
+        if (err instanceof URIError) continue;
+        throw err;
+      }
     }
   }
   return cookies;

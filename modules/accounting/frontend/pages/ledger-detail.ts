@@ -63,6 +63,9 @@ export async function handle(ctx: PageContext): Promise<PageResult> {
     try {
       if (action === 'post_payment') {
         const amountCents = Math.round(parseFloat(ctx.body['amount'] ?? '0') * 100);
+        if (!Number.isFinite(amountCents) || amountCents <= 0) {
+          throw new Error('Payment amount must be greater than zero.');
+        }
         const txDate = new Date(ctx.body['transaction_date'] ?? Date.now()).getTime();
 
         await ctx.api.post('/api/v1/accounting/transactions', {
@@ -82,9 +85,13 @@ export async function handle(ctx: PageContext): Promise<PageResult> {
       } else if (action === 'deposit_disposition') {
         const deductions: any[] = [];
         if (ctx.body['damage_description'] && ctx.body['damage_amount']) {
+          const amountCents = Math.round(parseFloat(ctx.body['damage_amount']) * 100);
+          if (!Number.isFinite(amountCents) || amountCents < 0) {
+            throw new Error('Deduction amount must be zero or greater.');
+          }
           deductions.push({
             description: ctx.body['damage_description'],
-            amount_cents: Math.round(parseFloat(ctx.body['damage_amount']) * 100),
+            amount_cents: amountCents,
             category: 'repairs'
           });
         }

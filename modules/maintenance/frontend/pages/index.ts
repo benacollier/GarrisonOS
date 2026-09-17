@@ -28,7 +28,7 @@ export async function handle(ctx: PageContext): Promise<PageResult> {
     }
 
     try {
-      const estCost = parseFloat(ctx.body['estimated_cost'] ?? '0');
+      const estCost = parseFloat(ctx.body['estimated_cost'] || '0') || 0;
       await ctx.api.post('/api/v1/maintenance/work-orders', {
         property_id: ctx.body['property_id'] ?? '',
         title: ctx.body['title'] ?? '',

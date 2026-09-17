@@ -121,7 +121,9 @@ export class WebRouter {
     }
 
     // Find handler in static route table
-    let handler: PageHandler | null | undefined = ROUTE_TABLE[rawPath];
+    let handler: PageHandler | null | undefined = Object.hasOwn(ROUTE_TABLE, rawPath)
+      ? ROUTE_TABLE[rawPath]
+      : null;
 
     // Fallback: Dynamic module page resolution
     if (!handler) {
@@ -177,10 +179,11 @@ export class WebRouter {
 
       ctx.res.writeHead(result.status || 200, { 'Content-Type': 'text/html; charset=utf-8' });
       ctx.res.end(body);
-    } catch (err: any) {
+    } catch (err) {
+      process.stderr.write(`[web] Page handler error: ${String(err)}\n`);
       const errorContent = renderErrorPage(
-        err.message || 'An unexpected error occurred while communicating with the GarrisonOS core engine.',
-        err.code || 'SYSTEM_ERROR'
+        'An unexpected error occurred while communicating with the GarrisonOS core engine.',
+        'SYSTEM_ERROR'
       );
 
       const body = renderLayout({

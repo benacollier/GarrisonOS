@@ -5,11 +5,25 @@ function formatCurrency(cents: number): string {
   return (cents / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+function parseUtcDate(value: string, endOfDay: boolean): number | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+
+  const suffix = endOfDay ? 'T23:59:59.999Z' : 'T00:00:00.000Z';
+  const timestamp = new Date(`${value}${suffix}`).getTime();
+  if (!Number.isFinite(timestamp) || new Date(timestamp).toISOString().slice(0, 10) !== value) {
+    return null;
+  }
+  return timestamp;
+}
+
 export async function handle(ctx: PageContext): Promise<PageResult> {
   const propertyId = ctx.query['property_id'] || '';
-  const unexportedOnly = ctx.query['unexported_only'] !== '0' && ctx.query['unexported_only'] !== 'false';
+  const filterSubmitted = ctx.query['filter_submitted'] !== undefined;
+  const unexportedOnly = filterSubmitted ? ctx.query['unexported_only'] === '1' : true;
   const startDate = ctx.query['start_date'] || '';
   const endDate = ctx.query['end_date'] || '';
+  const startDateMs = parseUtcDate(startDate, false);
+  const endDateMs = parseUtcDate(endDate, true);
 
   let error: string | null = null;
   let preview: any[] = [];
@@ -23,8 +37,8 @@ export async function handle(ctx: PageContext): Promise<PageResult> {
     const queryParams = new URLSearchParams();
     if (propertyId) queryParams.set('property_id', propertyId);
     if (unexportedOnly) queryParams.set('unexported_only', 'true');
-    if (startDate) queryParams.set('start_date', String(new Date(startDate).getTime()));
-    if (endDate) queryParams.set('end_date', String(new Date(`${endDate}T23:59:59Z`).getTime()));
+    if (startDateMs !== null) queryParams.set('start_date', String(startDateMs));
+    if (endDateMs !== null) queryParams.set('end_date', String(endDateMs));
 
     const previewRes = await ctx.api.get(`/api/v1/accounting/quickbooks/preview?${queryParams.toString()}`);
     preview = previewRes?.data?.entries || [];
@@ -40,8 +54,8 @@ export async function handle(ctx: PageContext): Promise<PageResult> {
   const exportParams = new URLSearchParams();
   if (propertyId) exportParams.set('property_id', propertyId);
   exportParams.set('unexported_only', unexportedOnly ? 'true' : 'false');
-  if (startDate) exportParams.set('start_date', String(new Date(startDate).getTime()));
-  if (endDate) exportParams.set('end_date', String(new Date(`${endDate}T23:59:59Z`).getTime()));
+  if (startDateMs !== null) exportParams.set('start_date', String(startDateMs));
+  if (endDateMs !== null) exportParams.set('end_date', String(endDateMs));
   exportParams.set('mark_exported', 'true');
   const exportQueryStr = exportParams.toString();
 
@@ -165,6 +179,7 @@ export async function handle(ctx: PageContext): Promise<PageResult> {
     <!-- Filter Bar -->
     <div class="card" style="margin-bottom: 1.5rem;">
       <form method="GET" action="/accounting/quickbooks" style="display: flex; gap: 1rem; align-items: flex-end; flex-wrap: wrap; padding: 1rem;">
+        <input type="hidden" name="filter_submitted" value="1">
         <div class="form-group" style="margin: 0; min-width: 200px;">
           <label class="form-label">Filter Property (Class)</label>
           <select name="property_id" class="form-select">

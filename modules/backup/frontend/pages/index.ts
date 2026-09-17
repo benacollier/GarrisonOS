@@ -102,12 +102,12 @@ export async function handle(ctx: PageContext): Promise<PageResult> {
   }
 
   // Fetch scheduler daemon status
-  let scheduler: any = {};
+  let scheduler: any = null;
   try {
     const scheduleRes = await ctx.api.get('/api/v1/backups/scheduler/status');
-    scheduler = scheduleRes?.data?.scheduler ?? {};
-  } catch {
-    // Non-blocking if scheduler status is temporarily unavailable
+    scheduler = scheduleRes?.data?.scheduler ?? null;
+  } catch (err) {
+    process.stderr.write(`[backup] Scheduler status unavailable: ${String(err)}\n`);
   }
 
   const alertSuccess = flashMessage
@@ -120,12 +120,14 @@ export async function handle(ctx: PageContext): Promise<PageResult> {
 
   const csrfInput = csrfField(csrfToken);
 
-  const schedulerActive = !!scheduler.enabled;
-  const schedulerBadge = schedulerActive
-    ? html`<span style="font-size: 0.75rem; background: #e6f4ea; color: #137333; padding: 0.2rem 0.5rem; border-radius: 4px; font-weight: 600;">DAEMON ACTIVE</span>`
-    : html`<span style="font-size: 0.75rem; background: #f1f3f4; color: #5f6368; padding: 0.2rem 0.5rem; border-radius: 4px; font-weight: 600;">MANUAL ONLY</span>`;
+  const schedulerActive = scheduler?.enabled === true;
+  const schedulerBadge = scheduler === null
+    ? html`<span style="font-size: 0.75rem; background: #fce8e6; color: #c5221f; padding: 0.2rem 0.5rem; border-radius: 4px; font-weight: 600;">STATUS UNAVAILABLE</span>`
+    : schedulerActive
+      ? html`<span style="font-size: 0.75rem; background: #e6f4ea; color: #137333; padding: 0.2rem 0.5rem; border-radius: 4px; font-weight: 600;">DAEMON ACTIVE</span>`
+      : html`<span style="font-size: 0.75rem; background: #f1f3f4; color: #5f6368; padding: 0.2rem 0.5rem; border-radius: 4px; font-weight: 600;">MANUAL ONLY</span>`;
 
-  const nextBackupStr = scheduler.nextScheduledBackupAt
+  const nextBackupStr = scheduler?.nextScheduledBackupAt
     ? new Date(scheduler.nextScheduledBackupAt).toISOString().replace('T', ' ').slice(0, 19) + ' UTC'
     : null;
 
@@ -133,13 +135,23 @@ export async function handle(ctx: PageContext): Promise<PageResult> {
     ? html`<div><strong>Next Scheduled Backup:</strong> ${nextBackupStr}</div>`
     : raw('');
 
-  const maintenanceLine = scheduler.maintenanceInProgress
+  const maintenanceLine = scheduler?.maintenanceInProgress
     ? html`
       <div style="color: #e37400; font-weight: 600; margin-top: 0.25rem;">
         Maintenance actively running: ${String(scheduler.maintenanceInProgress)}
       </div>
     `
     : raw('');
+
+  const schedulerPolicy = scheduler === null
+    ? html`<div>Scheduler status and policy values are currently unavailable.</div>`
+    : html`
+      <div><strong>Backup Interval:</strong> Every ${String(scheduler.intervalHours ?? 24)} hours</div>
+      <div><strong>Vacuum Interval:</strong> Every ${String(scheduler.vacuumIntervalHours ?? 168)} hours</div>
+      <div><strong>Retention Policy:</strong> ${String(scheduler.retentionDays ?? 30)} days</div>
+      ${nextBackupLine}
+      ${maintenanceLine}
+    `;
 
   const backupRows: SafeHtml[] = [];
   for (const b of backups) {
@@ -298,11 +310,7 @@ export async function handle(ctx: PageContext): Promise<PageResult> {
         </h2>
 
         <div style="font-size: 0.85rem; color: var(--color-text-muted, #555); margin-bottom: 1rem; line-height: 1.6;">
-          <div><strong>Backup Interval:</strong> Every ${String(scheduler.intervalHours ?? 24)} hours</div>
-          <div><strong>Vacuum Interval:</strong> Every ${String(scheduler.vacuumIntervalHours ?? 168)} hours</div>
-          <div><strong>Retention Policy:</strong> ${String(scheduler.retentionDays ?? 30)} days</div>
-          ${nextBackupLine}
-          ${maintenanceLine}
+          ${schedulerPolicy}
         </div>
 
         <div style="display: flex; gap: 0.75rem; flex-wrap: wrap;">

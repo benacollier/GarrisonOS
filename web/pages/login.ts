@@ -14,7 +14,7 @@ export interface LoginPageOptions {
 export function renderLoginPage(options: LoginPageOptions): string {
   const flashes = (options.flashMessages || []).map(
     (f) =>
-      html`<div class="alert alert-${f.type === 'success' ? 'success' : 'danger'}" style="margin-bottom: 1.5rem;">
+      html`<div class="alert alert-${f.type === 'error' ? 'danger' : f.type}" style="margin-bottom: 1.5rem;">
         ${f.message}
       </div>`
   );
@@ -133,4 +133,3 @@ export async function handle(ctx: PageContext): Promise<PageResult> {
     isFullDocument: true,
   };
 }
-

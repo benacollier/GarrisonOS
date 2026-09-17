@@ -101,7 +101,7 @@ export async function handle(ctx: PageContext): Promise<PageResult> {
   });
 
   const descHtml = workOrder.description
-    ? raw(workOrder.description.replace(/\r?\n/g, '<br>'))
+    ? raw(String(workOrder.description).split(/\r?\n/).map((line) => html`${line}`.toString()).join('<br>'))
     : html`<span class="text-muted">No details provided.</span>`;
 
   const content = html`
