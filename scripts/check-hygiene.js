@@ -10,12 +10,13 @@ import { execSync } from 'node:child_process';
  * 1. Host Path Hygiene (No hardcoded Windows/Unix absolute paths)
  * 2. Secret & Credential Scanning (No private keys, tokens, or live secrets)
  * 3. Zero External Dependencies (Node.js runtime code must only import node:* or relative paths)
- * 4. Strict Equality (No loose == or != in TypeScript or PHP source)
+ * 4. Strict Equality (No loose == or != in TypeScript source)
  * 5. Synchronous Database Invariant (No await on DatabaseSync methods: prepare, exec)
  * 6. Tenant Isolation & Zero Parameter Leakage (No tenant_id in route parameters or query/body bindings)
  * 7. SQL Portability & Parameterization (No template literal string interpolations in db.prepare)
  * 8. UTC Timestamp Rigor (No SQLite-only non-portable functions: datetime, strftime, unixepoch)
  * 9. Fail-Closed Security (Installers must have mandatory checksum verification and error-aborts)
+ * 10. Zero PHP Dependency (All presentation code must be 100% pure TypeScript)
  */
 
 const PATH_CHECK_EXEMPTIONS = new Set([
@@ -106,10 +107,14 @@ function checkFile(relPath) {
 
   const lines = content.split(/\r?\n/);
   const isTypeScript = relPath.endsWith('.ts');
-  const isPhp = relPath.endsWith('.php');
-  const isSource = isTypeScript || isPhp || relPath.endsWith('.js');
+  const isSource = isTypeScript || relPath.endsWith('.js');
   const isSql = relPath.endsWith('.sql');
   const isInstaller = relPath.startsWith('scripts/install.');
+
+  // Prohibit any legacy or new PHP files
+  if (relPath.endsWith('.php')) {
+    reportViolation('PROHIBITED PHP FILE', relPath, 0, 'PHP files are prohibited. GarrisonOS is 100% pure TypeScript.');
+  }
 
   // 1. Host Path Checks
   if (!PATH_CHECK_EXEMPTIONS.has(relPath)) {
@@ -144,8 +149,8 @@ function checkFile(relPath) {
     });
   }
 
-  // 4. Strict Equality Checks (=== and !==) in TypeScript and PHP
-  if (isTypeScript || isPhp) {
+  // 4. Strict Equality Checks (=== and !==) in TypeScript
+  if (isTypeScript) {
     lines.forEach((line, index) => {
       const trimmed = line.trim();
       if (trimmed.startsWith('//') || trimmed.startsWith('*') || trimmed.startsWith('/*') || trimmed.startsWith('#')) return;

@@ -30,8 +30,8 @@ To help us triage and resolve the issue quickly, please include:
 
 1. **Description**: A clear overview of the potential vulnerability and its impact.
 2. **Steps to Reproduce**: Detailed reproduction steps, including sample HTTP requests, payloads, or proof-of-concept code.
-3. **Affected Component**: Affected API endpoints, backend modules, or PHP presentation templates.
-4. **Environment**: Node.js and PHP versions, deployment model (e.g. systemd + Nginx/Caddy).
+3. **Affected Component**: Affected API endpoints, backend modules, or TypeScript presentation templates.
+4. **Environment**: Node.js version, deployment model (e.g. systemd + Nginx/Caddy).
 
 ---
 
@@ -52,7 +52,7 @@ To help us triage and resolve the issue quickly, please include:
 * **Strict Tenant Isolation**: Implicit tenant scoping via `AsyncLocalStorage` and compound database indexes.
 * **Zero Outbound Telemetry**: Offline-first design with no unsolicited outbound external network requests or tracking.
 * **Cryptographic Standards**: Native `scrypt` password hashing, signed HMAC-SHA256 session tokens, and constant-time equality comparisons (`node:crypto.timingSafeEqual`).
-* **Presentation Layer Hygiene**: Mandatory CSRF protection on state mutations, contextual output escaping (`htmlspecialchars`), and strict Content Security Policy (CSP).
+* **Presentation Layer Hygiene**: Mandatory CSRF protection on state mutations, automatic contextual output escaping via tagged template `html`, and strict Content Security Policy (CSP).
 * **Path Traversal & Storage Security**: Attachments stored outside the web root (`STORAGE_PATH`), validated against MIME/extension whitelists and path traversal vectors.
 
 ---
@@ -76,7 +76,7 @@ The following scenarios are considered out of scope:
 
 * Denial-of-service (DoS) against local loopback ports (`127.0.0.1:3000`).
 * Attacks requiring physical access, root compromise, or local shell control of the host machine.
-* Vulnerabilities in third-party reverse proxies (Nginx, Caddy) or PHP runtime versions themselves.
+* Vulnerabilities in third-party reverse proxies (Nginx, Caddy).
 * Social engineering or physical attacks against host operators.
 
 ---

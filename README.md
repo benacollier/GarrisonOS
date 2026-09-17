@@ -5,7 +5,7 @@
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](LICENSE)
 [![Status](https://img.shields.io/badge/Status-Pre--Production%20Prototype-yellow.svg)](#pre-production-disclaimer)
 [![Node.js](https://img.shields.io/badge/Node.js-v22.5%2B-green.svg)](https://nodejs.org/)
-[![PHP](https://img.shields.io/badge/PHP-8.2%2B-purple.svg)](https://www.php.net/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.8%2B-blue.svg)](https://www.typescriptlang.org/)
 [![Dependencies](https://img.shields.io/badge/Runtime_Dependencies-0-brightgreen.svg)](#dependencies--runtime-prerequisites)
 [![Multi-Tenancy](https://img.shields.io/badge/Multi--Tenancy-Row--Level_Isolation-orange.svg)](#architectural-principles)
 [![Documentation](https://img.shields.io/badge/Docs-GitHub_Pages-blue.svg)](https://garrisonos.github.io/GarrisonOS/)
@@ -26,7 +26,7 @@ GarrisonOS is engineered to provide self-managing landlords, independent propert
 
 The software addresses day-to-day operational tasks, cash-basis accounting, and structured recordkeeping without the recurring subscription costs, vendor lock-in, or opaque data silos imposed by legacy property management platforms.
 
-Built from first principles around **zero external runtime dependencies**, GarrisonOS operates entirely on the standard libraries of Node.js and native PHP, backed by an embedded SQLite engine operating in Write-Ahead Logging (WAL) mode.
+Built from first principles around **zero external runtime dependencies**, GarrisonOS operates entirely as 100% pure TypeScript on the standard libraries of Node.js, backed by an embedded SQLite engine operating in Write-Ahead Logging (WAL) mode.
 
 ---
 
@@ -61,7 +61,7 @@ The GarrisonOS MVP is focused strictly on delivering a self-hosted property mana
 
 1. **Zero External Runtime Dependencies**:
    * **Backend Engine**: Built exclusively on native Node.js standard modules (`node:http`, `node:sqlite`, `node:crypto`, `node:async_hooks`, `node:events`, `node:fs`, `node:path`, `node:test`, `node:assert`). No npm packages at runtime (no Express, Fastify, Prisma, TypeORM, Zod, uuid, or bcrypt).
-   * **Frontend Presentation**: Built exclusively on native PHP 8.2+ with standard built-in extensions (`pdo_sqlite`, `curl`, `session`, `filter`) and semantic HTML5 with vanilla CSS Custom Properties. No Composer packages, CSS preprocessors, or frontend JavaScript frameworks.
+   * **Frontend Presentation**: Built exclusively on native TypeScript SSR with Node.js standard modules (`node:http`, `node:crypto`, `node:fs`, `node:path`), automatic XSS-safe tagged template HTML (`html` in `web/lib/html.ts`), and semantic HTML5 with vanilla CSS Custom Properties. Zero runtime npm dependencies, no PHP, no frontend frameworks, and no client bundlers.
 2. **Strict Multi-Tenancy & Row-Level Isolation**:
    * Every operational database table includes a `tenant_id TEXT NOT NULL` column referencing `tenants(id)`.
    * Tenant context is extracted from request headers (`X-Tenant-ID`) or authenticated session tokens and propagated down the execution stack using `AsyncLocalStorage`.
@@ -76,7 +76,7 @@ The GarrisonOS MVP is focused strictly on delivering a self-hosted property mana
    * **Soft Deletes**: Standardized `deleted_at INTEGER` timestamp column across all entity tables (`NULL` when active).
 5. **Decoupled API-First Architecture**:
    * The core Node.js engine exposes a zero-dependency HTTP REST API.
-   * The native PHP frontend communicates with the engine via internal loopback HTTP requests, forwarding user session context, authentication tokens, and tenant headers.
+   * The TypeScript web presentation layer communicates with the API engine via loopback HTTP requests, forwarding user session context, authentication tokens, and tenant headers.
 6. **Drop-in Modularity**:
    * Domain features are encapsulated in self-contained directories under `modules/[module_name]/` containing their own migrations, backend routes, event subscribers, repositories, and frontend views/hooks.
 
@@ -104,12 +104,9 @@ GarrisonOS is intentionally architected with **zero external runtime package dep
 
 ### Frontend Presentation Layer
 
-* **Runtime**: [PHP](https://www.php.net/) `8.2` or newer.
-* **Standard PHP Extensions Required**:
-  * `curl`: HTTP client for backend REST API communication.
-  * `session`: Secure session management and CSRF token persistence.
-  * `filter`: Input validation and sanitization.
-  * `pdo_sqlite`: Standard SQLite database driver extension.
+* **Runtime**: [Node.js](https://nodejs.org/) `v22.5.0` or newer (unified with backend engine).
+* **Architecture**: Server-Side Rendered (SSR) TypeScript templates with tagged template `html` auto-escaping and HMAC-SHA256 cookie sessions.
+* **Standard Library Modules Utilized**: `node:http`, `node:crypto`, `node:fs`, `node:path`.
 * **Client-Side Stack**:
   * Semantic HTML5.
   * Vanilla CSS with CSS Custom Properties (supports Light and Dark themes).
@@ -218,10 +215,10 @@ For a comprehensive phase-by-phase implementation plan, milestone deliverables, 
 ||Three-way bank reconciliation & audit reporting|✅|Automated proof schedule verifying Bank Balance = GL Trust Balance = Active Lease Liabilities.|
 ||Vendor tax compliance (W-9 & 1099-NEC aggregation)|✅|Vendor Tax ID tracking and annual maintenance expense aggregation with statutory $600 threshold reporting.|
 ||IRS Schedule E, NOI, and QuickBooks compatibility|✅|Schedule E mapping, Rent Roll, QBO/IIF/OFX exports, and year-end 1099-NEC vendor aggregation implemented and tested.|
-|**5. Native Presentation Layer & User Experience**|Native PHP shell, layouts, and CSS system|🟡|Server-rendered shell, design tokens, and light/dark theme operational; deployment integration being hardened.|
-||Dashboard and operator views|🟡|Dashboard KPI summary cards and entity CRUD views exist; several reporting sub-tabs remain read-only.|
-||Financial reporting views|🟡|Ledger, Rent Roll, and Schedule E views exist; 3-way reconciliation audit view to be added.|
-||Form validation, CSRF, and session handling|🟡|CSRF tokens, timing-safe auth verification, and session helpers exist; complete end-to-end security review remains.|
+|**5. Native Presentation Layer & User Experience**|Native TypeScript SSR shell, layouts, and CSS system|✅|Server-rendered shell, design tokens, and light/dark theme operational; 100% pure TypeScript.|
+||Dashboard and operator views|✅|Dashboard KPI summary cards and entity CRUD views operational across all modules.|
+||Financial reporting views|✅|Ledger, Rent Roll, Chart of Accounts, Trial Balance, and Schedule E views operational.|
+||Form validation, CSRF, and session handling|✅|Cryptographic CSRF tokens, HMAC-SHA256 cookie sessions, and fail-closed validation verified.|
 |**6. Data Portability, Resilience & Backup**|SQLite snapshots and WAL checkpointing|✅|Snapshot service, online `VACUUM INTO`, and safe WAL checkpointing implemented and tested.|
 ||Tenant data export/import and integrity verification|✅|Tenant-scoped `.json.gz` export/import with SHA-256 cryptographic verification implemented and tested.|
 ||Disaster-recovery restore|✅|CLI restore tooling (`scripts/restore.js`) with header validation, WAL cache cleanup, and migration execution.|
@@ -315,16 +312,18 @@ garrison-os/
 │   ├── maintenance/               # Work Orders, Dispatch & test/
 │   └── backup/                    # SQLite Snapshots, Portability & test/
 │
-├── web/                           # Native PHP Presentation Layer
-│   ├── index.php                  # Front controller, CSRF validator & dynamic router
+├── web/                           # Native TypeScript SSR Presentation Layer
+│   ├── server.ts                  # Presentation HTTP server, body parser & session manager
+│   ├── router.ts                  # Front controller, CSRF validator & dynamic router
+│   ├── static.ts                  # Static asset handler with path-traversal guards
 │   ├── lib/                       # API client, session auth, CSRF, and UI hooks
 │   ├── templates/                 # Base layout, header, dynamic sidebar, flash alerts
-│   ├── pages/                     # Dashboard, login, and setup wizard view controllers
+│   ├── pages/                     # Dashboard, login, setup wizard, and error handlers
 │   └── public/                    # Design tokens, CSS styles, and minimal JavaScript
 │
 ├── scripts/                       # Zero-Dependency Operational & CI Tooling
 │   ├── setup.js                   # Automated preflight environment validator & seeder
-│   ├── serve.js                   # Unified Node API & PHP-FPM development runner
+│   ├── serve.js                   # Unified Node API & Web presentation development runner
 │   ├── test.js                    # Dynamic multi-module test runner harness
 │   ├── restore.js                 # Disaster recovery & snapshot restore utility
 │   └── check-hygiene.js           # Secret scanning & repository hygiene checks
@@ -346,8 +345,7 @@ garrison-os/
 
 Ensure you have the following installed on your system:
 
-* **Node.js**: `v22.5.0` or higher (`node -v`)
-* **PHP**: `8.2` or higher (`php -v`) with `curl`, `session`, `filter`, and `pdo_sqlite` extensions enabled
+* **Node.js**: `v22.5.0` or higher (`node -v`) — includes native `node:sqlite`, `node:http`, and `node:crypto`. Zero external packages or PHP runtime required.
 
 ---
 
@@ -497,9 +495,9 @@ All contributions must adhere to the engineering standards specified in [AGENTS.
 
 GarrisonOS is built on and inspired by foundational open-source standards, tools, specifications, and regulatory frameworks:
 
-* **Product & Runtime Foundations**: [Node.js](https://nodejs.org/), [PHP](https://www.php.net/), [SQLite](https://www.sqlite.org/), and [RFC 9562 UUIDv7](https://www.rfc-editor.org/rfc/rfc9562.html).
+* **Product & Runtime Foundations**: [Node.js](https://nodejs.org/), [TypeScript](https://www.typescriptlang.org/), [SQLite](https://www.sqlite.org/), and [RFC 9562 UUIDv7](https://www.rfc-editor.org/rfc/rfc9562.html).
 * **Accounting & Domain Standards**: [IRS Form 1040 Schedule E](https://www.irs.gov/forms-pubs/about-schedule-e-form-1040) and QuickBooks interoperability formats.
-* **Development Tooling & AI Workers**: [TypeScript](https://www.typescriptlang.org/), [LLM Worker Tools](https://github.com/thevahidal/llm-worker-tools), [NVIDIA NIM](https://build.nvidia.com/), [Ollama](https://ollama.com/), [Qwen 2.5 Coder](https://github.com/QwenLM/Qwen2.5-Coder), [Betterleaks](https://github.com/betterleaks/betterleaks), and [markdownlint](https://github.com/DavidAnson/markdownlint).
+* **Development Tooling & AI Workers**: [LLM Worker Tools](https://github.com/thevahidal/llm-worker-tools), [NVIDIA NIM](https://build.nvidia.com/), [Ollama](https://ollama.com/), [Qwen 2.5 Coder](https://github.com/QwenLM/Qwen2.5-Coder), [Betterleaks](https://github.com/betterleaks/betterleaks), and [markdownlint](https://github.com/DavidAnson/markdownlint).
 * **Governance & Community Standards**: [Conventional Commits](https://www.conventionalcommits.org/), [Apache ICLA](https://www.apache.org/licenses/icla.pdf), [Contributor Covenant](https://www.contributor-covenant.org), and [Mozilla D&I](https://github.com/mozilla/diversity).
 
 For complete third-party notices, license texts, and detailed upstream attributions, see [ATTRIBUTIONS.md](ATTRIBUTIONS.md).

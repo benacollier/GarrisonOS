@@ -19,7 +19,7 @@ GarrisonOS runs exclusively on native runtimes. Do not import, install, or refer
 | **Configuration** | Native `process.env` & Node `--env-file` | `dotenv`, `dotenv-expand` |
 | **Async Context** | `node:async_hooks` (`AsyncLocalStorage`) | Custom context managers |
 | **Testing** | `node:test`, `node:assert` | `jest`, `mocha`, `chai`, `vitest`, `supertest` |
-| **Frontend Presentation** | Native PHP (`pdo_sqlite`, `curl`, `session`, `filter`) | Composer packages, Laravel, Symfony, React, Vue, build bundlers |
+| **Frontend Presentation** | Native TypeScript SSR (`web/lib/html.ts`, `node:http`) | PHP, Composer packages, Laravel, Symfony, React, Vue, build bundlers |
 
 * **Permitted devDependencies**: Only `typescript` and `@types/node` are permitted.
 * **Portable Path Hygiene**: Never hardcode host- or user-specific absolute filesystem paths (e.g., `C:\Users\...`, `/home/user/...`). All paths must use `node:path` primitives (`path.join()`, `path.resolve()`) or standard environment variables (`STORAGE_PATH`, `SQLITE_PATH`).
@@ -137,11 +137,11 @@ All API endpoints must return structured JSON envelopes conforming to `api/respo
 
 * Use `successResponse(res, data, statusCode, meta)` and `errorResponse(res, code, message, statusCode)` from `api/response.ts`.
 * Internal database driver errors, SQL statements, and stack traces must **NEVER** be leaked in HTTP responses.
-* Enforce **strict equality** (`===` / `!==`) across all TypeScript and PHP code. Loose equality is prohibited.
+* Enforce **strict equality** (`===` / `!==`) across all TypeScript code. Loose equality is prohibited.
 
 ---
 
-## 4. Security & PHP Presentation
+## 4. Security & TypeScript Web Presentation
 
 ### Cryptography & Engine Isolation
 
@@ -151,16 +151,19 @@ All API endpoints must return structured JSON envelopes conforming to `api/respo
 * **Zero Outbound Telemetry**: The engine operates offline-first. No unsolicited external network calls, tracking, or remote telemetry are permitted.
 * **File Uploads & Media Storage**: Uploaded files must be stored outside the web root (`STORAGE_PATH`), validate explicit allowed MIME/extension whitelists, enforce byte size limits, and validate resolved paths against directory traversal attacks via `path.resolve()`.
 
-### Safe PHP Presentation
+### Safe TypeScript Web Presentation
 
-* **XSS Prevention**: All dynamic values rendered in PHP templates must be strictly escaped:
+* **XSS Prevention**: All dynamic values rendered in HTML templates must be escaped automatically using the tagged template `html` function from `web/lib/html.ts`:
 
-  ```php
-  <?= htmlspecialchars((string)$value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?>
+  ```typescript
+  html`<div>${userProvidedString}</div>`
   ```
 
-* **CSRF Protection**: All state-modifying requests (POST, PUT, DELETE) from the presentation layer must validate a cryptographic CSRF token stored in the PHP session.
+  Use `raw()` only for verified trusted HTML fragments.
+
+* **CSRF Protection**: All state-modifying requests (POST, PUT, DELETE) from the presentation layer must validate a cryptographic CSRF token stored in the HMAC-signed cookie session via `validateCsrf()` using `node:crypto.timingSafeEqual`.
 * **Strict CSP**: Inline dynamic scripts and unvalidated DOM injections (`innerHTML`, `eval()`) are forbidden.
+* **Zero External Dependencies**: The presentation layer executes natively on Node.js standard libraries (`node:http`, `node:crypto`, `node:fs`, `node:path`) with zero runtime npm packages, bundlers, or CSS preprocessors.
 
 ---
 

@@ -101,13 +101,6 @@ if ! command -v node >/dev/null 2>&1; then
 fi
 echo "  ✔ Found Node.js $(node -v)"
 
-if ! command -v php >/dev/null 2>&1; then
-    echo "❌ Error: PHP CLI was not found in PATH."
-    echo "   Please install PHP 8.2+ with curl, session, filter, and pdo_sqlite."
-    exit 1
-fi
-echo "  ✔ Found PHP $(php -v | head -n 1)"
-
 # 2. Resolve Installation Directory & Download Release (if needed)
 mkdir -p "$TARGET_DIR"
 TARGET_DIR=$(cd "$TARGET_DIR" && pwd)

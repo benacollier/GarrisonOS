@@ -28,6 +28,8 @@ if (!target || target === 'all') {
   testFiles = getTestFiles(resolve('dist'));
 } else if (target === 'core') {
   testFiles = getTestFiles(resolve('dist/test'));
+} else if (target === 'web') {
+  testFiles = getTestFiles(resolve('dist/web/test'));
 } else {
   const moduleTestDir = resolve('dist/modules', target, 'test');
   if (!existsSync(moduleTestDir)) {

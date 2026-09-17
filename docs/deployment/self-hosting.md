@@ -9,8 +9,8 @@ This guide details running GarrisonOS in a production environment using Linux sy
 ```mermaid
 flowchart LR
     User["HTTPS Request"] --> Caddy["Caddy / Nginx (Port 443/80)"]
-    Caddy -->|PHP FastCGI :9000| PHPFPM["PHP-FPM (Presentation Layer)"]
-    PHPFPM -->|Loopback HTTP :3000| NodeEngine["Node.js Engine (api/server.ts)"]
+    Caddy -->|Reverse Proxy :8080| WebServer["TypeScript Web Presentation (:8080)"]
+    WebServer -->|Loopback HTTP :3000| NodeEngine["Node.js API Engine (:3000)"]
     NodeEngine --> SQLite[("SQLite DB (WAL Mode)")]
 ```
 
@@ -18,7 +18,7 @@ flowchart LR
 
 ## 2. Setting Up Systemd Services
 
-### 1. Node.js Core Backend Service (`/etc/systemd/system/garrison-engine.service`)
+### 1. Node.js Core API Engine (`/etc/systemd/system/garrison-engine.service`)
 
 ```ini
 [Unit]
@@ -38,11 +38,32 @@ LimitNOFILE=65535
 WantedBy=multi-user.target
 ```
 
-### 2. Enable and Start Services
+### 2. Node.js Web Presentation Service (`/etc/systemd/system/garrison-web.service`)
+
+```ini
+[Unit]
+Description=GarrisonOS Web Presentation Layer
+After=garrison-engine.service
+Requires=garrison-engine.service
+
+[Service]
+Type=simple
+User=www-data
+WorkingDirectory=/var/www/garrison-os
+ExecStart=/usr/bin/node dist/web/server.js
+Restart=always
+EnvironmentFile=/var/www/garrison-os/.env
+LimitNOFILE=65535
+
+[Install]
+WantedBy=multi-user.target
+```
+
+### 3. Enable and Start Services
 
 ```bash
 sudo systemctl daemon-reload
-sudo systemctl enable --now garrison-engine
+sudo systemctl enable --now garrison-engine garrison-web
 ```
 
 ---
@@ -53,19 +74,7 @@ sudo systemctl enable --now garrison-engine
 
 ```caddy
 garrison.yourdomain.com {
-    root * /var/www/garrison-os/web
-    php_fastcgi unix//run/php/php8.2-fpm.sock
-    file_server
-
-    # Block direct access to hidden files, env files, SQLite databases, and internal PHP includes
-    @restricted {
-        path /.*
-        path *.env*
-        path *.sqlite*
-        path /lib/*
-        path /templates/*
-    }
-    error @restricted 403
+    reverse_proxy 127.0.0.1:8080
 }
 ```
 
@@ -75,25 +84,13 @@ garrison.yourdomain.com {
 server {
     listen 80;
     server_name garrison.yourdomain.com;
-    root /var/www/garrison-os/web;
-    index index.php;
 
     location / {
-        try_files $uri $uri/ /index.php?$query_string;
-    }
-
-    location ~ \.php$ {
-        include snippets/fastcgi-php.conf;
-        fastcgi_pass unix:/run/php/php8.2-fpm.sock;
-    }
-
-    # Deny direct access to internal templates, includes, hidden files, env files, and SQLite databases
-    location ~ ^/(lib|templates) {
-        deny all;
-    }
-
-    location ~ /(\.|\.env|\.sqlite) {
-        deny all;
+        proxy_pass http://127.0.0.1:8080;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
     }
 }
 ```
@@ -103,24 +100,16 @@ server {
 ## 4. Production Security Hardening
 
 1. **File Permissions**:
-   - Ensure SQLite database files (`garrison.db`, `garrison.db-wal`, `garrison.db-shm`) and `.env` have restrictive permissions:
+   - Ensure SQLite database files (`garrison.sqlite*`) and `.env` have restrictive permissions:
 
      ```bash
-     chmod 600 garrison.db* .env
-     chown www-data:www-data garrison.db* .env
+     chmod 600 garrison.sqlite* .env
+     chown www-data:www-data garrison.sqlite* .env
      ```
 
 2. **Loopback Isolation**:
-   - The Node.js engine must bind strictly to `127.0.0.1:3000` (`HOST=127.0.0.1` in `.env`). Never bind to `0.0.0.0` or expose the Node.js port directly to the public Internet.
-3. **PHP Session Hardening (`php.ini`)**:
-   - Enforce secure session cookies:
-
-     ```ini
-     session.cookie_httponly = 1
-     session.cookie_secure = 1
-     session.cookie_samesite = "Strict"
-     session.use_strict_mode = 1
-     ```
-
+   - The Node.js API engine must bind strictly to `127.0.0.1:3000` (`HOST=127.0.0.1` in `.env`). Never bind to `0.0.0.0` or expose the Node.js API port directly to the public Internet.
+3. **Session Hardening**:
+   - Cookie sessions are signed with HMAC-SHA256 using `APP_SECRET` and are automatically configured with `HttpOnly`, `SameSite=Strict`, and `Secure` over HTTPS.
 4. **Storage Directory Outside Web Root**:
-   - Ensure `STORAGE_PATH` (where attachments, receipts, and documents are saved) is placed entirely outside the web root (e.g. `/var/www/garrison-storage`).
+   - Ensure `STORAGE_PATH` (where attachments, receipts, and documents are saved) is placed in a dedicated directory outside the public tree (e.g. `/var/www/garrison-os/storage/uploads`).

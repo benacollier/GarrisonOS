@@ -69,18 +69,6 @@ if (-not $nodeCmd) {
 $nodeVersion = & node -v
 Write-Host "  ✔ Found Node.js: $nodeVersion" -ForegroundColor Green
 
-# Check PHP
-$phpCmd = Get-Command php -ErrorAction SilentlyContinue
-if (-not $phpCmd) {
-    Write-Host "❌ Error: PHP CLI was not found in PATH." -ForegroundColor Red
-    Write-Host "   Please install PHP 8.2+ with curl, session, filter, and pdo_sqlite." -ForegroundColor Yellow
-    Write-Host "   Download PHP for Windows: https://windows.php.net/download/" -ForegroundColor Yellow
-    exit 1
-}
-
-$phpVersion = & php -v | Select-Object -First 1
-Write-Host "  ✔ Found PHP: $phpVersion" -ForegroundColor Green
-
 # 2. Resolve Installation Directory & Download Release (if needed)
 $targetPath = [System.IO.Path]::GetFullPath($InstallDir)
 if (-not (Test-Path $targetPath)) {

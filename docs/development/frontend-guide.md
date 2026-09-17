@@ -1,69 +1,110 @@
 # Frontend Presentation Layer Guide
 
-GarrisonOS presentation layer is engineered in native PHP 8.2+ with semantic HTML5 and vanilla CSS Custom Properties.
+GarrisonOS presentation layer is engineered as a **zero-dependency Server-Side Rendered (SSR) TypeScript system** with semantic HTML5, tagged template XSS auto-escaping, and vanilla CSS Custom Properties.
 
 ---
 
-## 1. Zero-Framework Philosophy
+## 1. Zero-External-Dependency Philosophy
 
-* **No CSS Preprocessors**: Standard CSS Custom Properties (`web/public/css/variables.css`, `web/public/css/style.css`) provide theming, spacing tokens, and typography.
-* **No Client JS Frameworks**: Dynamic components (such as modals and drawers) utilize native HTML `<dialog>` and standard browser APIs.
-* **No Composer Packages**: Relies exclusively on PHP's standard built-in extensions (`session`, `filter`, `pdo_sqlite`) and the native HTTP client (`web/lib/api.php`) with automatic fallback to native PHP HTTP stream wrappers (`stream_context_create`) if `ext-curl` is not installed or enabled.
-* **Front Controller Hardening**: `web/index.php` provides built-in static asset serving with MIME mapping for development/embedded mode, production error boundaries (`web/pages/error.php`), and strict session cookie security defaults.
+* **Pure TypeScript on Node.js**: The presentation layer executes natively on Node.js standard libraries (`node:http`, `node:crypto`, `node:fs`, `node:path`) with zero external runtime npm packages or bundlers.
+* **XSS-Safe Tagged Template HTML**: Views use the `html` tagged template function from `web/lib/html.ts`, which automatically HTML-escapes interpolated strings and variables while preserving trusted `raw()` SafeHtml markup.
+* **No CSS Preprocessors**: Standard CSS Custom Properties (`web/public/css/variables.css`, `web/public/css/style.css`) provide dark/light theme switching, spacing tokens, and responsive typography.
+* **No Client JS Frameworks**: Modals, tabs, and interactive components utilize native HTML `<dialog>` and standard browser APIs with progressive enhancement.
+* **Front Controller Hardening**: `web/server.ts` and `web/router.ts` provide static asset serving with MIME mapping and directory traversal guards, HMAC-SHA256 cookie session management, and CSRF enforcement.
 
 ---
 
-## 2. Dynamic Slot & Hook System
+## 2. Dynamic Hook Registry
 
-Modules inject navigation links, dashboard metrics, and detail tabs using `frontend/hooks.php`:
+Modules register navigation links and composite dashboard cards via `frontend/hooks.ts`:
 
-```php
-<?php
-// Example modules/properties/frontend/hooks.php
-use GarrisonOS\Hooks;
+```typescript
+// Example: modules/properties/frontend/hooks.ts
+import { HookRegistry } from '../../../web/lib/hooks.js';
 
-Hooks::registerNav([
-    'label' => 'Properties',
-    'url'   => '/properties',
-    'icon'  => 'building',
-    'order' => 10
-]);
+HookRegistry.registerNavigation({
+  label: 'Properties',
+  route: '/properties',
+  icon: 'building',
+  order: 10,
+  section: 'portfolio'
+});
 
-Hooks::registerDashboardMetric(function($api) {
-    $stats = $api->get('/api/v1/properties/occupancy-stats');
-    return [
-        'title' => 'Occupancy Rate',
-        'value' => $stats['occupancy_rate'] . '%',
-        'sub'   => $stats['occupied_units'] . ' of ' . $stats['total_units'] . ' units'
-    ];
+HookRegistry.registerDashboardCard('/api/v1/properties/metrics/occupancy', (res: any) => {
+  if (!res || res.success !== true) return null;
+  const metrics = res.data?.metrics || {};
+  return {
+    id: 'occupancy_metric',
+    title: 'Portfolio Occupancy',
+    value: `${Number(metrics.occupancyRatePercentage ?? 0).toFixed(1)}%`,
+    subtitle: `${metrics.occupiedUnits ?? 0} of ${metrics.totalUnits ?? 0} units occupied`,
+    order: 10
+  };
 });
 ```
 
 ---
 
-## 3. Session & CSRF Security
+## 3. Page Handler Contract
 
-### Session Cookie Hygiene & Hardening
+Every module page handler conforms to the standard `handle` signature:
 
-Production PHP configurations (`php.ini` or front controller) must enforce strict cookie hygiene:
+```typescript
+import { PageContext, PageResult } from '../../../../web/lib/page-context.js';
+import { html, raw, SafeHtml } from '../../../../web/lib/html.js';
+import { csrfField, validateCsrf } from '../../../../web/lib/csrf.js';
 
-```ini
-session.cookie_httponly = 1
-session.cookie_secure = 1
-session.cookie_samesite = "Strict"
-session.use_strict_mode = 1
+export async function handle(ctx: PageContext): Promise<PageResult> {
+  const csrfToken = ctx.session.getCsrfToken();
+
+  if (ctx.method === 'POST') {
+    if (!validateCsrf(csrfToken, ctx.body['csrf_token'])) {
+      return {
+        title: 'Error',
+        status: 403,
+        content: html`<div class="alert alert-danger">CSRF token validation failed.</div>`
+      };
+    }
+    // Process mutation...
+    ctx.session.addFlash('success', 'Saved successfully');
+    return { redirect: '/properties', content: '' };
+  }
+
+  return {
+    title: 'Properties',
+    content: html`<h1>Properties</h1>`
+  };
+}
 ```
+
+---
+
+## 4. Session & CSRF Security
+
+### Cookie Session Hygiene
+
+Sessions are stored in client cookies signed with HMAC-SHA256 using the server's cryptographic `APP_SECRET`:
+
+* `HttpOnly`: Mitigates script access to session tokens.
+* `SameSite=Strict`: Blocks cross-site cookie transmission.
+* `Secure`: Transmitted over HTTPS in production deployments.
+* Constant-time comparison prevents timing oracle attacks against the signature.
 
 ### CSRF Protection
 
-Every state-modifying form in PHP must include the CSRF token:
+Every state-modifying form must include the CSRF token using `csrfField()`:
 
-```html
-<form method="POST" action="/properties/create">
-    <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_token'] ?? '') ?>">
-    <!-- Inputs -->
+```typescript
+html`
+  <form method="POST" action="/properties/create">
+    ${csrfField(ctx.session.getCsrfToken())}
+    <div class="form-group">
+      <label for="name">Property Name</label>
+      <input type="text" id="name" name="name" required class="form-control">
+    </div>
     <button type="submit" class="btn btn-primary">Save Property</button>
-</form>
+  </form>
+`
 ```
 
-The front controller (`web/index.php`) automatically verifies `csrf_token` on all `POST`, `PUT`, and `DELETE` requests before dispatching to page templates.
+All state-modifying requests are validated with `node:crypto.timingSafeEqual`.
