@@ -105,7 +105,10 @@ export const rateLimitMiddleware: Middleware = async (req, res, next) => {
  */
 export const tenantContextMiddleware: Middleware = async (req, res, next) => {
   const isBatchRoute = req.path === '/api/v1/batch' || req.path === '/api/v1/batch/';
-  const isAdministratorRoute = req.path === '/api/v1/system/backup';
+  const isAdministratorRoute = (
+    req.path === '/api/v1/system/backup' ||
+    req.path === '/api/v1/backups/scheduler/trigger'
+  );
   const isPublicRoute = (
     req.path === '/health' ||
     req.path === '/ready' ||

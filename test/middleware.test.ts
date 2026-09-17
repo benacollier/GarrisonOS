@@ -208,6 +208,22 @@ describe('Tenant context & authentication middleware', () => {
     assert.equal(body.error.code, 'FORBIDDEN');
   });
 
+  it('blocks unauthenticated access to the scheduler trigger before its handler runs', async () => {
+    const req = new MockRequest('POST', '/api/v1/backups/scheduler/trigger', {
+      'x-tenant-id': 'tenant-auth-1',
+      'x-user-id': 'user-owner-1'
+    });
+    const res = new MockResponse();
+
+    let nextCalled = false;
+    await tenantContextMiddleware(req as any, res as any, async () => { nextCalled = true; });
+
+    assert.equal(nextCalled, false);
+    assert.equal(res.statusCode, 403);
+    const body = JSON.parse(res.body);
+    assert.equal(body.error.code, 'FORBIDDEN');
+  });
+
   it('blocks non-owner access to administrator backup endpoint', async () => {
     const token = createToken({
       sub: 'user-manager-1',

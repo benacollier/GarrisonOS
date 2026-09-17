@@ -25,6 +25,32 @@ export interface SchedulerStatus {
   nextScheduledVacuumAt: number | null;
   totalBackupsRun: number;
   totalVacuumsRun: number;
+  maintenanceInProgress: 'backup' | 'vacuum' | null;
+}
+
+const MAX_INTERVAL_HOURS = 596;
+
+/**
+ * Validate scheduler values after defaults, environment values, and overrides are merged.
+ *
+ * @param config Final scheduler configuration.
+ * @throws Error when an interval cannot be represented safely by a Node.js timer or retention is invalid.
+ */
+function validateSchedulerConfig(config: SchedulerConfig): void {
+  const intervals: Array<[string, number]> = [
+    ['intervalHours', config.intervalHours],
+    ['vacuumIntervalHours', config.vacuumIntervalHours]
+  ];
+
+  for (const [name, value] of intervals) {
+    if (!Number.isFinite(value) || value <= 0 || value > MAX_INTERVAL_HOURS) {
+      throw new Error(`${name} must be greater than 0 and no more than ${MAX_INTERVAL_HOURS} hours`);
+    }
+  }
+
+  if (!Number.isFinite(config.retentionDays) || config.retentionDays <= 0) {
+    throw new Error('retentionDays must be greater than 0');
+  }
 }
 
 /**
@@ -37,6 +63,9 @@ export class BackupScheduler {
   private backupTimer: NodeJS.Timeout | null = null;
   private vacuumTimer: NodeJS.Timeout | null = null;
   private isRunning: boolean = false;
+  private maintenanceInProgress: 'backup' | 'vacuum' | null = null;
+  private activeBackupPromise: Promise<BackupRecord | null> | null = null;
+  private activeVacuumPromise: Promise<{ durationMs: number; checkpointResult: string }> | null = null;
 
   private config: SchedulerConfig;
   private lastBackupAt: number | null = null;
@@ -54,29 +83,24 @@ export class BackupScheduler {
       : true;
 
     const envInterval = process.env['BACKUP_INTERVAL_HOURS'];
-    const parsedInterval = envInterval ? Number(envInterval) : 24;
-    const intervalHours = Number.isInteger(parsedInterval) && parsedInterval > 0
-      ? parsedInterval
-      : 24;
+    const intervalHours = envInterval !== undefined ? Number(envInterval) : 24;
 
     const envRetention = process.env['BACKUP_RETENTION_DAYS'];
-    const parsedRetention = envRetention ? Number(envRetention) : 30;
-    const retentionDays = Number.isInteger(parsedRetention) && parsedRetention > 0
-      ? parsedRetention
-      : 30;
+    const retentionDays = envRetention !== undefined ? Number(envRetention) : 30;
 
     const envVacuumInterval = process.env['BACKUP_VACUUM_INTERVAL_HOURS'];
-    const parsedVacuumInterval = envVacuumInterval ? Number(envVacuumInterval) : 168; // Default weekly (7 days)
-    const vacuumIntervalHours = Number.isInteger(parsedVacuumInterval) && parsedVacuumInterval > 0
-      ? parsedVacuumInterval
-      : 168;
+    const vacuumIntervalHours = envVacuumInterval !== undefined
+      ? Number(envVacuumInterval)
+      : 168; // Default weekly (7 days)
 
-    this.config = {
+    const config = {
       enabled: customConfig.enabled !== undefined ? customConfig.enabled : isEnabled,
       intervalHours: customConfig.intervalHours ?? intervalHours,
       retentionDays: customConfig.retentionDays ?? retentionDays,
       vacuumIntervalHours: customConfig.vacuumIntervalHours ?? vacuumIntervalHours
     };
+    validateSchedulerConfig(config);
+    this.config = config;
   }
 
   public static getInstance(config?: Partial<SchedulerConfig>): BackupScheduler {
@@ -141,7 +165,7 @@ export class BackupScheduler {
   /**
    * Stops active timers cleanly during server shutdown.
    */
-  public stop(): void {
+  public async stop(): Promise<void> {
     if (this.backupTimer) {
       clearInterval(this.backupTimer);
       this.backupTimer = null;
@@ -151,6 +175,16 @@ export class BackupScheduler {
       this.vacuumTimer = null;
     }
     this.isRunning = false;
+
+    const activeOperations: Promise<unknown>[] = [];
+    if (this.activeBackupPromise) {
+      activeOperations.push(this.activeBackupPromise);
+    }
+    if (this.activeVacuumPromise) {
+      activeOperations.push(this.activeVacuumPromise);
+    }
+    await Promise.allSettled(activeOperations);
+
     this.nextScheduledBackupAt = null;
     this.nextScheduledVacuumAt = null;
   }
@@ -162,6 +196,31 @@ export class BackupScheduler {
    * @returns The created backup record or null on error.
    */
   public async executeScheduledBackup(): Promise<BackupRecord | null> {
+    if (this.maintenanceInProgress) {
+      throw new Error(
+        `Cannot start backup while ${this.maintenanceInProgress} maintenance is in progress`
+      );
+    }
+
+    this.maintenanceInProgress = 'backup';
+    const operation = this.runScheduledBackup();
+    this.activeBackupPromise = operation;
+    try {
+      return await operation;
+    } finally {
+      if (this.activeBackupPromise === operation) {
+        this.activeBackupPromise = null;
+      }
+      this.maintenanceInProgress = null;
+    }
+  }
+
+  /**
+   * Run a full scheduled backup inside the scheduler's system request context.
+   *
+   * @returns The completed backup record.
+   */
+  private async runScheduledBackup(): Promise<BackupRecord | null> {
     const tenantId = this.resolveSystemTenantId();
     const correlationId = generateUUIDv7();
 
@@ -171,26 +230,13 @@ export class BackupScheduler {
         correlationId
       },
       async () => {
+        let record: BackupRecord;
         try {
-          const record = await BackupService.createFullDatabaseBackup();
+          record = await BackupService.createFullDatabaseBackup();
           this.lastBackupAt = Date.now();
           this.lastBackupStatus = 'completed';
           this.totalBackupsRun += 1;
           this.nextScheduledBackupAt = Date.now() + (this.config.intervalHours * 3600 * 1000);
-
-          // Prune backups exceeding retention threshold
-          const prunedCount = BackupService.pruneOldBackups(this.config.retentionDays);
-
-          eventBus.publish('backup.scheduled.completed', {
-            backupId: record.id,
-            tenantId: record.tenant_id,
-            filename: record.filename,
-            fileSizeBytes: record.file_size_bytes,
-            checksumSha256: record.checksum_sha256,
-            prunedCount
-          });
-
-          return record;
         } catch (err: any) {
           this.lastBackupAt = Date.now();
           this.lastBackupStatus = 'failed';
@@ -203,6 +249,29 @@ export class BackupScheduler {
 
           throw err;
         }
+
+        let prunedCount = 0;
+        try {
+          prunedCount = BackupService.pruneOldBackups(this.config.retentionDays);
+        } catch (err: any) {
+          process.stderr.write(`[BackupScheduler] Backup retention pruning failed: ${String(err)}\n`);
+          eventBus.publish('backup.retention.failed', {
+            backupId: record.id,
+            error: err?.message || 'Backup retention pruning failed',
+            timestamp: Date.now()
+          });
+        }
+
+        eventBus.publish('backup.scheduled.completed', {
+          backupId: record.id,
+          tenantId: record.tenant_id,
+          filename: record.filename,
+          fileSizeBytes: record.file_size_bytes,
+          checksumSha256: record.checksum_sha256,
+          prunedCount
+        });
+
+        return record;
       }
     );
   }
@@ -213,6 +282,31 @@ export class BackupScheduler {
    * @returns Performance and duration metrics.
    */
   public async executeScheduledVacuum(): Promise<{ durationMs: number; checkpointResult: string }> {
+    if (this.maintenanceInProgress) {
+      throw new Error(
+        `Cannot start vacuum while ${this.maintenanceInProgress} maintenance is in progress`
+      );
+    }
+
+    this.maintenanceInProgress = 'vacuum';
+    const operation = this.runScheduledVacuum();
+    this.activeVacuumPromise = operation;
+    try {
+      return await operation;
+    } finally {
+      if (this.activeVacuumPromise === operation) {
+        this.activeVacuumPromise = null;
+      }
+      this.maintenanceInProgress = null;
+    }
+  }
+
+  /**
+   * Run database maintenance inside the scheduler's system request context.
+   *
+   * @returns Performance and duration metrics from the maintenance worker.
+   */
+  private async runScheduledVacuum(): Promise<{ durationMs: number; checkpointResult: string }> {
     const tenantId = this.resolveSystemTenantId();
     const correlationId = generateUUIDv7();
 
@@ -223,7 +317,7 @@ export class BackupScheduler {
       },
       async () => {
         try {
-          const result = BackupService.vacuumDatabase();
+          const result = await BackupService.vacuumDatabase();
           this.lastVacuumAt = Date.now();
           this.totalVacuumsRun += 1;
           this.nextScheduledVacuumAt = Date.now() + (this.config.vacuumIntervalHours * 3600 * 1000);
@@ -259,7 +353,8 @@ export class BackupScheduler {
       nextScheduledBackupAt: this.nextScheduledBackupAt,
       nextScheduledVacuumAt: this.nextScheduledVacuumAt,
       totalBackupsRun: this.totalBackupsRun,
-      totalVacuumsRun: this.totalVacuumsRun
+      totalVacuumsRun: this.totalVacuumsRun,
+      maintenanceInProgress: this.maintenanceInProgress
     };
   }
 }

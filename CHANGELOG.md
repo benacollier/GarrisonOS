@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Harden the backup scheduler with bounded configuration, owner-only manual triggers, mutually exclusive worker-thread maintenance, independent retention error reporting, and shutdown waits for active operations.
 - Handle natural and compound unique key conflicts during merge restores in `modules/backup/backend/service.ts` to replace conflicting rows cleanly without unique constraint failures.
 - Fail closed on signal termination (`code === null`) in `scripts/test.js` to report runner termination and prevent CI false-passes.
 - Enforce cryptographic digest computation, comparison, and fail-closed abort verification patterns for installer scripts in `scripts/check-hygiene.js`.
@@ -23,7 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- In-process automated backup and database maintenance scheduler daemon (`BackupScheduler` in `modules/backup/backend/scheduler.ts`) executing periodic point-in-time full database snapshots (`garrison-db-<timestamp>.sqlite.gz`), WAL truncation and page reclamation (`VACUUM` and `PRAGMA optimize`), and retention policy pruning without external cron dependencies.
+- In-process automated backup and database maintenance scheduler daemon (`BackupScheduler` in `modules/backup/backend/scheduler.ts`) executing periodic point-in-time full database snapshots (`garrison-db-<timestamp>.sqlite.gz`), WAL truncation, optimizer-statistics updates (`PRAGMA optimize`), database page reclamation (`VACUUM`), and retention policy pruning without external cron dependencies.
 - Administrative scheduler status endpoint (`GET /api/v1/backups/scheduler/status`) and manual trigger endpoint (`POST /api/v1/backups/scheduler/trigger`).
 - Development tooling and repository verification guide (`docs/development/tooling.md`) and unified root acknowledgements and attributions registry (`ATTRIBUTIONS.md`).
 - Low-token test runner reporter in `scripts/test.js` outputting single-line pass summaries and emitting full diagnostic output only on failure.

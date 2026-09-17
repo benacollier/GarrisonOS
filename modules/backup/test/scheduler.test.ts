@@ -52,10 +52,13 @@ class MockResponse {
 describe('Backup Module - Automated Scheduler, Vacuum & Retention Daemon', () => {
   const testTenant = 'tenant-scheduler-test';
   const testStorageDir = path.resolve('./storage/test-scheduler-backups');
+  const maintenanceDatabasePath = path.join(testStorageDir, 'maintenance.sqlite');
   let scheduler: BackupScheduler;
 
   before(() => {
     process.env['STORAGE_PATH'] = testStorageDir;
+    process.env['SQLITE_PATH'] = maintenanceDatabasePath;
+    fs.mkdirSync(testStorageDir, { recursive: true });
     getDatabase({ inMemory: true });
     createTestDb();
 
@@ -75,9 +78,10 @@ describe('Backup Module - Automated Scheduler, Vacuum & Retention Daemon', () =>
     });
   });
 
-  after(() => {
-    scheduler.stop();
+  after(async () => {
+    await scheduler.stop();
     closeDatabase();
+    delete process.env['SQLITE_PATH'];
     if (fs.existsSync(testStorageDir)) {
       try {
         fs.rmSync(testStorageDir, { recursive: true, force: true });
@@ -85,8 +89,8 @@ describe('Backup Module - Automated Scheduler, Vacuum & Retention Daemon', () =>
     }
   });
 
-  afterEach(() => {
-    scheduler.stop();
+  afterEach(async () => {
+    await scheduler.stop();
   });
 
   it('initializes scheduler with configuration and reports initial status', () => {
@@ -100,18 +104,45 @@ describe('Backup Module - Automated Scheduler, Vacuum & Retention Daemon', () =>
     assert.equal(status.lastVacuumAt, null);
   });
 
-  it('starts and stops scheduler lifecycle cleanly without throwing', () => {
+  it('starts and stops scheduler lifecycle cleanly without throwing', async () => {
     scheduler.start();
     let status = scheduler.getStatus();
     assert.equal(status.running, true);
     assert.ok(status.nextScheduledBackupAt !== null && status.nextScheduledBackupAt > Date.now());
     assert.ok(status.nextScheduledVacuumAt !== null && status.nextScheduledVacuumAt > Date.now());
 
-    scheduler.stop();
+    await scheduler.stop();
     status = scheduler.getStatus();
     assert.equal(status.running, false);
     assert.equal(status.nextScheduledBackupAt, null);
     assert.equal(status.nextScheduledVacuumAt, null);
+  });
+
+  it('rejects invalid merged timer and retention configuration values', () => {
+    assert.throws(
+      () => new BackupScheduler({ intervalHours: 0 }),
+      /intervalHours must be greater than 0/
+    );
+    assert.throws(
+      () => new BackupScheduler({ vacuumIntervalHours: 597 }),
+      /vacuumIntervalHours must be greater than 0 and no more than 596 hours/
+    );
+    assert.throws(
+      () => new BackupScheduler({ retentionDays: 0 }),
+      /retentionDays must be greater than 0/
+    );
+
+    const previousInterval = process.env['BACKUP_INTERVAL_HOURS'];
+    process.env['BACKUP_INTERVAL_HOURS'] = 'invalid';
+    try {
+      assert.throws(() => new BackupScheduler(), /intervalHours must be greater than 0/);
+    } finally {
+      if (previousInterval === undefined) {
+        delete process.env['BACKUP_INTERVAL_HOURS'];
+      } else {
+        process.env['BACKUP_INTERVAL_HOURS'] = previousInterval;
+      }
+    }
   });
 
   it('executes scheduled backup, emits backup.scheduled.completed event, and records status', async () => {
@@ -161,6 +192,95 @@ describe('Backup Module - Automated Scheduler, Vacuum & Retention Daemon', () =>
     const vacuumEventReceived = await vacuumEventHandled;
     assert.ok(vacuumEventReceived);
     assert.ok(vacuumEventReceived.durationMs >= 0);
+  });
+
+  it('serializes backup and vacuum work and waits for active maintenance during stop', async () => {
+    const originalCreateBackup = BackupService.createFullDatabaseBackup;
+    const originalPruneBackups = BackupService.pruneOldBackups;
+    const completedRecord = {
+      id: 'guarded-backup',
+      tenant_id: testTenant,
+      backup_type: 'full_system' as const,
+      filename: 'guarded.sqlite.gz',
+      relative_path: 'guarded.sqlite.gz',
+      file_size_bytes: 42,
+      checksum_sha256: 'a'.repeat(64),
+      status: 'completed' as const,
+      error_message: null,
+      metadata_json: null,
+      created_at: Date.now(),
+      deleted_at: null
+    };
+    let releaseBackup!: (record: typeof completedRecord) => void;
+
+    BackupService.createFullDatabaseBackup = async () => new Promise((resolve) => {
+      releaseBackup = resolve;
+    });
+    BackupService.pruneOldBackups = () => 0;
+
+    try {
+      const backupOperation = scheduler.executeScheduledBackup();
+      assert.equal(scheduler.getStatus().maintenanceInProgress, 'backup');
+
+      await assert.rejects(
+        scheduler.executeScheduledVacuum(),
+        /Cannot start vacuum while backup maintenance is in progress/
+      );
+
+      let stopCompleted = false;
+      const stopOperation = scheduler.stop().then(() => { stopCompleted = true; });
+      await Promise.resolve();
+      assert.equal(stopCompleted, false);
+
+      releaseBackup(completedRecord);
+      assert.equal(await backupOperation, completedRecord);
+      await stopOperation;
+      assert.equal(stopCompleted, true);
+      assert.equal(scheduler.getStatus().maintenanceInProgress, null);
+    } finally {
+      BackupService.createFullDatabaseBackup = originalCreateBackup;
+      BackupService.pruneOldBackups = originalPruneBackups;
+    }
+  });
+
+  it('reports retention pruning failures without failing a completed backup', async () => {
+    const originalCreateBackup = BackupService.createFullDatabaseBackup;
+    const originalPruneBackups = BackupService.pruneOldBackups;
+    const completedRecord = {
+      id: 'completed-before-pruning',
+      tenant_id: testTenant,
+      backup_type: 'full_system' as const,
+      filename: 'completed.sqlite.gz',
+      relative_path: 'completed.sqlite.gz',
+      file_size_bytes: 42,
+      checksum_sha256: 'b'.repeat(64),
+      status: 'completed' as const,
+      error_message: null,
+      metadata_json: null,
+      created_at: Date.now(),
+      deleted_at: null
+    };
+    const retentionFailure = new Promise<any>((resolve) => {
+      eventBus.subscribe('backup.retention.failed', resolve);
+    });
+
+    BackupService.createFullDatabaseBackup = async () => completedRecord;
+    BackupService.pruneOldBackups = () => {
+      throw new Error('retention storage unavailable');
+    };
+
+    try {
+      const result = await scheduler.executeScheduledBackup();
+      assert.equal(result, completedRecord);
+      assert.equal(scheduler.getStatus().lastBackupStatus, 'completed');
+
+      const failureEvent = await retentionFailure;
+      assert.equal(failureEvent.backupId, completedRecord.id);
+      assert.equal(failureEvent.error, 'retention storage unavailable');
+    } finally {
+      BackupService.createFullDatabaseBackup = originalCreateBackup;
+      BackupService.pruneOldBackups = originalPruneBackups;
+    }
   });
 
   it('prunes expired backups during scheduled backup execution', async () => {

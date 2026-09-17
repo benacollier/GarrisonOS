@@ -3,6 +3,7 @@ import * as path from 'node:path';
 import * as zlib from 'node:zlib';
 import * as crypto from 'node:crypto';
 import { pipeline } from 'node:stream/promises';
+import { Worker } from 'node:worker_threads';
 import { getDatabase, closeDatabase, withTransaction } from '../../../database/client.js';
 import { runMigrations } from '../../../database/migrator.js';
 import { RequestContext } from '../../../core/context.js';
@@ -243,22 +244,48 @@ export class BackupService {
    *
    * @returns Performance and vacuum completion metrics.
    */
-  public static vacuumDatabase(): { durationMs: number; checkpointResult: string } {
-    const db = getDatabase();
-    const startTime = Date.now();
+  public static vacuumDatabase(): Promise<{ durationMs: number; checkpointResult: string }> {
+    const databasePath = process.env['SQLITE_PATH'] || './garrison.sqlite';
 
-    // 1. Truncate and checkpoint write-ahead log
-    db.exec('PRAGMA wal_checkpoint(TRUNCATE);');
+    return new Promise((resolve, reject) => {
+      const worker = new Worker(new URL('./maintenance-worker.js', import.meta.url), {
+        workerData: { databasePath }
+      });
+      let settled = false;
 
-    // 2. Perform SQLite online page reclamation and index optimization
-    db.exec('PRAGMA optimize;');
-    db.exec('VACUUM;');
+      worker.once('message', (message: unknown) => {
+        settled = true;
+        const result = message as {
+          success?: boolean;
+          durationMs?: number;
+          checkpointResult?: string;
+          error?: string;
+        };
+        if (
+          result.success === true &&
+          typeof result.durationMs === 'number' &&
+          typeof result.checkpointResult === 'string'
+        ) {
+          resolve({
+            durationMs: result.durationMs,
+            checkpointResult: result.checkpointResult
+          });
+        } else {
+          reject(new Error(result.error || 'Database maintenance worker returned an invalid response'));
+        }
+      });
 
-    const durationMs = Date.now() - startTime;
-    return {
-      durationMs,
-      checkpointResult: 'PRAGMA wal_checkpoint(TRUNCATE) and VACUUM completed successfully'
-    };
+      worker.once('error', (err) => {
+        settled = true;
+        reject(err);
+      });
+
+      worker.once('exit', (code) => {
+        if (!settled) {
+          reject(new Error(`Database maintenance worker exited before reporting a result (code ${code})`));
+        }
+      });
+    });
   }
 
   /**

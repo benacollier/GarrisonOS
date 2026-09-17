@@ -26,6 +26,10 @@ export function registerSubscribers(bus: EventBus): void {
     process.stderr.write(`[BackupEvent] Scheduled backup failed: ${event?.error}\n`);
   });
 
+  bus.subscribe('backup.retention.failed', (event: any) => {
+    process.stderr.write(`[BackupEvent] Backup retention pruning failed: ${event?.error}\n`);
+  });
+
   bus.subscribe('database.vacuumed', (event: any) => {
     process.stdout.write(`[BackupEvent] Database vacuum completed in ${event?.durationMs}ms: ${event?.checkpointResult}\n`);
   });

@@ -62,6 +62,8 @@ find "$BACKUP_DIR" -type f -name "*.sqlite" -mtime +30 -delete
 
 Over months of operations, deleting records may leave unused pages in the SQLite database file. Periodically vacuuming reorganizes the file:
 
+The in-process scheduler delegates these synchronous SQLite operations to a dedicated worker thread. WAL truncation checkpoints the write-ahead log, `PRAGMA optimize` updates query-planner statistics, and `VACUUM` separately reclaims unused database pages.
+
 ```bash
 # Optimize query planner statistics
 sqlite3 garrison.sqlite "PRAGMA optimize;"
