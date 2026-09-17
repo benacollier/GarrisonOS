@@ -23,6 +23,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- In-process automated backup and database maintenance scheduler daemon (`BackupScheduler` in `modules/backup/backend/scheduler.ts`) executing periodic point-in-time full database snapshots (`garrison-db-<timestamp>.sqlite.gz`), WAL truncation and page reclamation (`VACUUM` and `PRAGMA optimize`), and retention policy pruning without external cron dependencies.
+- Administrative scheduler status endpoint (`GET /api/v1/backups/scheduler/status`) and manual trigger endpoint (`POST /api/v1/backups/scheduler/trigger`).
 - Development tooling and repository verification guide (`docs/development/tooling.md`) and unified root acknowledgements and attributions registry (`ATTRIBUTIONS.md`).
 - Low-token test runner reporter in `scripts/test.js` outputting single-line pass summaries and emitting full diagnostic output only on failure.
 - Unified architectural and compliance validation scanner in `scripts/check-hygiene.js` enforcing zero runtime dependencies, strict equality, synchronous SQLite, parameterized SQL, tenant parameter isolation, and fail-closed scripts in <150ms.

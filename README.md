@@ -224,8 +224,8 @@ For a comprehensive phase-by-phase implementation plan, milestone deliverables, 
 ||Form validation, CSRF, and session handling|🟡|CSRF tokens, timing-safe auth verification, and session helpers exist; complete end-to-end security review remains.|
 |**6. Data Portability, Resilience & Backup**|SQLite snapshots and WAL checkpointing|✅|Snapshot service, online `VACUUM INTO`, and safe WAL checkpointing implemented and tested.|
 ||Tenant data export/import and integrity verification|✅|Tenant-scoped `.json.gz` export/import with SHA-256 cryptographic verification implemented and tested.|
-||Disaster-recovery restore|🟡|CLI restore tooling exists with header validation; automated scheduled backup daemon and runbooks remain.|
-||Scheduled backups, monitoring, and vacuum routines|⬜|Operational backup scheduling service and automated database maintenance daemon are planned.|
+||Disaster-recovery restore|✅|CLI restore tooling (`scripts/restore.js`) with header validation, WAL cache cleanup, and migration execution.|
+||Scheduled backups, monitoring, and vacuum routines|✅|In-process `BackupScheduler` daemon executing automated snapshots, online vacuum/optimize, and retention pruning.|
 |**7. MVP Verification, Hardening & Self-Hosting**|Unit/module tests and tenant-isolation regression coverage|✅|Core and module test suites pass with zero dependencies; deterministic event listeners replace legacy timer sleeps.|
 ||Security review and production hardening|🟡|Token spoofing prevention and Actions SHA-pinning complete; comprehensive third-party audit planned for Tranche 4.|
 ||Secure release packaging (Method 2) & checksum verification|✅|Pre-packaged release archives with cryptographic SHA-256 verification implemented across installer tooling.|

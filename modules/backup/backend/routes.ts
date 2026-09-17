@@ -3,15 +3,63 @@ import { Router } from '../../../api/router.js';
 import { successResponse, errorResponse } from '../../../api/response.js';
 import { BackupRepository } from './repository.js';
 import { BackupService, RestoreTenantOptions } from './service.js';
+import { BackupScheduler } from './scheduler.js';
 import { eventBus } from '../../../core/events.js';
 
 export function registerRoutes(router: Router): void {
+  // Scheduler status
+  router.getBatchSafe('/api/v1/backups/scheduler/status', (_req, res) => {
+    try {
+      const scheduler = BackupScheduler.getInstance();
+      const status = scheduler.getStatus();
+      successResponse(res, { scheduler: status });
+    } catch (err: any) {
+      errorResponse(res, 'SYSTEM_ERROR', err.message, 500);
+    }
+  });
+
+  // Trigger manual scheduler job (backup or vacuum)
+  router.post('/api/v1/backups/scheduler/trigger', async (req, res) => {
+    try {
+      const { action } = (req as any).body || {};
+      const scheduler = BackupScheduler.getInstance();
+
+      if (action === 'vacuum') {
+        const result = await scheduler.executeScheduledVacuum();
+        return successResponse(res, { message: 'Database maintenance routine executed successfully', result });
+      }
+
+      const record = await scheduler.executeScheduledBackup();
+      successResponse(res, { message: 'Scheduled backup executed successfully', backup: record }, 201);
+    } catch (err: any) {
+      errorResponse(res, 'SCHEDULER_ERROR', err.message, 500);
+    }
+  });
+
   // List backups
   router.getBatchSafe('/api/v1/backups', (req, res) => {
     try {
-      const url = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`);
-      const limit = parseInt(url.searchParams.get('limit') || '50', 10);
-      const offset = parseInt(url.searchParams.get('offset') || '0', 10);
+      const rawLimit = (req as any).query?.['limit'];
+      const rawOffset = (req as any).query?.['offset'];
+
+      let limit = 50;
+      let offset = 0;
+
+      if (rawLimit !== undefined && rawLimit !== '') {
+        const parsed = Number(rawLimit);
+        if (!Number.isInteger(parsed) || parsed <= 0 || parsed > 100) {
+          return errorResponse(res, 'VALIDATION_ERROR', 'Query parameter "limit" must be a positive integer between 1 and 100', 400);
+        }
+        limit = parsed;
+      }
+
+      if (rawOffset !== undefined && rawOffset !== '') {
+        const parsed = Number(rawOffset);
+        if (!Number.isInteger(parsed) || parsed < 0) {
+          return errorResponse(res, 'VALIDATION_ERROR', 'Query parameter "offset" must be a non-negative integer', 400);
+        }
+        offset = parsed;
+      }
 
       const result = BackupRepository.list(limit, offset);
       successResponse(res, result);

@@ -523,6 +523,17 @@ export async function startServer(
   // Load all functional modules dynamically
   await loadModules(router, eventBus);
 
+  // Initialize and start background backup & vacuum scheduler if enabled
+  try {
+    const schedulerMod = await import('../modules/backup/backend/scheduler.js').catch(() => null);
+    if (schedulerMod?.BackupScheduler) {
+      const scheduler = schedulerMod.BackupScheduler.getInstance();
+      scheduler.start();
+    }
+  } catch {
+    // Non-blocking if backup module is unmounted or disabled
+  }
+
   const server = createHttpServer((req: IncomingMessage, res: ServerResponse) => {
     router.handle(req, res);
   });
@@ -548,7 +559,13 @@ if (isDirectExecution) {
     process.exit(1);
   });
 
-  const cleanup = () => {
+  const cleanup = async () => {
+    try {
+      const schedulerMod = await import('../modules/backup/backend/scheduler.js').catch(() => null);
+      if (schedulerMod?.BackupScheduler) {
+        schedulerMod.BackupScheduler.getInstance().stop();
+      }
+    } catch {}
     closeDatabase();
     process.exit(0);
   };

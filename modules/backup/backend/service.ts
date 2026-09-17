@@ -238,6 +238,30 @@ export class BackupService {
   }
 
   /**
+   * Performs an online WAL checkpoint and database vacuuming maintenance routine.
+   * Checkpoints pending WAL frames and reclaims unused database pages.
+   *
+   * @returns Performance and vacuum completion metrics.
+   */
+  public static vacuumDatabase(): { durationMs: number; checkpointResult: string } {
+    const db = getDatabase();
+    const startTime = Date.now();
+
+    // 1. Truncate and checkpoint write-ahead log
+    db.exec('PRAGMA wal_checkpoint(TRUNCATE);');
+
+    // 2. Perform SQLite online page reclamation and index optimization
+    db.exec('PRAGMA optimize;');
+    db.exec('VACUUM;');
+
+    const durationMs = Date.now() - startTime;
+    return {
+      durationMs,
+      checkpointResult: 'PRAGMA wal_checkpoint(TRUNCATE) and VACUUM completed successfully'
+    };
+  }
+
+  /**
    * Restore tenant data from a backup archive buffer or on-disk backup ID.
    * Options:
    *  - clean_slate: Replaces all tenant records in the backed up tables before inserting.
