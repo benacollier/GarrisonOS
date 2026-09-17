@@ -149,6 +149,8 @@ GarrisonOS leverages and attributes several key open-source tooling standards:
 - **[CLA Assistant](https://cla-assistant.io/)**: Automated Contributor License Agreement signature workflow.
 - **[Conventional Commits](https://www.conventionalcommits.org/)**: Commit specification standard for structured changelogs.
 
+For the comprehensive directory of project acknowledgements and open-source attributions, see [ATTRIBUTIONS.md](ATTRIBUTIONS.md).
+
 ---
 
 ## 7. Issue & Pull Request Labels

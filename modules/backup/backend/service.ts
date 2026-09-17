@@ -135,7 +135,7 @@ export class BackupService {
         SELECT DISTINCT m.name as table_name
         FROM sqlite_master m
         JOIN pragma_table_info(m.name) p
-        WHERE m.type = 'table' AND p.name = 'tenant_id' AND m.name != 'backups'
+        WHERE m.type = 'table' AND p.name = 'tenant_id' AND m.name <> 'backups'
       `).all() as { table_name: string }[];
 
       const exportData: Record<string, any[]> = {
@@ -147,6 +147,7 @@ export class BackupService {
       };
 
       for (const { table_name } of tables) {
+        // hygiene-exempt: dynamic table identifier from sqlite_master whitelist
         const rows = db.prepare(`SELECT * FROM "${table_name}" WHERE tenant_id = ?`).all(tenantId);
         exportData[table_name] = rows;
       }
@@ -294,7 +295,7 @@ export class BackupService {
         SELECT DISTINCT m.name as table_name
         FROM sqlite_master m
         JOIN pragma_table_info(m.name) p
-        WHERE m.type = 'table' AND p.name = 'tenant_id' AND m.name != 'backups'
+        WHERE m.type = 'table' AND p.name = 'tenant_id' AND m.name <> 'backups'
       `).all() as { table_name: string }[];
 
       const validTableNames = new Set(dbTables.map((t) => t.table_name));
@@ -307,11 +308,22 @@ export class BackupService {
         }
       }
 
+      // Tables with tenant-scoped natural / compound unique constraints:
+      // In merge mode, if a row in the backup shares the natural key with an existing target row having a different id,
+      // resolve the conflict beforehand so the backup's record replaces it cleanly.
+      const naturalKeyLookups: Record<string, string[]> = {
+        users: ['tenant_id', 'email'],
+        lease_contacts: ['tenant_id', 'lease_id', 'contact_id'],
+        journal_entries: ['tenant_id', 'entry_number']
+      };
+
       // 2. Insert records table by table
       for (const [tableName, rows] of Object.entries(exportData)) {
         if (tableName === '_export_metadata' || !validTableNames.has(tableName) || !Array.isArray(rows)) {
           continue;
         }
+
+        const naturalKeys = naturalKeyLookups[tableName];
 
         let insertedCount = 0;
         for (const row of rows) {
@@ -322,12 +334,25 @@ export class BackupService {
           const cols = Object.keys(sanitizedRow);
           if (cols.length === 0) continue;
 
+          // If merge mode and table has natural key columns, delete any existing record with matching natural key and differing id
+          if (options.mode === 'merge' && naturalKeys && sanitizedRow['id']) {
+            const hasAllKeys = naturalKeys.every(k => sanitizedRow[k] !== undefined);
+            if (hasAllKeys) {
+              const whereClause = naturalKeys.map(k => `"${k}" = ?`).join(' AND ') + ' AND "id" <> ?';
+              const params = [...naturalKeys.map(k => sanitizedRow[k]), sanitizedRow['id']];
+              tx.prepare(`DELETE FROM "${tableName}" WHERE ${whereClause}`).run(...params);
+            }
+          }
+
           const placeholders = cols.map(() => '?').join(', ');
           const colNames = cols.map((c) => `"${c}"`).join(', ');
           const values = cols.map((c) => sanitizedRow[c]);
 
-          // Use INSERT OR REPLACE to support both merge and clean_slate cleanly
-          const insertSql = `INSERT OR REPLACE INTO "${tableName}" (${colNames}) VALUES (${placeholders})`;
+          // Use ANSI-compliant ON CONFLICT (id) DO UPDATE to support both merge and clean_slate cleanly
+          const updateSet = cols.filter(c => c !== 'id').map(c => `"${c}" = excluded."${c}"`).join(', ');
+          const insertSql = updateSet.length > 0
+            ? `INSERT INTO "${tableName}" (${colNames}) VALUES (${placeholders}) ON CONFLICT (id) DO UPDATE SET ${updateSet}`
+            : `INSERT INTO "${tableName}" (${colNames}) VALUES (${placeholders}) ON CONFLICT (id) DO NOTHING`;
           tx.prepare(insertSql).run(...values);
           insertedCount++;
         }

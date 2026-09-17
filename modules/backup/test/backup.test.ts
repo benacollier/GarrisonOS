@@ -146,6 +146,62 @@ describe('Backup Module - Snapshots, Exports, and Integrity Verification', () =>
     });
   });
 
+  it('handles compound unique constraint conflicts during merge restore', async () => {
+    await runInTenantContext(testTenant, async () => {
+      const db = getDatabase();
+      const now = Date.now();
+
+      // Seed property, unit, contact, and lease for foreign keys
+      db.prepare(`
+        INSERT INTO properties (id, tenant_id, name, property_type, address_line1, city, state, postal_code, created_at, updated_at)
+        VALUES ('prop-u1', ?, 'Prop', 'single_family', '123 St', 'City', 'ST', '12345', ?, ?)
+      `).run(testTenant, now, now);
+
+      db.prepare(`
+        INSERT INTO units (id, tenant_id, property_id, unit_number, status, market_rent_cents, created_at, updated_at)
+        VALUES ('unit-u1', ?, 'prop-u1', '101', 'occupied', 100000, ?, ?)
+      `).run(testTenant, now, now);
+
+      db.prepare(`
+        INSERT INTO contacts (id, tenant_id, contact_type, first_name, last_name, created_at, updated_at)
+        VALUES ('cont-u1', ?, 'tenant', 'Alice', 'Smith', ?, ?)
+      `).run(testTenant, now, now);
+
+      db.prepare(`
+        INSERT INTO leases (id, tenant_id, unit_id, status, start_date, end_date, rent_amount_cents, created_at, updated_at)
+        VALUES ('lease-u1', ?, 'unit-u1', 'active', ?, ?, 100000, ?, ?)
+      `).run(testTenant, now, now + 86400000, now, now);
+
+      // Add a lease contact row in the snapshot
+      db.prepare(`
+        INSERT INTO lease_contacts (id, tenant_id, lease_id, contact_id, role, created_at)
+        VALUES ('lc-orig-id', ?, 'lease-u1', 'cont-u1', 'primary_tenant', ?)
+      `).run(testTenant, now);
+
+      // Create backup archive
+      const backup = await BackupService.createTenantExport();
+
+      // Re-create the same association under a DIFFERENT row ID
+      db.prepare('DELETE FROM lease_contacts WHERE id = ?').run('lc-orig-id');
+      db.prepare(`
+        INSERT INTO lease_contacts (id, tenant_id, lease_id, contact_id, role, created_at)
+        VALUES ('lc-different-id', ?, 'lease-u1', 'cont-u1', 'primary_tenant', ?)
+      `).run(testTenant, now);
+
+      // Restoring in merge mode must replace conflicting natural key row without UNIQUE constraint failure
+      const mergeRes = await BackupService.restoreTenantData(
+        { backupId: backup.id },
+        { mode: 'merge' }
+      );
+      assert.equal(mergeRes.success, true);
+
+      const rows = db.prepare('SELECT id, role FROM lease_contacts WHERE tenant_id = ? AND lease_id = ? AND contact_id = ?')
+        .all(testTenant, 'lease-u1', 'cont-u1') as { id: string; role: string }[];
+      assert.equal(rows.length, 1);
+      assert.equal(rows[0]?.id, 'lc-orig-id');
+    });
+  });
+
   it('rejects cross-tenant data restoration attempts', async () => {
     let backupId = '';
     await runInTenantContext(testTenant, async () => {

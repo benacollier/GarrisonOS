@@ -7,8 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Fixed
-
+- Handle natural and compound unique key conflicts during merge restores in `modules/backup/backend/service.ts` to replace conflicting rows cleanly without unique constraint failures.
+- Fail closed on signal termination (`code === null`) in `scripts/test.js` to report runner termination and prevent CI false-passes.
+- Enforce cryptographic digest computation, comparison, and fail-closed abort verification patterns for installer scripts in `scripts/check-hygiene.js`.
+- Convert dynamic table queries and backup restoration queries in `modules/backup/backend/service.ts` to ANSI-standard PostgreSQL-compatible SQL (`ON CONFLICT (id) DO UPDATE` instead of `INSERT OR REPLACE`).
+- Resolve markdownlint formatting errors across all documentation and root markdown files (`AGENTS.md`, `README.md`, `docs/LLMREVIEW20260915.md`).
 - Enforce strict token-derived `userId` in `tenantContextMiddleware` and reject mismatched `X-User-ID` headers to prevent identity spoofing.
 - Require owner role verification for system backup endpoint (`/api/v1/system/backup`).
 - Fix `EventBus.publish` to synchronously capture and inherit active `RequestContext` (`tenantId`, `correlationId`, `userId`) when payloads omit explicit context.
@@ -20,6 +23,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Development tooling and repository verification guide (`docs/development/tooling.md`) and unified root acknowledgements and attributions registry (`ATTRIBUTIONS.md`).
+- Low-token test runner reporter in `scripts/test.js` outputting single-line pass summaries and emitting full diagnostic output only on failure.
+- Unified architectural and compliance validation scanner in `scripts/check-hygiene.js` enforcing zero runtime dependencies, strict equality, synchronous SQLite, parameterized SQL, tenant parameter isolation, and fail-closed scripts in <150ms.
+- Section 7 Agent Tool & Context Hygiene Directives in `AGENTS.md` mandating line-range slicing on `view_file` and mechanical test/hygiene verification over raw context ingestion.
+- Workspace ignore configurations (`.geminiignore` and `.ignore`) excluding build outputs, WAL databases, coverage artifacts, and binary assets from whole-directory agent indexing.
 - Statutory trust accounting non-commingling validation invariant in `JournalService.postEntry` preventing unauthorized commingling of account `1020` with operating revenue/expenses.
 - Three-Way Bank Reconciliation report service (`AccountingRepository.getThreeWayReconciliation`) and endpoint (`GET /api/v1/accounting/reconciliation/three-way`) supporting empirical bank statement balances and historical active lease cutoff parity.
 - Annual IRS Form 1099-NEC vendor expense aggregation report service (`AccountingRepository.getVendor1099Report`) and endpoint (`GET /api/v1/accounting/reports/1099-nec`) with dynamic tax-year threshold selection and reversal exclusion.

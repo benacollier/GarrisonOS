@@ -413,6 +413,7 @@ export class JournalService {
       params.push(filter.end_date);
     }
 
+    // hygiene-exempt: subquery composition using parameterized placeholders
     const countRow = db.prepare(`SELECT COUNT(*) as count FROM (${sql})`).get(...params) as { count: number };
     const total = countRow?.count || 0;
 
