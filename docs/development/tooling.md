@@ -1,6 +1,6 @@
-# Development Tooling, AI Workers & Attribution Guide
+# Development Tooling & AI Worker Architecture
 
-This guide documents the development tooling, multi-tier background AI worker architecture, and open-source attributions utilized across the GarrisonOS developer environment.
+This guide documents the development tooling, multi-tier background AI worker architecture, test reporter, and repository compliance scanner utilized across the GarrisonOS developer environment. For complete open-source attributions and third-party notices, see [ATTRIBUTIONS.md](../../ATTRIBUTIONS.md).
 
 ---
 
@@ -18,7 +18,7 @@ To minimize primary model context consumption and safeguard API quotas (e.g. Gem
 [Tier 3: Guarded Fallback] ──► Primary Agent (Targeted Line Slices Only)
 ```
 
-### Tier Specifications & Attributions
+### Tier Specifications
 
 * **Tier 1 (Cloud Primary - High Throughput & Massive Context)**:
   * **Engine**: [NVIDIA NIM (Inference Microservices)](https://build.nvidia.com/)
@@ -64,16 +64,3 @@ To minimize primary model context consumption and safeguard API quotas (e.g. Gem
   6. **Fail-Closed Security**: Validates cryptographic SHA256 checksum verification and non-zero exit codes in installer scripts.
   7. **Host Path & Credential Hygiene**: Scans for host-specific absolute filesystem paths and exposed credentials or secrets.
 
----
-
-## 4. Development Tooling Attributions
-
-GarrisonOS acknowledges and credits the following open-source tools and infrastructure powering our development environment:
-
-* **[LLM Worker Tools](https://github.com/OhOkThisIsFine/llm-worker-tools)**: Ambient background context reduction and scaffolding MCP server.
-* **[NVIDIA NIM](https://build.nvidia.com/)**: Cloud inference microservices powering high-throughput background codebase reconnaissance.
-* **[Ollama](https://ollama.com/)** *(MIT License)*: Local large language model execution runtime driving offline fallback operations.
-* **[Qwen 2.5 Coder](https://github.com/QwenLM/Qwen2.5-Coder)** *(Apache-2.0 License)*: Code generation and analysis model developed by Alibaba Cloud.
-* **[Betterleaks](https://github.com/betterleaks/betterleaks)** *(Apache-2.0 License)*: Zero-dependency secret and credential scanner.
-* **[markdownlint-cli](https://github.com/igorshubovych/markdownlint-cli)** *(MIT License)*: Markdown syntax and style verification.
-* **[TypeScript](https://www.typescriptlang.org/)** *(Apache-2.0 License)*: Compile-time static type system and compiler.
