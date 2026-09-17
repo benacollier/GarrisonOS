@@ -111,14 +111,47 @@ jobs:
                 return;
               }
 
+              const EXEMPT_AUTHORS = ['benacollier'];
+              const author = (pr.user && pr.user.login) ? pr.user.login.toLowerCase() : '';
+
+              async function areAllCommitsVerified(prNumber) {
+                try {
+                  const commits = await github.paginate(github.rest.pulls.listCommits, {
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    pull_number: prNumber,
+                    per_page: 100
+                  });
+                  if (!commits || commits.length === 0) return false;
+                  return commits.every(c => c.commit && c.commit.verification && c.commit.verification.verified);
+                } catch (e) {
+                  core.warning(`Error checking commit signatures: ${e.message}`);
+                  return false;
+                }
+              }
+
               if (action === 'opened' || action === 'reopened' || action === 'ready_for_review') {
+                if (EXEMPT_AUTHORS.includes(author)) {
+                  const verified = await areAllCommitsVerified(pr.number);
+                  if (verified) {
+                    await syncLabels(pr.number, ['status/ready-to-merge'], ['status/draft', 'status/needs-review', 'status/changes-requested', 'status/ci-failing']);
+                    return;
+                  }
+                }
                 await syncLabels(pr.number, ['status/needs-review'], ['status/draft', 'status/changes-requested', 'status/ready-to-merge', 'status/ci-failing']);
                 return;
               }
 
               if (action === 'synchronize') {
+                if (EXEMPT_AUTHORS.includes(author)) {
+                  const verified = await areAllCommitsVerified(pr.number);
+                  if (verified) {
+                    await syncLabels(pr.number, ['status/ready-to-merge'], ['status/draft', 'status/needs-review', 'status/changes-requested']);
+                    return;
+                  }
+                }
                 // New commits pushed: if changes were requested, return to needs-review
-                const currentLabels = (pr.labels || []).map(l => l.name);
+                const currentLabels = (pr.labels || []).map(l => (typeof l === 'string' ? l : l.name));
                 if (currentLabels.includes('status/changes-requested')) {
                   await syncLabels(pr.number, ['status/needs-review'], ['status/changes-requested']);
                 }

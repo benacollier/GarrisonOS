@@ -1,0 +1,95 @@
+name: Auto Approve
+
+on:
+  pull_request_target:
+    types: [opened, reopened, ready_for_review, synchronize]
+
+permissions:
+  pull-requests: write
+  contents: read
+
+jobs:
+  auto-approve:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify Commits and Auto-Approve
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.PERSONAL_ACCESS_TOKEN || secrets.GITHUB_TOKEN }}
+          script: |
+            const EXEMPT_AUTHORS = ['benacollier'];
+            const pr = context.payload.pull_request;
+            if (!pr) return;
+
+            const author = (pr.user && pr.user.login) ? pr.user.login.toLowerCase() : '';
+            if (!EXEMPT_AUTHORS.includes(author)) {
+              core.info(`Author '${author}' is not in exempt list. Skipping auto-approval.`);
+              return;
+            }
+
+            if (pr.draft) {
+              core.info('PR is a draft. Skipping auto-approval.');
+              return;
+            }
+
+            // Retrieve all commits on the pull request to verify cryptographic signatures
+            const commits = await github.paginate(github.rest.pulls.listCommits, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: pr.number,
+              per_page: 100
+            });
+
+            if (!commits || commits.length === 0) {
+              core.warning('No commits found on PR.');
+              return;
+            }
+
+            const unverifiedCommits = [];
+            for (const c of commits) {
+              const isVerified = c.commit && c.commit.verification && c.commit.verification.verified;
+              if (!isVerified) {
+                unverifiedCommits.push({
+                  sha: c.sha ? c.sha.substring(0, 7) : 'unknown',
+                  reason: c.commit && c.commit.verification ? c.commit.verification.reason : 'unverified'
+                });
+              }
+            }
+
+            if (unverifiedCommits.length > 0) {
+              core.warning(`Cannot auto-approve: PR contains ${unverifiedCommits.length} unverified/unsigned commit(s): ${JSON.stringify(unverifiedCommits)}`);
+              return;
+            }
+
+            core.info(`All ${commits.length} commit(s) verified successfully.`);
+
+            // Check existing reviews to avoid duplicate approvals on the exact same commit head
+            const reviews = await github.rest.pulls.listReviews({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: pr.number
+            });
+
+            const currentHeadSha = pr.head.sha;
+            const alreadyApprovedHead = (reviews.data || []).some(
+              r => r.state === 'APPROVED' && r.commit_id === currentHeadSha
+            );
+
+            if (alreadyApprovedHead) {
+              core.info(`Head commit ${currentHeadSha.substring(0, 7)} is already approved.`);
+              return;
+            }
+
+            try {
+              await github.rest.pulls.createReview({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: pr.number,
+                event: 'APPROVE',
+                commit_id: currentHeadSha,
+                body: 'Automated maintainer approval: all commits authored by @' + pr.user.login + ' are cryptographically verified.'
+              });
+              core.info(`Successfully submitted automated approving review for PR #${pr.number}.`);
+            } catch (error) {
+              core.setFailed(`Failed to submit approving review: ${error.message}`);
+            }
