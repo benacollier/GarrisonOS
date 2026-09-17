@@ -308,11 +308,22 @@ export class BackupService {
         }
       }
 
+      // Tables with tenant-scoped natural / compound unique constraints:
+      // In merge mode, if a row in the backup shares the natural key with an existing target row having a different id,
+      // resolve the conflict beforehand so the backup's record replaces it cleanly.
+      const naturalKeyLookups: Record<string, string[]> = {
+        users: ['tenant_id', 'email'],
+        lease_contacts: ['tenant_id', 'lease_id', 'contact_id'],
+        journal_entries: ['tenant_id', 'entry_number']
+      };
+
       // 2. Insert records table by table
       for (const [tableName, rows] of Object.entries(exportData)) {
         if (tableName === '_export_metadata' || !validTableNames.has(tableName) || !Array.isArray(rows)) {
           continue;
         }
+
+        const naturalKeys = naturalKeyLookups[tableName];
 
         let insertedCount = 0;
         for (const row of rows) {
@@ -322,6 +333,16 @@ export class BackupService {
           const sanitizedRow = { ...row, tenant_id: tenantId };
           const cols = Object.keys(sanitizedRow);
           if (cols.length === 0) continue;
+
+          // If merge mode and table has natural key columns, delete any existing record with matching natural key and differing id
+          if (options.mode === 'merge' && naturalKeys && sanitizedRow['id']) {
+            const hasAllKeys = naturalKeys.every(k => sanitizedRow[k] !== undefined);
+            if (hasAllKeys) {
+              const whereClause = naturalKeys.map(k => `"${k}" = ?`).join(' AND ') + ' AND "id" <> ?';
+              const params = [...naturalKeys.map(k => sanitizedRow[k]), sanitizedRow['id']];
+              tx.prepare(`DELETE FROM "${tableName}" WHERE ${whereClause}`).run(...params);
+            }
+          }
 
           const placeholders = cols.map(() => '?').join(', ');
           const colNames = cols.map((c) => `"${c}"`).join(', ');

@@ -46,8 +46,13 @@ const startTime = Date.now();
 
 if (isVerbose) {
   const child = spawn(process.execPath, ['--test', ...testFiles], { stdio: 'inherit' });
-  child.on('close', (code) => {
-    process.exit(code ?? 0);
+  child.on('close', (code, signal) => {
+    if (code === 0) {
+      process.exit(0);
+    } else {
+      process.stderr.write(`\n❌ Test run failed (exit code ${code}, signal ${signal})\n`);
+      process.exit(code ?? 1);
+    }
   });
 } else {
   // Low-token mode: buffer output and report succinct single-line summary on pass
@@ -63,13 +68,13 @@ if (isVerbose) {
     stderrBuffer += chunk;
   });
 
-  child.on('close', (code) => {
+  child.on('close', (code, signal) => {
     const elapsedSeconds = ((Date.now() - startTime) / 1000).toFixed(2);
-    if ((code ?? 0) === 0) {
+    if (code === 0) {
       process.stdout.write(`✔ All test suites passed (${testFiles.length} suites in ${elapsedSeconds}s, 0 failures).\n`);
       process.exit(0);
     } else {
-      process.stderr.write(`\n❌ Test run failed (exit code ${code}):\n`);
+      process.stderr.write(`\n❌ Test run failed (exit code ${code}, signal ${signal}):\n`);
       if (stdoutBuffer) process.stdout.write(stdoutBuffer);
       if (stderrBuffer) process.stderr.write(stderrBuffer);
       process.exit(code ?? 1);

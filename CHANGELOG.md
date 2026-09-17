@@ -7,8 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Fixed
-
+- Handle natural and compound unique key conflicts during merge restores in `modules/backup/backend/service.ts` to replace conflicting rows cleanly without unique constraint failures.
+- Fail closed on signal termination (`code === null`) in `scripts/test.js` to report runner termination and prevent CI false-passes.
+- Enforce cryptographic digest computation, comparison, and fail-closed abort verification patterns for installer scripts in `scripts/check-hygiene.js`.
 - Convert dynamic table queries and backup restoration queries in `modules/backup/backend/service.ts` to ANSI-standard PostgreSQL-compatible SQL (`ON CONFLICT (id) DO UPDATE` instead of `INSERT OR REPLACE`).
 - Resolve markdownlint formatting errors across all documentation and root markdown files (`AGENTS.md`, `README.md`, `docs/LLMREVIEW20260915.md`).
 - Enforce strict token-derived `userId` in `tenantContextMiddleware` and reject mismatched `X-User-ID` headers to prevent identity spoofing.

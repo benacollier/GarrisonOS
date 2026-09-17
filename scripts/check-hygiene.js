@@ -199,9 +199,32 @@ function checkFile(relPath) {
 
   // 8. Fail-Closed Installer Integrity
   if (isInstaller) {
-    if (!content.includes('SHA256') && !content.includes('sha256')) {
-      reportViolation('INSTALLER INTEGRITY', relPath, 0, `Installer script missing mandatory SHA256 checksum verification.`);
+    if (relPath.endsWith('.sh')) {
+      // Must compute SHA-256 (sha256sum/shasum), compare actual vs expected hash, and abort on mismatch
+      const computesHash = /command\s+-v\s+(?:sha256sum|shasum)/.test(content) && /(?:sha256sum|shasum\s+-a\s+256)/.test(content);
+      const comparesHash = /\[\s*(?:"\$ACTUAL_HASH"\s*!=\s*"\$EXPECTED_HASH"|\$ACTUAL_HASH\s*!=\s*\$EXPECTED_HASH)/.test(content);
+      const abortsOnMismatch = /echo\s+.*Checksum verification failed.*exit\s+1/s.test(content) || /exit\s+1/.test(content);
+
+      if (!computesHash) {
+        reportViolation('INSTALLER INTEGRITY', relPath, 0, `Installer script missing SHA-256 digest computation (sha256sum / shasum).`);
+      }
+      if (!comparesHash || !abortsOnMismatch) {
+        reportViolation('INSTALLER INTEGRITY', relPath, 0, `Installer script missing comparison of calculated hash against expected checksum with abort on mismatch.`);
+      }
+    } else if (relPath.endsWith('.ps1')) {
+      // Must compute SHA-256 (Get-FileHash -Algorithm SHA256), compare actual vs expected hash, and abort on mismatch
+      const computesHash = /Get-FileHash\b[^\r\n]*-Algorithm\s+SHA256/i.test(content);
+      const comparesHash = /\$actualHash\s+-ne\s+\$expectedHash/i.test(content);
+      const abortsOnMismatch = /exit\s+1|throw\b/i.test(content);
+
+      if (!computesHash) {
+        reportViolation('INSTALLER INTEGRITY', relPath, 0, `PowerShell installer missing Get-FileHash -Algorithm SHA256 computation.`);
+      }
+      if (!comparesHash || !abortsOnMismatch) {
+        reportViolation('INSTALLER INTEGRITY', relPath, 0, `PowerShell installer missing comparison of calculated hash against expected checksum with abort on mismatch.`);
+      }
     }
+
     if (!content.includes('exit 1') && !content.includes('throw') && !content.includes('exit $LastExitCode')) {
       reportViolation('FAIL-OPEN SCRIPT', relPath, 0, `Installer script must fail closed with explicit non-zero exit code on verification failure.`);
     }
