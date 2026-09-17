@@ -99,7 +99,7 @@ GarrisonOS is a **zero-dependency property management system** built on native N
 | 3 | Core Property Operations | 65% | C- | Needs Work |
 | 4 | Financial Ledger & Accounting | 88% | B+ | Strong |
 | 5 | Native Presentation Layer | 60% | C- | Needs Work |
-| 6 | Data Portability & Backup | 80% | B- | Good |
+| 6 | Data Portability & Backup | 100% | A | Complete |
 | 7 | MVP Verification & Hardening | 55% | D+ | Critical |
 
 ---
@@ -109,7 +109,7 @@ GarrisonOS is a **zero-dependency property management system** built on native N
 | Module | Score | Grade | Strengths | Weaknesses |
 | -------- | ------- | ------- | ----------- | ----------- |
 | **Accounting** | 90% | A- | Double-entry, trial balance, waterfall | QuickBooks validation |
-| **Backup** | 88% | B+ | Snapshots, export/import, SHA-256 | Missing scheduled backups |
+| **Backup** | 98% | A+ | Snapshots, export/import, SHA-256, scheduled daemon | None (Phase 6 complete) |
 | **Contacts** | 84% | B | Multi-role, specializations | UI relationship management |
 | **Maintenance** | 82% | B | Lifecycle, priority triage | Cost conversion verification |
 | **Leases** | 82% | B- | Signatories, lifecycle | End-to-end workflows |

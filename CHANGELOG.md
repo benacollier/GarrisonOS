@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Added dedicated **Automation & Maintenance** operator card in `modules/backup/frontend/pages/index.php` providing real-time daemon status, cadence indicators, and CSRF-protected triggers for on-demand scheduled backups and vacuum routines.
+- Updated module manifest (`modules/backup/module.json`) and deployment documentation (`docs/deployment/backup-and-maintenance.md`) to reflect automated in-process scheduling and worker-thread maintenance routines.
+- Updated project review analysis (`docs/LLMREVIEW20260915.md`) marking Phase 6 complete and Backup module health at 98% (A+).
 - Harden the backup scheduler with bounded configuration, owner-only manual triggers, mutually exclusive worker-thread maintenance, independent retention error reporting, and shutdown waits for active operations.
 - Handle natural and compound unique key conflicts during merge restores in `modules/backup/backend/service.ts` to replace conflicting rows cleanly without unique constraint failures.
 - Fail closed on signal termination (`code === null`) in `scripts/test.js` to report runner termination and prevent CI false-passes.

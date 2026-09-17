@@ -1,7 +1,7 @@
 {
   "id": "backup",
   "name": "Backup & Disaster Recovery",
-  "description": "Zero-dependency point-in-time database snapshots, tenant data portability, and integrity verification.",
+  "description": "Zero-dependency point-in-time database snapshots, tenant data portability, automated scheduling, and integrity verification.",
   "navigation": [
     {
       "label": "Backups",
