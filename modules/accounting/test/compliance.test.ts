@@ -1,6 +1,6 @@
 import { describe, it, before, after } from 'node:test';
 import * as assert from 'node:assert/strict';
-import { createTestDb, runInTenantContext } from '../../../test/helpers.js';
+import { createTestDb, runInOperatorContext } from '../../../test/helpers.js';
 import { closeDatabase, getDatabase } from '../../../database/client.js';
 import { JournalService } from '../backend/journal.js';
 import { ChartOfAccountsRepository } from '../backend/chart_of_accounts.js';
@@ -18,7 +18,7 @@ describe('Accounting Module - Statutory Trust Accounting & Regulatory Compliance
   });
 
   it('enforces statutory trust non-commingling invariant: rejects posting 1020 directly to operating revenue/expense', () => {
-    runInTenantContext('tenant-compliance-test', () => {
+    runInOperatorContext('tenant-compliance-test', () => {
       ChartOfAccountsRepository.ensureDefaultAccounts();
       const accounts = ChartOfAccountsRepository.listAccounts();
       const trustBank = accounts.find((a) => a.account_number === '1020')!;
@@ -67,7 +67,7 @@ describe('Accounting Module - Statutory Trust Accounting & Regulatory Compliance
   });
 
   it('computes statutory Three-Way Bank Reconciliation with parity across GL trust, liability, and lease subledgers', () => {
-    runInTenantContext('tenant-reconciliation-test', () => {
+    runInOperatorContext('tenant-reconciliation-test', () => {
       const db = getDatabase();
       ChartOfAccountsRepository.ensureDefaultAccounts();
       const accounts = ChartOfAccountsRepository.listAccounts();
@@ -152,7 +152,7 @@ describe('Accounting Module - Statutory Trust Accounting & Regulatory Compliance
   });
 
   it('aggregates annual vendor maintenance payments and flags IRS 1099-NEC threshold by tax year', () => {
-    runInTenantContext('tenant-1099-test', () => {
+    runInOperatorContext('tenant-1099-test', () => {
       const db = getDatabase();
       const now = Date.now();
       const taxYear = 2026;

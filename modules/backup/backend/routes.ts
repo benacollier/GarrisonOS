@@ -89,7 +89,6 @@ export function registerRoutes(router: Router): void {
       eventBus.publish('backup.created', {
         backupId: record.id,
         operatorId: record.operator_id,
-        tenantId: record.operator_id,
         backupType: record.backup_type
       });
 

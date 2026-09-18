@@ -1,6 +1,6 @@
 import { test, describe, it, before, after } from 'node:test';
 import * as assert from 'node:assert/strict';
-import { createTestDb, runInTenantContext } from '../../../test/helpers.js';
+import { createTestDb, runInOperatorContext } from '../../../test/helpers.js';
 import { PropertiesRepository } from '../backend/repository.js';
 import { closeDatabase, getDatabase } from '../../../database/client.js';
 
@@ -15,7 +15,7 @@ describe('Properties Module - Lifecycle & Inventory Management', () => {
   });
 
   it('creates, updates, and deletes legal portfolios', () => {
-    runInTenantContext('tenant-prop-test', () => {
+    runInOperatorContext('tenant-prop-test', () => {
       // Create portfolio
       const portfolio = PropertiesRepository.createPortfolio({
         name: 'Blue Ridge Holdings LLC',
@@ -43,7 +43,7 @@ describe('Properties Module - Lifecycle & Inventory Management', () => {
   });
 
   it('manages property and unit lifecycle, vacancies, and occupancy metrics', () => {
-    runInTenantContext('tenant-prop-test', () => {
+    runInOperatorContext('tenant-prop-test', () => {
       // 1. Create property
       const prop = PropertiesRepository.createProperty({
         name: 'Highland Ridge Apartments',

@@ -160,11 +160,11 @@ export async function handleWebRequest(
     query[key] = val;
   });
 
-  // Prepare ApiClient bound to active session auth & tenant
+  // Prepare ApiClient bound to active session auth & operator
   const api = new ApiClient({
     baseUrl: apiUrl,
     authToken: session.authToken,
-    tenantId: session.tenantId,
+    operatorId: session.operatorId,
   });
 
   // Hook writeHead to automatically commit modified sessions

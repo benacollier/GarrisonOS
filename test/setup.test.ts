@@ -132,7 +132,7 @@ describe('System First-Launch Setup Subsystem', () => {
     assert.ok(body.data.token);
     assert.equal(body.data.user.email, 'alex@blueridge.local');
     assert.equal(body.data.user.role, 'owner');
-    assert.ok(body.data.user.tenant_id);
+    assert.ok(body.data.user.operator_id);
 
     // Verify database state
     const db = getDatabase();
@@ -141,12 +141,12 @@ describe('System First-Launch Setup Subsystem', () => {
     assert.equal(userRow.role, 'owner');
     assert.match(userRow.password_hash, /^\$scrypt\$/);
 
-    const tenantRow = db.prepare('SELECT * FROM tenants WHERE id = ?').get(body.data.user.tenant_id) as any;
-    assert.ok(tenantRow);
-    assert.equal(tenantRow.name, 'Blue Ridge Properties');
+    const operatorRow = db.prepare('SELECT * FROM operators WHERE id = ?').get(body.data.user.operator_id) as any;
+    assert.ok(operatorRow);
+    assert.equal(operatorRow.name, 'Blue Ridge Properties');
 
     // Verify demo data was seeded under this operator
-    const propertyCount = db.prepare('SELECT COUNT(*) as count FROM properties WHERE operator_id = ?').get(tenantRow.id) as any;
+    const propertyCount = db.prepare('SELECT COUNT(*) as count FROM properties WHERE operator_id = ?').get(operatorRow.id) as any;
     assert.equal(propertyCount.count, 1);
 
     // Verify GET /api/v1/system/status now reports is_configured: true

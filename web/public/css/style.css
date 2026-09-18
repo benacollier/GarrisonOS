@@ -106,7 +106,7 @@ a:hover {
   align-items: center;
 }
 
-.tenant-selector {
+.operator-selector {
   display: flex;
   align-items: center;
   gap: 0.5rem;

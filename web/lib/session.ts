@@ -34,11 +34,6 @@ export interface SessionUser {
    * Associated operator isolation identifier.
    */
   operator_id: string;
-
-  /**
-   * Legacy alias for operator_id retained for backward compatibility.
-   */
-  tenant_id?: string;
 }
 
 /**
@@ -74,11 +69,6 @@ export interface SessionData {
    * Selected operator identifier.
    */
   operatorId?: string | null;
-
-  /**
-   * Legacy alias for operatorId.
-   */
-  tenantId?: string | null;
 
   /**
    * Cryptographic CSRF token protecting state-modifying requests.
@@ -254,24 +244,12 @@ export class Session {
    * Selected operator ID.
    */
   public get operatorId(): string {
-    return this.data.operatorId || this.data.user?.operator_id || this.data.tenantId || this.data.user?.tenant_id || 'operator-demo';
+    return this.data.operatorId || this.data.user?.operator_id || 'operator-demo';
   }
 
   public set operatorId(val: string) {
     this.data.operatorId = val;
-    this.data.tenantId = val;
     this.isModified = true;
-  }
-
-  /**
-   * Backward-compatible alias for operatorId.
-   */
-  public get tenantId(): string {
-    return this.operatorId;
-  }
-
-  public set tenantId(val: string) {
-    this.operatorId = val;
   }
 
   /**

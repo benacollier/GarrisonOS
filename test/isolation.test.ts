@@ -1,6 +1,6 @@
 import { test, describe, it, before, after } from 'node:test';
 import * as assert from 'node:assert/strict';
-import { createTestDb, runInTenantContext } from './helpers.js';
+import { createTestDb, runInOperatorContext } from './helpers.js';
 import { PropertiesRepository } from '../modules/properties/backend/repository.js';
 import { ContactsRepository } from '../modules/contacts/backend/repository.js';
 import { LeasesRepository } from '../modules/leases/backend/repository.js';
@@ -21,7 +21,7 @@ describe('Cross-Tenant Data Isolation & Security Guardrails', () => {
 
   it('strictly isolates properties, portfolios, and units between tenants', () => {
     // 1. Create property & unit in Tenant Alpha
-    const propAlpha = runInTenantContext('tenant-alpha', () => {
+    const propAlpha = runInOperatorContext('tenant-alpha', () => {
       const p = PropertiesRepository.createProperty({
         name: 'Alpha Tower',
         property_type: 'multi_family',
@@ -39,7 +39,7 @@ describe('Cross-Tenant Data Isolation & Security Guardrails', () => {
     });
 
     // 2. Query properties & units from Tenant Beta
-    runInTenantContext('tenant-beta', () => {
+    runInOperatorContext('tenant-beta', () => {
       const propsBeta = PropertiesRepository.listProperties();
       assert.equal(propsBeta.length, 0);
 
@@ -52,7 +52,7 @@ describe('Cross-Tenant Data Isolation & Security Guardrails', () => {
   });
 
   it('strictly isolates contacts directory between tenants', () => {
-    const contactAlpha = runInTenantContext('tenant-alpha', () => {
+    const contactAlpha = runInOperatorContext('tenant-alpha', () => {
       return ContactsRepository.createContact({
         contact_type: 'tenant',
         first_name: 'John',
@@ -61,7 +61,7 @@ describe('Cross-Tenant Data Isolation & Security Guardrails', () => {
       });
     });
 
-    runInTenantContext('tenant-beta', () => {
+    runInOperatorContext('tenant-beta', () => {
       const contactsBeta = ContactsRepository.listContacts();
       assert.equal(contactsBeta.length, 0);
 
@@ -71,7 +71,7 @@ describe('Cross-Tenant Data Isolation & Security Guardrails', () => {
   });
 
   it('strictly isolates financial transactions and rent roll between tenants', () => {
-    runInTenantContext('tenant-alpha', () => {
+    runInOperatorContext('tenant-alpha', () => {
       AccountingRepository.createTransaction({
         transaction_type: 'payment',
         category: 'rent',
@@ -81,7 +81,7 @@ describe('Cross-Tenant Data Isolation & Security Guardrails', () => {
       });
     });
 
-    runInTenantContext('tenant-beta', () => {
+    runInOperatorContext('tenant-beta', () => {
       const txBeta = AccountingRepository.listTransactions();
       assert.equal(txBeta.length, 0);
 
@@ -92,7 +92,7 @@ describe('Cross-Tenant Data Isolation & Security Guardrails', () => {
   });
 
   it('strictly isolates maintenance work orders between tenants', () => {
-    const { prop, wo } = runInTenantContext('tenant-alpha', () => {
+    const { prop, wo } = runInOperatorContext('tenant-alpha', () => {
       const p = PropertiesRepository.createProperty({
         name: 'Alpha Maintenance Prop',
         property_type: 'single_family',
@@ -111,7 +111,7 @@ describe('Cross-Tenant Data Isolation & Security Guardrails', () => {
       return { prop: p, wo: w };
     });
 
-    runInTenantContext('tenant-beta', () => {
+    runInOperatorContext('tenant-beta', () => {
       const woBeta = MaintenanceRepository.listWorkOrders();
       assert.equal(woBeta.length, 0);
 

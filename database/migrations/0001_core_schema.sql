@@ -17,9 +17,6 @@ CREATE TABLE IF NOT EXISTS operators (
     deleted_at INTEGER
 );
 
--- Backward compatibility view for legacy queries
-CREATE VIEW IF NOT EXISTS tenants AS SELECT * FROM operators;
-
 -- System operators and users
 CREATE TABLE IF NOT EXISTS users (
     id TEXT PRIMARY KEY,

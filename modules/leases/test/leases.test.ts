@@ -1,6 +1,6 @@
 import { test, describe, it, before, after } from 'node:test';
 import * as assert from 'node:assert/strict';
-import { createTestDb, runInTenantContext } from '../../../test/helpers.js';
+import { createTestDb, runInOperatorContext } from '../../../test/helpers.js';
 import { PropertiesRepository } from '../../properties/backend/repository.js';
 import { ContactsRepository } from '../../contacts/backend/repository.js';
 import { LeasesRepository } from '../backend/repository.js';
@@ -17,7 +17,7 @@ describe('Leases Module - Agreement Lifecycle & Signatories', () => {
   });
 
   it('creates leases with signatories and manages contract lifecycle transitions', () => {
-    runInTenantContext('tenant-lease-test', () => {
+    runInOperatorContext('tenant-lease-test', () => {
       // 1. Setup property, unit, and contact
       const prop = PropertiesRepository.createProperty({
         name: 'Oak Tree Townhomes',

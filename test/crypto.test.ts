@@ -64,7 +64,7 @@ describe('Cryptography & Identity Subsystem', () => {
     const secret = 'super-secret-test-key-at-least-32-chars-long';
     const payload = {
       sub: 'user-123',
-      tid: 'tenant-abc',
+      opid: 'tenant-abc',
       role: 'owner',
       exp: Math.floor(Date.now() / 1000) + 3600
     };
@@ -75,7 +75,7 @@ describe('Cryptography & Identity Subsystem', () => {
     const verified = verifyToken(token, secret);
     assert.ok(verified !== null);
     assert.equal(verified?.sub, 'user-123');
-    assert.equal(verified?.tid, 'tenant-abc');
+    assert.equal(verified?.opid, 'tenant-abc');
     assert.equal(verified?.role, 'owner');
 
     // Verify tampered token fails
@@ -97,7 +97,7 @@ describe('Cryptography & Identity Subsystem', () => {
     const tokenWithVersion = createToken(
       {
         sub: 'user-456',
-        tid: 'tenant-xyz',
+        opid: 'tenant-xyz',
         role: 'manager',
         exp: Math.floor(Date.now() / 1000) + 3600,
         tv: 1
@@ -117,7 +117,7 @@ describe('Cryptography & Identity Subsystem', () => {
     const legacyToken = createToken(
       {
         sub: 'user-789',
-        tid: 'tenant-legacy',
+        opid: 'tenant-legacy',
         role: 'read_only',
         exp: Math.floor(Date.now() / 1000) + 3600
       },
@@ -159,7 +159,7 @@ describe('Token Revocation with Database Backing', () => {
     const token = createToken(
       {
         sub: 'user-rev-test',
-        tid: 'tenant-rev-test',
+        opid: 'tenant-rev-test',
         role: 'owner',
         exp: Math.floor(Date.now() / 1000) + 3600,
         tv: 1
@@ -176,7 +176,7 @@ describe('Token Revocation with Database Backing', () => {
     const token = createToken(
       {
         sub: 'user-rev-test',
-        tid: 'tenant-rev-test',
+        opid: 'tenant-rev-test',
         role: 'owner',
         exp: Math.floor(Date.now() / 1000) + 3600,
         tv: 2
@@ -192,7 +192,7 @@ describe('Token Revocation with Database Backing', () => {
     const token = createToken(
       {
         sub: 'user-rev-test',
-        tid: 'tenant-rev-test',
+        opid: 'tenant-rev-test',
         role: 'owner',
         exp: Math.floor(Date.now() / 1000) + 3600
       },
@@ -210,7 +210,7 @@ describe('Token Revocation with Database Backing', () => {
     const token = createToken(
       {
         sub: 'user-rev-test',
-        tid: 'tenant-rev-test',
+        opid: 'tenant-rev-test',
         role: 'owner',
         exp: Math.floor(Date.now() / 1000) + 3600,
         tv: 1
@@ -224,7 +224,7 @@ describe('Token Revocation with Database Backing', () => {
     db.prepare('UPDATE users SET deleted_at = NULL WHERE id = ?').run('user-rev-test');
   });
 
-  it('rejects createToken if neither opid nor tid claim is provided', () => {
+  it('rejects createToken if opid claim is not provided', () => {
     assert.throws(
       () => {
         createToken(

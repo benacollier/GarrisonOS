@@ -25,20 +25,14 @@ export function ensureOperator(operatorId: string, dbInstance?: DatabaseSync): v
   }
 }
 
-export const ensureTenant = ensureOperator;
-
 export function runInOperatorContext<T>(operatorId: string, fn: () => T, userId?: string): T {
   ensureOperator(operatorId);
   return RequestContext.run(
     {
       operatorId,
-      tenantId: operatorId,
       userId: userId || generateUUIDv7(),
       correlationId: generateUUIDv7()
     },
     fn
   );
 }
-
-export const runInTenantContext = runInOperatorContext;
-

@@ -1,6 +1,6 @@
 import { test, describe, it, before, after } from 'node:test';
 import * as assert from 'node:assert/strict';
-import { createTestDb, runInTenantContext } from '../../../test/helpers.js';
+import { createTestDb, runInOperatorContext } from '../../../test/helpers.js';
 import { JournalService } from '../backend/journal.js';
 import { ChartOfAccountsRepository } from '../backend/chart_of_accounts.js';
 import { closeDatabase, getDatabase } from '../../../database/client.js';
@@ -16,7 +16,7 @@ describe('Accounting Module - Native Double-Entry Journal Service', () => {
   });
 
   it('enforces debit and credit zero-sum balanced invariant', () => {
-    runInTenantContext('tenant-journal-test', () => {
+    runInOperatorContext('tenant-journal-test', () => {
       ChartOfAccountsRepository.ensureDefaultAccounts();
       const accounts = ChartOfAccountsRepository.listAccounts();
       const ar = accounts.find((a) => a.category_mapping === 'accounts_receivable')!;
@@ -87,7 +87,7 @@ describe('Accounting Module - Native Double-Entry Journal Service', () => {
   });
 
   it('posts reversal entry accurately and marks original entry reversed', () => {
-    runInTenantContext('tenant-journal-test', () => {
+    runInOperatorContext('tenant-journal-test', () => {
       ChartOfAccountsRepository.ensureDefaultAccounts();
       const accounts = ChartOfAccountsRepository.listAccounts();
       const bank = accounts.find((a) => a.category_mapping === 'operating_bank')!;
@@ -133,7 +133,7 @@ describe('Accounting Module - Native Double-Entry Journal Service', () => {
   });
 
   it('allows historical account references only in internal historical-reference mode', () => {
-    runInTenantContext('tenant-historical-reference-test', () => {
+    runInOperatorContext('tenant-historical-reference-test', () => {
       const db = getDatabase();
       ChartOfAccountsRepository.ensureDefaultAccounts();
       const accounts = ChartOfAccountsRepository.listAccounts();
@@ -172,7 +172,7 @@ describe('Accounting Module - Native Double-Entry Journal Service', () => {
   });
 
   it('computes perfectly balanced Trial Balance report', () => {
-    runInTenantContext('tenant-trial-balance-test', () => {
+    runInOperatorContext('tenant-trial-balance-test', () => {
       ChartOfAccountsRepository.ensureDefaultAccounts();
       const accounts = ChartOfAccountsRepository.listAccounts();
       const ar = accounts.find((a) => a.category_mapping === 'accounts_receivable')!;
@@ -215,7 +215,7 @@ describe('Accounting Module - Native Double-Entry Journal Service', () => {
   });
 
   it('excludes future journal entries from Trial Balance as-of cutoff date', () => {
-    runInTenantContext('tenant-cutoff-test', () => {
+    runInOperatorContext('tenant-cutoff-test', () => {
       ChartOfAccountsRepository.ensureDefaultAccounts();
       const accounts = ChartOfAccountsRepository.listAccounts();
       const ar = accounts.find((a) => a.category_mapping === 'accounts_receivable')!;
@@ -257,16 +257,16 @@ describe('Accounting Module - Native Double-Entry Journal Service', () => {
   });
 
   it('rejects foreign entity references belonging to other tenants', () => {
-    runInTenantContext('tenant-a', () => {
+    runInOperatorContext('tenant-a', () => {
       ChartOfAccountsRepository.ensureDefaultAccounts();
     });
 
-    runInTenantContext('tenant-b', () => {
+    runInOperatorContext('tenant-b', () => {
       ChartOfAccountsRepository.ensureDefaultAccounts();
       const tenantBAccounts = ChartOfAccountsRepository.listAccounts();
       const bRent = tenantBAccounts.find((a) => a.category_mapping === 'rent')!;
 
-      runInTenantContext('tenant-a', () => {
+      runInOperatorContext('tenant-a', () => {
         const tenantAAccounts = ChartOfAccountsRepository.listAccounts();
         const aAr = tenantAAccounts.find((a) => a.category_mapping === 'accounts_receivable')!;
 

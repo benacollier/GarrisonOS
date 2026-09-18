@@ -276,8 +276,6 @@ export async function handle(ctx: PageContext): Promise<PageResult> {
             ctx.session.authToken = token;
             if (res.data.operator_id) {
               ctx.session.operatorId = res.data.operator_id;
-            } else if (res.data.tenant_id) {
-              ctx.session.operatorId = res.data.tenant_id;
             }
             ctx.session.addFlash('success', `Welcome to GarrisonOS, ${user.first_name || 'Admin'}! Your organization has been initialized.`);
             return { redirect: '/dashboard', content: '' };

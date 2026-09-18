@@ -10,11 +10,6 @@ export interface RequestContextData {
   operatorId?: string;
 
   /**
-   * Legacy alias for operatorId retained for backward compatibility.
-   */
-  tenantId?: string;
-
-  /**
    * Authenticated user ID, if request is authenticated.
    */
   userId?: string;
@@ -41,9 +36,6 @@ export class RequestContext {
    * @returns The value returned by `fn`.
    */
   public static run<T>(context: RequestContextData, fn: () => T): T {
-    if (!context.operatorId && context.tenantId) {
-      context.operatorId = context.tenantId;
-    }
     return storage.run(context, fn);
   }
 
@@ -78,17 +70,7 @@ export class RequestContext {
    */
   public static getOperatorId(): string {
     const ctx = RequestContext.get();
-    return ctx.operatorId || ctx.tenantId || '';
-  }
-
-  /**
-   * Retrieves the active tenant/operator ID.
-   *
-   * @deprecated Use getOperatorId() instead. Retained for backward compatibility.
-   * @returns The operator/tenant ID string.
-   */
-  public static getTenantId(): string {
-    return RequestContext.getOperatorId();
+    return ctx.operatorId || '';
   }
 
   /**

@@ -11,7 +11,7 @@ import { eventBus } from '../core/events.js';
 
 // Publishing an event
 eventBus.publish('payment.recorded', {
-  tenantId: '018d9f4e-28b3-7a91-91bc-0a75bc89a712',
+  operatorId: '018d9f4e-28b3-7a91-91bc-0a75bc89a712',
   transactionId: '018d9f4e-28b3-7a91-91bc-0a75bc89a713',
   leaseId: '018d9f4e-28b3-7a91-91bc-0a75bc89a714',
   amountCents: 150000,
@@ -34,7 +34,7 @@ Fired when a lease agreement transitions to `active`.
 
 ```typescript
 interface LeaseActivatedEvent {
-  tenantId: string;
+  operatorId: string;
   leaseId: string;
   unitId: string;
   rentAmountCents: number;
@@ -48,7 +48,7 @@ Fired when a lease agreement reaches `terminated` status.
 
 ```typescript
 interface LeaseTerminatedEvent {
-  tenantId: string;
+  operatorId: string;
   leaseId: string;
   unitId: string;
   terminatedAt: number;
@@ -61,7 +61,7 @@ Fired when a tenant payment is posted to the ledger.
 
 ```typescript
 interface PaymentRecordedEvent {
-  tenantId: string;
+  operatorId: string;
   transactionId: string;
   leaseId: string;
   amountCents: number;
@@ -75,7 +75,7 @@ Fired when a work order transitions to `completed`.
 
 ```typescript
 interface WorkOrderCompletedEvent {
-  tenantId: string;
+  operatorId: string;
   workOrderId: string;
   propertyId: string;
   unitId?: string;

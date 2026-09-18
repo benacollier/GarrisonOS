@@ -31,11 +31,6 @@ export interface LoginPageOptions {
    * Pre-filled operator isolation ID.
    */
   operatorId?: string;
-
-  /**
-   * Legacy alias for operatorId.
-   */
-  tenantId?: string;
 }
 
 /**
@@ -89,7 +84,7 @@ export function renderLoginPage(options: LoginPageOptions): string {
 
             <div class="form-group">
                 <label class="form-label" for="operator_id">Operator ID (Optional)</label>
-                <input class="form-input" type="text" id="operator_id" name="operator_id" placeholder="e.g. operator-demo" value="${options.operatorId || options.tenantId || ''}">
+                <input class="form-input" type="text" id="operator_id" name="operator_id" placeholder="e.g. operator-demo" value="${options.operatorId || ''}">
             </div>
 
             <button type="submit" class="btn btn-primary" style="width: 100%; padding: 0.75rem; font-size: 1rem; margin-top: 1rem;">
@@ -130,14 +125,13 @@ export async function handle(ctx: PageContext): Promise<PageResult> {
 
     email = typeof ctx.body['email'] === 'string' ? ctx.body['email'].trim() : '';
     const password = typeof ctx.body['password'] === 'string' ? ctx.body['password'] : '';
-    operatorId = typeof ctx.body['operator_id'] === 'string' ? ctx.body['operator_id'].trim() : (typeof ctx.body['tenant_id'] === 'string' ? ctx.body['tenant_id'].trim() : '');
+    operatorId = typeof ctx.body['operator_id'] === 'string' ? ctx.body['operator_id'].trim() : '';
 
     try {
       const res = await ctx.api.post('/api/v1/auth/login', {
         email,
         password,
         operator_id: operatorId ? operatorId : undefined,
-        tenant_id: operatorId ? operatorId : undefined,
       });
 
       const token = res.data?.token;
@@ -148,8 +142,6 @@ export async function handle(ctx: PageContext): Promise<PageResult> {
         ctx.session.authToken = token;
         if (res.data.operator_id) {
           ctx.session.operatorId = res.data.operator_id;
-        } else if (res.data.tenant_id) {
-          ctx.session.operatorId = res.data.tenant_id;
         }
         ctx.session.addFlash('success', `Welcome back, ${user.first_name || 'User'}!`);
         return { redirect: '/dashboard', content: '' };
@@ -167,7 +159,6 @@ export async function handle(ctx: PageContext): Promise<PageResult> {
     error,
     email,
     operatorId,
-    tenantId: operatorId,
   });
 
   return {
