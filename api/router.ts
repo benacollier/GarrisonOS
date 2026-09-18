@@ -33,9 +33,9 @@ export interface ApiRequest extends IncomingMessage {
   operatorId?: string;
 
   /**
-   * Legacy alias for operatorId retained for backward compatibility.
+   * Operator subdomain or path slug resolved from URL or host.
    */
-  tenantId?: string;
+  operatorSlug?: string;
 
   /**
    * Authenticated user ID, if authenticated.
@@ -309,6 +309,18 @@ export class Router {
     const pathname = parsedUrl.pathname;
     const method = req.method?.toUpperCase() || 'GET';
 
+    let effectivePathname = pathname;
+    const routingMode = (process.env['OPERATOR_ROUTING_MODE'] || 'subdomain').toLowerCase();
+    let operatorSlug: string | undefined;
+
+    if (routingMode === 'path' || routingMode === 'both') {
+      const pathMatch = pathname.match(/^\/(?:o|operator)\/([a-z0-9-]+)(\/.*)?$/i);
+      if (pathMatch && pathMatch[1]) {
+        operatorSlug = pathMatch[1].toLowerCase();
+        effectivePathname = pathMatch[2] || '/';
+      }
+    }
+
     const query: Record<string, string> = {};
     parsedUrl.searchParams.forEach((val, key) => {
       query[key] = val;
@@ -316,8 +328,9 @@ export class Router {
 
     const apiReq = req as ApiRequest;
     apiReq.query = query;
-    apiReq.path = pathname;
+    apiReq.path = effectivePathname;
     apiReq.params = {};
+    apiReq.operatorSlug = operatorSlug;
 
     try {
       apiReq.body = await this.parseBody(req);
@@ -334,7 +347,7 @@ export class Router {
 
     for (const route of this.routes) {
       if (route.method !== method) continue;
-      const match = pathname.match(route.regex);
+      const match = effectivePathname.match(route.regex);
       if (match) {
         matchedRoute = route;
         route.paramNames.forEach((name, index) => {
@@ -366,7 +379,7 @@ export class Router {
         if (method === 'OPTIONS') {
           res.writeHead(204, {
             'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
-            'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Operator-ID, X-Tenant-ID, X-Request-ID, X-User-ID'
+            'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Operator-ID, X-Request-ID, X-User-ID'
           });
           res.end();
           return;

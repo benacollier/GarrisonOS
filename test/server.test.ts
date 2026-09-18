@@ -46,7 +46,7 @@ class MockResponse {
 const testSecret = process.env['APP_SECRET'] || 'garrison-os-development-secret';
 const testToken = createToken({
   sub: 'batch-user',
-  tid: 'tenant-test',
+  opid: 'tenant-test',
   role: 'owner',
   exp: Math.floor(Date.now() / 1000) + 3600,
   tv: 1
@@ -171,7 +171,7 @@ describe('Batch endpoint', () => {
     const request = new MockRequest('POST', '/api/v1/batch', {
       'content-type': 'application/json',
       authorization: 'Bearer ' + testToken,
-      'x-tenant-id': 'spoofed-tenant',
+      'x-operator-id': 'spoofed-tenant',
       'x-user-id': 'spoofed-user',
       'x-request-id': 'request-test'
     });
@@ -196,7 +196,7 @@ describe('Batch endpoint', () => {
     assert.equal(seen[0]!.url, 'http://127.0.0.1:31234/health');
     const forwardedHeaders = new Headers(seen[0]!.init?.headers);
     assert.equal(forwardedHeaders.get('authorization'), 'Bearer ' + testToken);
-    assert.equal(forwardedHeaders.get('x-tenant-id'), null);
+    assert.equal(forwardedHeaders.get('x-operator-id'), null);
     assert.equal(forwardedHeaders.get('x-user-id'), null);
   });
 
@@ -285,11 +285,11 @@ describe('Batch endpoint', () => {
     assert.equal(result.body.error.code, 'UNAUTHORIZED');
   });
 
-  it('rejects tenant headers that disagree with the verified token', async () => {
+  it('rejects operator headers that disagree with the verified token', async () => {
     const router = createRouter(31_234);
     const request = new MockRequest('GET', '/api/v1/modules', {
       authorization: 'Bearer ' + testToken,
-      'x-tenant-id': 'spoofed-tenant'
+      'x-operator-id': 'spoofed-tenant'
     });
     const response = new MockResponse();
 
