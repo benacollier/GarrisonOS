@@ -13,6 +13,7 @@ class MockRequest extends EventEmitter {
   public path: string;
   public headers: Record<string, string>;
   public operatorId?: string;
+  public verifiedOperatorId?: string;
   public socket = { remoteAddress: '127.0.0.1' };
 
   constructor(path = '/api/v1/properties', operatorId?: string, ip = '127.0.0.1') {
@@ -20,6 +21,7 @@ class MockRequest extends EventEmitter {
     this.method = 'GET';
     this.path = path;
     this.operatorId = operatorId;
+    this.verifiedOperatorId = operatorId;
     this.headers = {
       'x-forwarded-for': ip
     };
@@ -140,6 +142,37 @@ describe('Global Sliding-Window Rate Limiter Subsystem', () => {
     await rateLimitMiddleware(reqB1 as any, resB1 as any, async () => { nextCalledB1 = true; });
     assert.equal(nextCalledB1, true);
     assert.equal(resB1.statusCode, 200);
+  });
+
+  it('falls back to public IP bucket when unverified x-operator-id is supplied without token', async () => {
+    process.env['RATE_LIMIT_PUBLIC_MAX'] = '3';
+    process.env['RATE_LIMIT_PUBLIC_WINDOW_MS'] = '60000';
+    const clientIp = '10.20.30.40';
+
+    // Client makes 3 requests presenting an unverified x-operator-id header without verified token
+    for (let i = 0; i < 3; i++) {
+      const req = new MockRequest('/api/v1/properties', undefined, clientIp);
+      req.headers['x-operator-id'] = 'unverified-operator-xyz';
+      req.operatorId = 'unverified-operator-xyz';
+      delete req.verifiedOperatorId;
+
+      const res = new MockResponse();
+      let nextCalled = false;
+      await rateLimitMiddleware(req as any, res as any, async () => { nextCalled = true; });
+      assert.equal(nextCalled, true);
+    }
+
+    // 4th request from same IP is throttled under the public IP bucket despite spoofed operator header
+    const req4 = new MockRequest('/api/v1/properties', undefined, clientIp);
+    req4.headers['x-operator-id'] = 'different-unverified-operator';
+    req4.operatorId = 'different-unverified-operator';
+    delete req4.verifiedOperatorId;
+
+    const res4 = new MockResponse();
+    let nextCalled4 = false;
+    await rateLimitMiddleware(req4 as any, res4 as any, async () => { nextCalled4 = true; });
+    assert.equal(nextCalled4, false);
+    assert.equal(res4.statusCode, 429);
   });
 
   it('resets window after resetAt timestamp expires', async () => {

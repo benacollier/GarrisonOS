@@ -147,7 +147,24 @@ export const correlationMiddleware: Middleware = async (req, res, next) => {
 
 /**
  * In-memory sliding-window rate limiter applying configurable limits across all routes.
- * Keys by operator ID when authenticated, and falls back to client IP for unauthenticated routes.
+/**
+ * Set of reserved operator subdomain identifiers that cannot be registered or resolved as tenants.
+ */
+export const RESERVED_SUBDOMAINS = new Set([
+  'localhost',
+  '127',
+  'api',
+  'app',
+  'portal',
+  'www',
+  'system',
+  'admin'
+]);
+
+/**
+ * Sliding-window rate limiter middleware protecting public, auth, and operational endpoints.
+ * Keys by verified operator ID when authenticated, and falls back to client IP whenever
+ * no verified operator identity is present.
  *
  * @param req - The API request object.
  * @param res - The HTTP server response object.
@@ -169,14 +186,30 @@ export const rateLimitMiddleware: Middleware = async (req, res, next) => {
     req.path === '/api/v1/system/restore'
   );
 
-  const operatorId = req.operatorId || (req.headers['x-operator-id'] as string) || '';
+  // Use only verified operator identity populated from verified token opid
+  let verifiedOperatorId = req.verifiedOperatorId;
+  if (!verifiedOperatorId) {
+    const authHeader = req.headers['authorization'];
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.slice(7).trim();
+      try {
+        const payload = verifyToken(token, APP_SECRET);
+        if (payload && typeof payload.opid === 'string' && payload.opid) {
+          verifiedOperatorId = payload.opid;
+          req.verifiedOperatorId = verifiedOperatorId;
+        }
+      } catch {
+        // Fall back to public IP bucket on token verification failure
+      }
+    }
+  }
 
   if (isAuthOrSetup) {
     key = `ratelimit:auth:${ip}:${req.path}`;
     maxAttempts = config.authMax;
     windowMs = config.authWindowMs;
-  } else if (operatorId) {
-    key = `ratelimit:operator:${operatorId}`;
+  } else if (verifiedOperatorId) {
+    key = `ratelimit:operator:${verifiedOperatorId}`;
     maxAttempts = config.operatorMax;
     windowMs = config.operatorWindowMs;
   } else {
@@ -252,8 +285,7 @@ export function resolveOperatorFromRequest(req: ApiRequest, db: any): string | n
     const parts = hostWithoutPort.split('.');
     if (parts.length >= 2) {
       const candidate = parts[0]!;
-      const reserved = new Set(['localhost', '127', 'api', 'app', 'portal', 'www', 'system', 'admin']);
-      if (!reserved.has(candidate)) {
+      if (!RESERVED_SUBDOMAINS.has(candidate)) {
         const row = db.prepare(
           'SELECT id FROM operators WHERE subdomain = ? AND deleted_at IS NULL'
         ).get(candidate) as { id: string } | undefined;
@@ -369,6 +401,9 @@ export const operatorContextMiddleware: Middleware = async (req, res, next) => {
 
     if (payload) {
       const tokenOpId = typeof payload.opid === 'string' ? payload.opid : '';
+      if (tokenOpId) {
+        req.verifiedOperatorId = tokenOpId;
+      }
       if (isBatchRoute) {
         operatorId = tokenOpId;
         userId = typeof payload.sub === 'string' ? payload.sub : undefined;

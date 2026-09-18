@@ -33,6 +33,11 @@ export interface ApiRequest extends IncomingMessage {
   operatorId?: string;
 
   /**
+   * Verified operator ID extracted from a valid cryptographic bearer token.
+   */
+  verifiedOperatorId?: string;
+
+  /**
    * Operator subdomain or path slug resolved from URL or host.
    */
   operatorSlug?: string;

@@ -65,6 +65,7 @@ describe('RequestContext & Multi-Operator Store Subsystem', () => {
   });
 
   it('propagates active RequestContext when payload omits operatorId', async () => {
+    let receivedPayloadOperatorId: string | undefined;
     let receivedOperatorId: string | undefined;
     let receivedCorrelationId: string | undefined;
     let receivedUserId: string | undefined;
@@ -72,6 +73,7 @@ describe('RequestContext & Multi-Operator Store Subsystem', () => {
     const testEventBus = new EventBus();
     const eventHandled = new Promise<void>((resolve) => {
       testEventBus.subscribe('test.no_operator', (payload: any) => {
+        receivedPayloadOperatorId = payload?.operatorId;
         receivedOperatorId = RequestContext.tryGet()?.operatorId;
         receivedCorrelationId = RequestContext.tryGet()?.correlationId;
         receivedUserId = RequestContext.tryGet()?.userId;
@@ -90,6 +92,7 @@ describe('RequestContext & Multi-Operator Store Subsystem', () => {
 
     await eventHandled;
 
+    assert.equal(receivedPayloadOperatorId, 'operator-inherited', 'Payload operatorId should match active context');
     assert.equal(receivedOperatorId, 'operator-inherited');
     assert.equal(receivedCorrelationId, 'corr-inherited');
     assert.equal(receivedUserId, 'user-inherited');

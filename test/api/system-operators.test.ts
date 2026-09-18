@@ -1,4 +1,4 @@
-import { describe, it, beforeEach } from 'node:test';
+import { describe, it, beforeEach, afterEach } from 'node:test';
 import * as assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
 import { createRouter } from '../../api/server.js';
@@ -64,9 +64,18 @@ class MockServerResponse {
 
 describe('System Operator Provisioning & Governance API', () => {
   const secret = process.env['APP_SECRET'] || 'garrison-os-development-secret';
+  const originalRoutingMode = process.env['OPERATOR_ROUTING_MODE'];
   let existingOperatorId: string;
   let ownerToken: string;
   let managerToken: string;
+
+  afterEach(() => {
+    if (originalRoutingMode !== undefined) {
+      process.env['OPERATOR_ROUTING_MODE'] = originalRoutingMode;
+    } else {
+      delete process.env['OPERATOR_ROUTING_MODE'];
+    }
+  });
 
   beforeEach(() => {
     const db = createTestDb();

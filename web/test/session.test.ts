@@ -5,6 +5,7 @@ import { Socket } from 'node:net';
 import { spawnSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 import { resolve } from 'node:path';
+import { createHmac } from 'node:crypto';
 import { Session, getSession, commitSession, clearSession, parseCookies } from '../lib/session.js';
 
 describe('Web Presentation - Cookie Session Management', () => {
@@ -115,5 +116,57 @@ describe('Web Presentation - Cookie Session Management', () => {
     const setCookie = res.getHeader('Set-Cookie') as string;
     assert.ok(setCookie.includes('Max-Age=0'));
     assert.ok(setCookie.includes('Expires=Thu, 01 Jan 1970 00:00:00 GMT'));
+  });
+
+  it('migrates legacy authenticated session with user.tenant_id to operatorId without falling back to operator-demo', () => {
+    const secret = 'super-secret-key-for-testing-12345';
+    const legacyData = {
+      user: {
+        id: 'usr-legacy-1',
+        email: 'legacy@example.com',
+        first_name: 'Legacy',
+        last_name: 'Owner',
+        role: 'owner',
+        tenant_id: 'op-migrated-123'
+      },
+      authToken: 'token-legacy'
+    };
+
+    const socket = new Socket();
+    const res = new ServerResponse(new IncomingMessage(socket));
+    const rawJson = JSON.stringify(legacyData);
+    const b64Data = Buffer.from(rawJson, 'utf8').toString('base64url');
+    // Compute HMAC
+    const signature = createHmac('sha256', secret).update(b64Data).digest('base64url');
+    const cookieValue = `${b64Data}.${signature}`;
+
+    const req = new IncomingMessage(socket);
+    req.headers['cookie'] = `garrison_session=${encodeURIComponent(cookieValue)}`;
+
+    const session = getSession(req, secret);
+    assert.equal(session.operatorId, 'op-migrated-123');
+    assert.notEqual(session.operatorId, 'operator-demo');
+    assert.equal(session.user?.operator_id, 'op-migrated-123');
+  });
+
+  it('does not fall back to operator-demo for authenticated session with missing operator context', () => {
+    const session = new Session({
+      user: {
+        id: 'usr-no-op',
+        email: 'noop@example.com',
+        first_name: 'No',
+        last_name: 'Op',
+        role: 'manager'
+      } as any,
+      authToken: 'token-xyz'
+    });
+
+    assert.equal(session.operatorId, '');
+    assert.notEqual(session.operatorId, 'operator-demo');
+  });
+
+  it('falls back to operator-demo for unauthenticated guest session', () => {
+    const session = new Session();
+    assert.equal(session.operatorId, 'operator-demo');
   });
 });

@@ -244,7 +244,21 @@ export class Session {
    * Selected operator ID.
    */
   public get operatorId(): string {
-    return this.data.operatorId || this.data.user?.operator_id || 'operator-demo';
+    const direct = this.data.operatorId || this.data.user?.operator_id;
+    if (direct) return direct;
+
+    // Check if legacy tenant_id is stored
+    const legacyTenantId = (this.data.user as any)?.tenant_id || (this.data as any)?.tenant_id;
+    if (typeof legacyTenantId === 'string' && legacyTenantId.trim()) {
+      return legacyTenantId.trim();
+    }
+
+    // Do not fall back to operator-demo for authenticated sessions lacking operator context
+    if (this.data.user || this.data.authToken) {
+      return '';
+    }
+
+    return 'operator-demo';
   }
 
   public set operatorId(val: string) {
@@ -338,6 +352,29 @@ export function getSession(req: IncomingMessage, secret: string = DEFAULT_SECRET
     if (rawJson) {
       try {
         const parsed = JSON.parse(Buffer.from(rawJson, 'base64url').toString('utf8'));
+        if (parsed && typeof parsed === 'object') {
+          const anyUser = parsed.user as Record<string, unknown> | undefined;
+          const legacyTenantId = (anyUser && typeof anyUser['tenant_id'] === 'string' ? anyUser['tenant_id'] : undefined)
+            || (typeof parsed.tenant_id === 'string' ? parsed.tenant_id : undefined);
+          const hasCurrentOperator = Boolean(
+            (typeof parsed.operatorId === 'string' && parsed.operatorId.trim()) ||
+            (anyUser && typeof anyUser['operator_id'] === 'string' && (anyUser['operator_id'] as string).trim())
+          );
+
+          if (legacyTenantId && !hasCurrentOperator) {
+            const trimmed = legacyTenantId.trim();
+            if (trimmed) {
+              parsed.operatorId = trimmed;
+              if (anyUser) {
+                anyUser['operator_id'] = trimmed;
+              }
+              const session = new Session(parsed);
+              return session;
+            } else {
+              return new Session();
+            }
+          }
+        }
         return new Session(parsed);
       } catch {
         // Fallback to empty session on parse failure

@@ -7,8 +7,9 @@ import { Router } from './router.js';
 import {
   securityHeadersMiddleware,
   correlationMiddleware,
+  rateLimitMiddleware,
   operatorContextMiddleware,
-  rateLimitMiddleware
+  RESERVED_SUBDOMAINS
 } from './middleware.js';
 import { successResponse, errorResponse } from './response.js';
 import { getDatabase, closeDatabase, withTransaction } from '../database/client.js';
@@ -67,8 +68,8 @@ export function createRouter(serverPort: number = PORT): Router {
   // Attach middleware stack
   router.use(securityHeadersMiddleware);
   router.use(correlationMiddleware);
-  router.use(operatorContextMiddleware);
   router.use(rateLimitMiddleware);
+  router.use(operatorContextMiddleware);
 
   // Health and readiness checks
   router.getBatchSafe('/health', (_req, res) => {
@@ -489,16 +490,6 @@ export function createRouter(serverPort: number = PORT): Router {
     const cleanLast = typeof last_name === 'string' && last_name.trim() ? last_name.trim() : 'User';
     const cleanCurrency = typeof currency === 'string' && currency.trim() ? currency.trim().toUpperCase() : 'USD';
 
-    const rawSubdomain = (
-      typeof subdomain === 'string' && subdomain.trim().length > 0 ? subdomain.trim() :
-      (typeof slug === 'string' && slug.trim().length > 0 ? slug.trim() :
-      (typeof path_slug === 'string' && path_slug.trim().length > 0 ? path_slug.trim() : ''))
-    );
-
-    let cleanSubdomain = rawSubdomain
-      ? rawSubdomain.toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-').slice(0, 32)
-      : cleanName.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-').slice(0, 32);
-
     if (!cleanName) {
       return errorResponse(res, 'VALIDATION_ERROR', 'Operator name is required', 400);
     }
@@ -507,6 +498,41 @@ export function createRouter(serverPort: number = PORT): Router {
     }
     if (cleanPassword.length < 8) {
       return errorResponse(res, 'VALIDATION_ERROR', 'Password must be at least 8 characters long', 400);
+    }
+
+    const hasExplicitSubdomain = (
+      subdomain !== undefined ||
+      slug !== undefined ||
+      path_slug !== undefined
+    );
+    const rawSubdomainCandidate = subdomain !== undefined ? subdomain : (slug !== undefined ? slug : path_slug);
+
+    let cleanSubdomain: string;
+    if (hasExplicitSubdomain) {
+      const rawStr = typeof rawSubdomainCandidate === 'string' ? rawSubdomainCandidate.trim() : '';
+      const normalized = rawStr
+        .toLowerCase()
+        .replace(/[^a-z0-9-]/g, '-')
+        .replace(/-+/g, '-')
+        .replace(/^-+|-+$/g, '')
+        .slice(0, 32);
+
+      if (!normalized || RESERVED_SUBDOMAINS.has(normalized)) {
+        return errorResponse(res, 'VALIDATION_ERROR', 'The specified subdomain or slug is invalid or reserved', 400);
+      }
+      cleanSubdomain = normalized;
+    } else {
+      let derived = cleanName
+        .toLowerCase()
+        .replace(/[^a-z0-9]/g, '-')
+        .replace(/-+/g, '-')
+        .replace(/^-+|-+$/g, '')
+        .slice(0, 32);
+
+      if (!derived || RESERVED_SUBDOMAINS.has(derived)) {
+        derived = derived ? `${derived.slice(0, 23)}-operator` : `op-${generateUUIDv7().slice(0, 8)}`;
+      }
+      cleanSubdomain = derived;
     }
 
     const defaultQuota = Number(process.env['DEFAULT_STORAGE_QUOTA_BYTES']) || 10737418240; // 10 GB default
@@ -544,7 +570,7 @@ export function createRouter(serverPort: number = PORT): Router {
         ).get(cleanSubdomain);
 
         if (existingSubdomain) {
-          if (rawSubdomain) {
+          if (hasExplicitSubdomain) {
             const err: any = new Error(`Subdomain or path '${cleanSubdomain}' is already in use`);
             err.code = 'CONFLICT';
             throw err;
