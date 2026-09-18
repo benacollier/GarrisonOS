@@ -95,7 +95,7 @@ Standard Error Codes:
 
 ## 4. Accounts Payable (AP) & Vendor Invoicing Subsystem
 
-### 2.1 List Bills
+### 4.1 List Bills
 * **Endpoint**: `GET /api/v1/accounting/bills`
 * **Query Parameters**:
   - `vendor_id` (string, optional): Filter by vendor UUIDv7.
@@ -128,7 +128,7 @@ Standard Error Codes:
 }
 ```
 
-### 2.2 Create Bill with Allocations
+### 4.2 Create Bill with Allocations
 * **Endpoint**: `POST /api/v1/accounting/bills`
 * **Request Body**:
 ```json
@@ -154,7 +154,7 @@ Standard Error Codes:
 ```
 * **Response (201 Created)**: Returns created bill record with allocations.
 
-### 2.3 Approve Bill
+### 4.3 Approve Bill
 * **Endpoint**: `POST /api/v1/accounting/bills/:id/approve`
 * **Permission**: `accounting:bills:approve`
 * **Behavior**: Transitions bill status to `approved`, creates double-entry journal entry (Debit `Expense Account`, Credit `2010 Accounts Payable`), and publishes `bill.approved` event.
@@ -171,7 +171,7 @@ Standard Error Codes:
 }
 ```
 
-### 2.4 Disburse Bill Payment (Check / ACH / Card)
+### 4.4 Disburse Bill Payment (Check / ACH / Card)
 * **Endpoint**: `POST /api/v1/accounting/bills/disbursements`
 * **Permission**: `accounting:bills:disburse`
 * **Request Body**:

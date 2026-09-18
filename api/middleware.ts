@@ -30,16 +30,29 @@ const CORS_ALLOWED_ORIGINS = new Set(
     .filter((origin) => origin.length > 0)
 );
 
-// Configurable sliding-window rate limiter settings
+/**
+ * Sliding-window rate limiter threshold and window duration configuration.
+ */
 export interface RateLimitConfig {
+  /** Maximum allowed requests per window for standard operational routes. */
   operatorMax: number;
+  /** Window duration in milliseconds for standard operational routes. */
   operatorWindowMs: number;
+  /** Maximum allowed requests per window for authentication routes. */
   authMax: number;
+  /** Window duration in milliseconds for authentication routes. */
   authWindowMs: number;
+  /** Maximum allowed requests per window for unauthenticated public routes. */
   publicMax: number;
+  /** Window duration in milliseconds for unauthenticated public routes. */
   publicWindowMs: number;
 }
 
+/**
+ * Retrieves environment-configured or default sliding-window rate limit parameters.
+ *
+ * @returns RateLimitConfig object.
+ */
 export function getRateLimitConfig(): RateLimitConfig {
   return {
     operatorMax: Number(process.env['RATE_LIMIT_OPERATOR_MAX']) || 120,
@@ -90,16 +103,29 @@ export function startRateLimitEviction(intervalMs = 60 * 1000): void {
   evictionTimer.unref();
 }
 
+/**
+ * Historical record of a rate limit throttling event.
+ */
 export interface RateLimitEvent {
+  /** Bucket key identifier. */
   key: string;
+  /** Epoch timestamp in milliseconds when throttle occurred. */
   timestamp: number;
+  /** HTTP request path that triggered throttling. */
   path?: string;
+  /** Client IP address. */
   ip?: string;
 }
 
+/**
+ * Aggregate telemetry snapshot for platform rate limiting.
+ */
 export interface RateLimitStats {
+  /** Number of active buckets currently tracked in memory. */
   activeBuckets: number;
+  /** Total count of blocked requests since process initialization. */
   totalBlocks: number;
+  /** Circular buffer of recent rate limit throttle events. */
   recentEvents: RateLimitEvent[];
 }
 

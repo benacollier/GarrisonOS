@@ -116,7 +116,7 @@ Progress across the seven canonical architectural phases leading to Foundational
 * [x] Multi-role directory management (tenants, clients, vendors, emergency contacts).
 * [x] Vendor compliance tracking (trade specializations, tax classifications, W-9 verification).
 * [x] Universal Document Attachments Subsystem across leases, properties, and work orders *(Sprint 3)*.
-* [x] Document & Media Safety Hygiene: Automatic EXIF stripping, bounded downsampling, and PDF script sanitization *(Sprint 3)*.
+* [x] Document & Media Safety Hygiene: Magic byte verification, strict MIME whitelisting, directory traversal defense, and PDF script sanitization *(Sprint 3)*.
 
 ---
 

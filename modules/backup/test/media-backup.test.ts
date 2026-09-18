@@ -11,13 +11,15 @@ import { unpackTar } from '../backend/tar.js';
 
 describe('Media Backup Integration & Full System Restore', () => {
   const testTenant = 'tenant-media-backup-test';
-  const testStorageDir = path.resolve('./storage/test-media-storage');
+  const testBaseDir = path.resolve('./storage/test-media-storage');
+  const testStorageDir = path.resolve('./storage/test-media-storage/attachments');
   const originalStoragePath = process.env['STORAGE_PATH'];
-  const testSqlitePath = path.resolve('./storage/test-media-storage/test-db.sqlite');
+  const testSqlitePath = path.resolve('./storage/test-media-storage/db/test-db.sqlite');
   const originalSqlitePath = process.env['SQLITE_PATH'];
 
   before(() => {
     fs.mkdirSync(testStorageDir, { recursive: true });
+    fs.mkdirSync(path.dirname(testSqlitePath), { recursive: true });
     process.env['STORAGE_PATH'] = testStorageDir;
     process.env['SQLITE_PATH'] = testSqlitePath;
 
@@ -41,17 +43,17 @@ describe('Media Backup Integration & Full System Restore', () => {
       delete process.env['SQLITE_PATH'];
     }
 
-    if (fs.existsSync(testStorageDir)) {
+    if (fs.existsSync(testBaseDir)) {
       try {
-        fs.rmSync(testStorageDir, { recursive: true, force: true });
+        fs.rmSync(testBaseDir, { recursive: true, force: true });
       } catch {}
     }
   });
 
   it('creates full system backup bundling SQLite snapshot and physical attachments into .tar.gz', async () => {
     await runInOperatorContext(testTenant, async () => {
-      // 1. Create dummy attachment files under STORAGE_PATH/attachments
-      const attachmentsDir = path.join(testStorageDir, 'attachments', testTenant);
+      // 1. Create dummy attachment files under STORAGE_PATH
+      const attachmentsDir = path.join(testStorageDir, testTenant);
       fs.mkdirSync(attachmentsDir, { recursive: true });
       const photoPath = path.join(attachmentsDir, 'photo.jpg');
       const docPath = path.join(attachmentsDir, 'lease.pdf');
@@ -92,7 +94,7 @@ describe('Media Backup Integration & Full System Restore', () => {
 
       const dbEntry = entries.find((e) => e.name === 'database.sqlite');
       assert.ok(dbEntry, 'Archive must contain database.sqlite');
-      assert.equal(dbEntry.data.subarray(0, 15).toString('utf8'), 'SQLite format 3');
+      assert.ok(dbEntry.data.subarray(0, 16).equals(Buffer.from('SQLite format 3\0')));
 
       const photoEntry = entries.find((e) => e.name === `attachments/${testTenant}/photo.jpg`);
       assert.ok(photoEntry, 'Archive must contain attachments photo entry');
@@ -111,7 +113,7 @@ describe('Media Backup Integration & Full System Restore', () => {
       const archivePath = BackupService.resolveSafeBackupPath(backup.relative_path);
 
       // 2. Wipe physical attachments and mutate database
-      const attachmentsDir = path.join(testStorageDir, 'attachments', testTenant);
+      const attachmentsDir = path.join(testStorageDir, testTenant);
       if (fs.existsSync(attachmentsDir)) {
         fs.rmSync(attachmentsDir, { recursive: true, force: true });
       }

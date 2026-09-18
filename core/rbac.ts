@@ -308,13 +308,61 @@ export function checkUserPermission(
 }
 
 /**
- * Checks whether a subuser is authorized to access resources within a specific portfolio.
- * Users with full administrative roles (system_owner, system_manager, owner, manager) have unrestricted access.
- * If a subuser has no portfolio restrictions defined, they have access to all portfolios.
- * Otherwise, the portfolio must be explicitly in their allowed access list.
+ * Strict hierarchical ranking of system and operator roles for privilege escalation defense.
+ */
+export const ROLE_RANK: Record<string, number> = Object.freeze({
+  system_owner: 100,
+  system_manager: 90,
+  owner: 80,
+  manager: 70,
+  leasing_agent: 50,
+  assistant: 50,
+  maintenance: 50,
+  auditor: 40,
+  viewer: 30,
+  read_only: 30
+});
+
+/**
+ * Validates whether an authenticated caller possessing callerRole is permitted
+ * to create or assign targetRole to another user.
+ *
+ * @param callerRole - Role of the requesting caller.
+ * @param targetRole - Role being assigned or updated.
+ * @returns True if assignment is within caller privilege ceiling.
+ */
+export function canAssignRole(callerRole: string, targetRole: string): boolean {
+  const callerRank = ROLE_RANK[callerRole];
+  const targetRank = ROLE_RANK[targetRole];
+
+  if (callerRank === undefined || targetRank === undefined) {
+    return false;
+  }
+
+  // Only system_owner can assign platform roles
+  if ((targetRole === 'system_owner' || targetRole === 'system_manager') && callerRole !== 'system_owner') {
+    return false;
+  }
+
+  // System owners have complete delegation authority
+  if (callerRole === 'system_owner') {
+    return true;
+  }
+
+  // Owners can assign any operator-level role up to owner
+  if (callerRole === 'owner') {
+    return targetRank <= (ROLE_RANK['owner'] ?? 80);
+  }
+
+  // Subordinate administrative roles (e.g. manager) can only assign roles strictly below their own rank
+  return callerRank > targetRank;
+}
+
+/**
+ * Checks whether a subuser is permitted to access a specific investment portfolio.
  *
  * @param userId - Unique user identifier.
- * @param portfolioId - Portfolio identifier to check.
+ * @param portfolioId - Portfolio identifier.
  * @param operatorId - Operator isolation identifier.
  * @param dbInstance - Optional DatabaseSync instance.
  * @returns True if access is permitted, false otherwise.
@@ -349,8 +397,13 @@ export function canAccessPortfolio(
     'SELECT portfolio_id FROM user_portfolio_access WHERE operator_id = ? AND user_id = ?'
   ).all(operatorId, userId) as Array<{ portfolio_id: string }>;
 
-  // If no specific restrictions configured, subuser has access to all portfolios in the operator
+  // Scoped subusers default to DENIED if no explicit whitelist configured
   if (restrictions.length === 0) {
+    return false;
+  }
+
+  // Explicit wildcard gives access to all portfolios
+  if (restrictions.some((r) => r.portfolio_id === '*')) {
     return true;
   }
 
@@ -391,20 +444,35 @@ export function canAccessModule(
     return true;
   }
 
+  const canonicalModule = moduleId === 'tenants' ? 'leases' : (moduleId === 'work_orders' ? 'maintenance' : moduleId);
+
   const allowedModules = db.prepare(
     'SELECT module_id FROM user_module_access WHERE operator_id = ? AND user_id = ?'
   ).all(operatorId, userId) as Array<{ module_id: string }>;
 
-  // If no explicit module restrictions are configured, access is governed by standard role permissions
+  // Scoped subusers default to DENIED if no explicit whitelist configured
   if (allowedModules.length === 0) {
+    return false;
+  }
+
+  // Explicit wildcard gives access to all modules
+  if (allowedModules.some((m) => m.module_id === '*')) {
     return true;
   }
 
-  return allowedModules.some((m) => m.module_id === moduleId);
+  return allowedModules.some((m) => {
+    const canonical = m.module_id === 'tenants' ? 'leases' : (m.module_id === 'work_orders' ? 'maintenance' : m.module_id);
+    return canonical === canonicalModule || m.module_id === moduleId;
+  });
 }
 
 /**
  * Retrieves the list of portfolio IDs explicitly assigned to a subuser.
+ *
+ * @param userId - Unique user identifier.
+ * @param operatorId - Operator isolation identifier.
+ * @param dbInstance - Optional DatabaseSync instance.
+ * @returns Array of assigned portfolio UUIDs.
  */
 export function getUserPortfolioAccess(
   userId: string,
@@ -419,7 +487,13 @@ export function getUserPortfolioAccess(
 }
 
 /**
- * Configures the portfolio access whitelist for a subuser.
+ * Configures the portfolio access whitelist for a subuser with operator-boundary validation.
+ *
+ * @param userId - Target user identifier.
+ * @param operatorId - Operator isolation boundary.
+ * @param portfolioIds - List of allowed portfolio UUIDs (or ['*'] for unrestricted).
+ * @param dbInstance - Optional DatabaseSync instance.
+ * @throws Error if target user or any portfolio does not belong to the active operator.
  */
 export function setUserPortfolioAccess(
   userId: string,
@@ -428,6 +502,24 @@ export function setUserPortfolioAccess(
   dbInstance?: DatabaseSync
 ): void {
   const db = dbInstance || getDatabase();
+
+  const user = db.prepare(
+    'SELECT id FROM users WHERE id = ? AND operator_id = ? AND deleted_at IS NULL'
+  ).get(userId, operatorId);
+  if (!user) {
+    throw new Error(`Target user ${userId} not found or does not belong to operator ${operatorId}`);
+  }
+
+  for (const pid of portfolioIds) {
+    if (pid === '*') continue;
+    const portfolio = db.prepare(
+      'SELECT id FROM portfolios WHERE id = ? AND operator_id = ? AND deleted_at IS NULL'
+    ).get(pid, operatorId);
+    if (!portfolio) {
+      throw new Error(`Portfolio ${pid} not found or does not belong to operator ${operatorId}`);
+    }
+  }
+
   db.prepare('DELETE FROM user_portfolio_access WHERE operator_id = ? AND user_id = ?').run(operatorId, userId);
   const insert = db.prepare(
     'INSERT INTO user_portfolio_access (id, operator_id, user_id, portfolio_id, created_at) VALUES (?, ?, ?, ?, ?)'
@@ -440,6 +532,11 @@ export function setUserPortfolioAccess(
 
 /**
  * Retrieves the list of module IDs explicitly assigned to a subuser.
+ *
+ * @param userId - Unique user identifier.
+ * @param operatorId - Operator isolation identifier.
+ * @param dbInstance - Optional DatabaseSync instance.
+ * @returns Array of assigned module identifier strings.
  */
 export function getUserModuleAccess(
   userId: string,
@@ -454,7 +551,13 @@ export function getUserModuleAccess(
 }
 
 /**
- * Configures the module access whitelist for a subuser.
+ * Configures the module access whitelist for a subuser with operator-boundary validation.
+ *
+ * @param userId - Target user identifier.
+ * @param operatorId - Operator isolation boundary.
+ * @param moduleIds - List of allowed module IDs (or ['*'] for unrestricted).
+ * @param dbInstance - Optional DatabaseSync instance.
+ * @throws Error if target user does not belong to the active operator.
  */
 export function setUserModuleAccess(
   userId: string,
@@ -463,6 +566,14 @@ export function setUserModuleAccess(
   dbInstance?: DatabaseSync
 ): void {
   const db = dbInstance || getDatabase();
+
+  const user = db.prepare(
+    'SELECT id FROM users WHERE id = ? AND operator_id = ? AND deleted_at IS NULL'
+  ).get(userId, operatorId);
+  if (!user) {
+    throw new Error(`Target user ${userId} not found or does not belong to operator ${operatorId}`);
+  }
+
   db.prepare('DELETE FROM user_module_access WHERE operator_id = ? AND user_id = ?').run(operatorId, userId);
   const insert = db.prepare(
     'INSERT INTO user_module_access (id, operator_id, user_id, module_id, created_at) VALUES (?, ?, ?, ?, ?)'

@@ -25,7 +25,7 @@ CREATE TABLE IF NOT EXISTS users (
     password_hash TEXT NOT NULL,
     first_name TEXT NOT NULL,
     last_name TEXT NOT NULL,
-    role TEXT NOT NULL CHECK (role IN ('owner', 'manager', 'assistant', 'read_only', 'maintenance', 'auditor', 'viewer', 'system_owner', 'system_manager', 'leasing_agent')),
+    role TEXT NOT NULL CHECK (role IN ('owner', 'manager', 'assistant', 'read_only')),
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL,
     deleted_at INTEGER,
@@ -47,4 +47,20 @@ CREATE TABLE IF NOT EXISTS audit_logs (
     FOREIGN KEY (operator_id) REFERENCES operators(id)
 );
 CREATE INDEX IF NOT EXISTS idx_audit_logs_operator_entity ON audit_logs(operator_id, entity_type, entity_id);
+
+-- File attachments & document metadata
+CREATE TABLE IF NOT EXISTS attachments (
+    id TEXT PRIMARY KEY,
+    operator_id TEXT NOT NULL,
+    entity_type TEXT NOT NULL,
+    entity_id TEXT NOT NULL,
+    file_name TEXT NOT NULL,
+    file_path TEXT NOT NULL,
+    file_size INTEGER NOT NULL,
+    mime_type TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    deleted_at INTEGER,
+    FOREIGN KEY (operator_id) REFERENCES operators(id)
+);
+CREATE INDEX IF NOT EXISTS idx_attachments_entity ON attachments(operator_id, entity_type, entity_id);
 

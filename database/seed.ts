@@ -82,8 +82,8 @@ export async function seedDatabase(dbInstance?: DatabaseSync): Promise<void> {
       VALUES (?, ?, ?, ?, ?)
     `).run(generateUUIDv7(), OPERATOR_ID, subuserId, portfolio2Id, now);
 
-    // Grant module access to properties, tenants, work_orders
-    for (const mod of ['properties', 'tenants', 'work_orders']) {
+    // Grant module access to properties, leases, maintenance
+    for (const mod of ['properties', 'leases', 'maintenance']) {
       tx.prepare(`
         INSERT INTO user_module_access (id, operator_id, user_id, module_id, created_at)
         VALUES (?, ?, ?, ?, ?)

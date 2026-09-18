@@ -167,11 +167,18 @@ export function sanitizePdf(buffer: Buffer): { buffer: Buffer; wasSanitized: boo
   }
 
   const pdfText = buffer.toString('binary');
+  // Verify structural presence of %%EOF trailer marker
+  if (!pdfText.includes('%%EOF')) {
+    throw new Error('Invalid PDF format: missing or corrupt %%EOF trailer marker');
+  }
+
+  // Dangerous triggers mapped to strictly equal-length safe replacements
+  // to avoid shifting object lengths or corrupting cross-reference byte offsets.
   const dangerousTriggers = [
-    { pattern: /\/JavaScript\b/g, replacement: '/DisabledJS' },
-    { pattern: /\/JS\b/g, replacement: '/No' },
-    { pattern: /\/Launch\b/g, replacement: '/NoLaunch' },
-    { pattern: /\/EmbeddedFiles\b/g, replacement: '/DisabledEmbed' }
+    { pattern: /\/JavaScript\b/g, replacement: '/DisabledJS' }, // 11 -> 11 bytes
+    { pattern: /\/JS\b/g, replacement: '/No' },                  // 3 -> 3 bytes
+    { pattern: /\/Launch\b/g, replacement: '/NoOp__' },          // 7 -> 7 bytes
+    { pattern: /\/EmbeddedFiles\b/g, replacement: '/DisabledEmbed' } // 14 -> 14 bytes
   ];
 
   let modifiedText = pdfText;

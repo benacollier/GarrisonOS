@@ -113,7 +113,8 @@ garrison-os/
 │       ├── 0002_add_token_version.sql
 │       ├── 0003_add_operator_storage_quota.sql
 │       ├── 0004_create_attachments.sql
-│       └── 0005_create_role_permissions.sql
+│       ├── 0005_create_role_permissions.sql
+│       └── 0006_platform_roles_and_subusers.sql
 │
 ├── modules/                   # Drop-in Functional Modules
 │   ├── properties/            # Portfolios, Properties, and Units

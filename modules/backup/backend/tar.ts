@@ -25,6 +25,10 @@ export interface ExtractedTarEntry {
   name: string;
   /** Extracted file contents buffer. */
   data: Buffer;
+  /** File size in bytes. */
+  size?: number;
+  /** Unix file permission mode. */
+  mode?: number;
 }
 
 /**
@@ -44,13 +48,35 @@ export function createTarHeader(
 ): Buffer {
   const header = Buffer.alloc(512, 0);
 
-  // 1. File name: bytes 0-99
-  const nameBuf = Buffer.from(name.replace(/\\/g, '/'), 'utf8');
-  if (nameBuf.length > 100) {
-    // Truncate if exceeds 100 bytes in basic ustar
-    nameBuf.copy(header, 0, 0, 100);
-  } else {
+  // 1. File name and prefix (ustar support up to 255 bytes)
+  const normalizedPath = name.replace(/\\/g, '/');
+  const nameBuf = Buffer.from(normalizedPath, 'utf8');
+
+  if (nameBuf.length <= 100) {
     nameBuf.copy(header, 0);
+  } else {
+    if (nameBuf.length > 255) {
+      throw new Error(`File path exceeds ustar maximum limit of 255 bytes: ${normalizedPath}`);
+    }
+    // Find split index at '/' boundary such that prefix <= 155 bytes and name <= 100 bytes
+    let splitIdx = -1;
+    for (let i = Math.min(normalizedPath.length - 1, 155); i >= 0; i--) {
+      if (normalizedPath[i] === '/') {
+        const pfx = normalizedPath.substring(0, i);
+        const n = normalizedPath.substring(i + 1);
+        if (Buffer.byteLength(pfx, 'utf8') <= 155 && Buffer.byteLength(n, 'utf8') <= 100) {
+          splitIdx = i;
+          break;
+        }
+      }
+    }
+    if (splitIdx === -1) {
+      throw new Error(`Path exceeds 100 bytes and cannot be split into ustar prefix and name: ${normalizedPath}`);
+    }
+    const prefixStr = normalizedPath.substring(0, splitIdx);
+    const nameStr = normalizedPath.substring(splitIdx + 1);
+    Buffer.from(nameStr, 'utf8').copy(header, 0);
+    Buffer.from(prefixStr, 'utf8').copy(header, 345);
   }
 
   // 2. Mode: bytes 100-107 (8 bytes octal)
@@ -118,15 +144,15 @@ export function packTar(entries: TarEntry[]): Buffer {
     }
   }
 
-  // End of archive: two 512-byte blocks of zeroes
+  // Two 512-byte zero blocks mark end of tar archive
   chunks.push(Buffer.alloc(1024, 0));
 
   return Buffer.concat(chunks);
 }
 
 /**
- * Unpacks an uncompressed POSIX tar buffer into extracted file records.
- * Validates path traversal defense to ensure extracted paths do not escape target roots.
+ * Unpacks an uncompressed POSIX tar archive buffer into a list of file entries,
+ * supporting ustar prefix headers and enforcing bounded extraction limits.
  *
  * @param tarBuffer - Tar archive byte buffer.
  * @returns Array of extracted file records.
@@ -134,6 +160,9 @@ export function packTar(entries: TarEntry[]): Buffer {
 export function unpackTar(tarBuffer: Buffer): ExtractedTarEntry[] {
   const entries: ExtractedTarEntry[] = [];
   let offset = 0;
+  let totalExtractedBytes = 0;
+  const MAX_ENTRIES = 10000;
+  const MAX_TOTAL_BYTES = 500 * 1024 * 1024; // 500MB safety ceiling
 
   while (offset + 512 <= tarBuffer.length) {
     const header = tarBuffer.subarray(offset, offset + 512);
@@ -151,19 +180,27 @@ export function unpackTar(tarBuffer: Buffer): ExtractedTarEntry[] {
       break;
     }
 
-    // Extract file name
+    // Extract file name (bytes 0-99)
     let nameEnd = 0;
     while (nameEnd < 100 && header[nameEnd] !== 0) {
       nameEnd++;
     }
-    const name = header.toString('utf8', 0, nameEnd).trim();
+    const baseName = header.toString('utf8', 0, nameEnd).trim();
+
+    // Extract prefix if present (bytes 345-499)
+    let prefixEnd = 345;
+    while (prefixEnd < 500 && header[prefixEnd] !== 0) {
+      prefixEnd++;
+    }
+    const prefix = prefixEnd > 345 ? header.toString('utf8', 345, prefixEnd).trim() : '';
+    const name = prefix.length > 0 ? `${prefix}/${baseName}` : baseName;
 
     // Extract size
     const sizeStr = header.toString('ascii', 124, 135).replace(/\0/g, '').trim();
     const size = parseInt(sizeStr, 8);
 
     if (Number.isNaN(size) || size < 0) {
-      break;
+      throw new Error(`Corrupted tar archive: invalid size for entry '${name || 'unknown'}'`);
     }
 
     // Extract type flag (byte 156)
@@ -176,14 +213,21 @@ export function unpackTar(tarBuffer: Buffer): ExtractedTarEntry[] {
         throw new Error(`Corrupted tar archive: truncated file entry for ${name}`);
       }
 
+      totalExtractedBytes += size;
+      if (entries.length >= MAX_ENTRIES || totalExtractedBytes > MAX_TOTAL_BYTES) {
+        throw new Error(`Archive extraction aborted: exceeded maximum safety limit`);
+      }
+
       const fileData = tarBuffer.subarray(offset, offset + size);
       entries.push({
         name,
-        data: Buffer.from(fileData)
+        data: fileData,
+        mode: 0o644,
+        size
       });
     }
 
-    // Advance offset past file data and 512-byte padding
+    // Advance to next 512-byte boundary
     const remainder = size % 512;
     const padding = remainder > 0 ? 512 - remainder : 0;
     offset += size + padding;

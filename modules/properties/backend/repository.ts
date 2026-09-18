@@ -1,7 +1,10 @@
-import { getDatabase } from '../../../database/client.js';
+import { getDatabase, withTransaction } from '../../../database/client.js';
 import { RequestContext } from '../../../core/context.js';
 import { generateUUIDv7 } from '../../../core/crypto.js';
 
+/**
+ * Portfolio entity representing a grouping of real estate properties.
+ */
 export interface Portfolio {
   id: string;
   operator_id: string;
@@ -14,6 +17,9 @@ export interface Portfolio {
   deleted_at?: number | null;
 }
 
+/**
+ * Property entity representing a physical real estate asset.
+ */
 export interface Property {
   id: string;
   operator_id: string;
@@ -32,6 +38,9 @@ export interface Property {
   deleted_at?: number | null;
 }
 
+/**
+ * Building entity representing a physical structure within a multi-building property.
+ */
 export interface Building {
   id: string;
   operator_id: string;
@@ -45,6 +54,9 @@ export interface Building {
   deleted_at?: number | null;
 }
 
+/**
+ * Unit entity representing a leasable space within a property or building.
+ */
 export interface Unit {
   id: string;
   operator_id: string;
@@ -63,8 +75,17 @@ export interface Unit {
   deleted_at?: number | null;
 }
 
+/**
+ * Repository providing data access for portfolios, properties, buildings, units, and occupancy metrics.
+ */
 export class PropertiesRepository {
   // --- Portfolios ---
+
+  /**
+   * List all active portfolios belonging to the active operator.
+   *
+   * @returns Array of active Portfolio records ordered by name.
+   */
   public static listPortfolios(): Portfolio[] {
     const operatorId = RequestContext.getOperatorId();
     const db = getDatabase();
@@ -75,6 +96,12 @@ export class PropertiesRepository {
     `).all(operatorId) as unknown as Portfolio[];
   }
 
+  /**
+   * Retrieve a single portfolio by ID within the active operator context.
+   *
+   * @param id - Unique UUIDv7 of the portfolio.
+   * @returns The portfolio entity or null if not found.
+   */
   public static getPortfolioById(id: string): Portfolio | null {
     const operatorId = RequestContext.getOperatorId();
     const db = getDatabase();
@@ -85,6 +112,12 @@ export class PropertiesRepository {
     return row || null;
   }
 
+  /**
+   * Create a new portfolio record scoped to the active operator.
+   *
+   * @param data - Initial portfolio creation payload.
+   * @returns The newly created Portfolio entity.
+   */
   public static createPortfolio(data: { name: string; tax_id?: string; notes?: string }): Portfolio {
     const operatorId = RequestContext.getOperatorId();
     const db = getDatabase();
@@ -99,6 +132,13 @@ export class PropertiesRepository {
     return PropertiesRepository.getPortfolioById(id)!;
   }
 
+  /**
+   * Update an existing portfolio within the active operator context.
+   *
+   * @param id - Unique UUIDv7 of the portfolio to update.
+   * @param data - Partial fields to update.
+   * @returns The updated Portfolio entity or null if not found.
+   */
   public static updatePortfolio(id: string, data: Partial<{ name: string; tax_id: string; notes: string }>): Portfolio | null {
     const existing = PropertiesRepository.getPortfolioById(id);
     if (!existing) return null;
@@ -120,6 +160,12 @@ export class PropertiesRepository {
     return PropertiesRepository.getPortfolioById(id);
   }
 
+  /**
+   * Soft-delete a portfolio by ID within the active operator context.
+   *
+   * @param id - Unique UUIDv7 of the portfolio to delete.
+   * @returns True if a record was soft-deleted, false otherwise.
+   */
   public static deletePortfolio(id: string): boolean {
     const operatorId = RequestContext.getOperatorId();
     const db = getDatabase();
@@ -132,6 +178,13 @@ export class PropertiesRepository {
   }
 
   // --- Properties ---
+
+  /**
+   * List active properties for the active operator, optionally filtered by portfolio.
+   *
+   * @param filter - Optional filter containing portfolio_id.
+   * @returns Array of active Property records ordered by name.
+   */
   public static listProperties(filter?: { portfolio_id?: string }): Property[] {
     const operatorId = RequestContext.getOperatorId();
     const db = getDatabase();
@@ -147,6 +200,12 @@ export class PropertiesRepository {
     return db.prepare(sql).all(...params) as unknown as Property[];
   }
 
+  /**
+   * Retrieve a single property by ID within the active operator context.
+   *
+   * @param id - Unique UUIDv7 of the property.
+   * @returns The property entity or null if not found.
+   */
   public static getPropertyById(id: string): Property | null {
     const operatorId = RequestContext.getOperatorId();
     const db = getDatabase();
@@ -157,6 +216,12 @@ export class PropertiesRepository {
     return row || null;
   }
 
+  /**
+   * Create a new property record scoped to the active operator.
+   *
+   * @param data - Initial property creation payload.
+   * @returns The newly created Property entity.
+   */
   public static createProperty(data: {
     name: string;
     property_type: Property['property_type'];
@@ -198,6 +263,13 @@ export class PropertiesRepository {
     return PropertiesRepository.getPropertyById(id)!;
   }
 
+  /**
+   * Update an existing property within the active operator context.
+   *
+   * @param id - Unique UUIDv7 of the property to update.
+   * @param data - Fields to update.
+   * @returns The updated Property entity or null if not found.
+   */
   public static updateProperty(id: string, data: Partial<Omit<Property, 'id' | 'operator_id' | 'tenant_id' | 'created_at' | 'updated_at' | 'deleted_at'>>): Property | null {
     const existing = PropertiesRepository.getPropertyById(id);
     if (!existing) return null;
@@ -232,6 +304,12 @@ export class PropertiesRepository {
     return PropertiesRepository.getPropertyById(id);
   }
 
+  /**
+   * Soft-delete a property by ID within the active operator context.
+   *
+   * @param id - Unique UUIDv7 of the property to delete.
+   * @returns True if a record was soft-deleted, false otherwise.
+   */
   public static deleteProperty(id: string): boolean {
     const operatorId = RequestContext.getOperatorId();
     const db = getDatabase();
@@ -244,6 +322,13 @@ export class PropertiesRepository {
   }
 
   // --- Buildings ---
+
+  /**
+   * List active buildings for the active operator, optionally filtered by property.
+   *
+   * @param propertyId - Optional UUIDv7 of the property.
+   * @returns Array of active Building records ordered by name.
+   */
   public static listBuildings(propertyId?: string): Building[] {
     const operatorId = RequestContext.getOperatorId();
     const db = getDatabase();
@@ -259,6 +344,12 @@ export class PropertiesRepository {
     return db.prepare(sql).all(...params) as unknown as Building[];
   }
 
+  /**
+   * Retrieve a single building by ID within the active operator context.
+   *
+   * @param id - Unique UUIDv7 of the building.
+   * @returns The building entity or null if not found.
+   */
   public static getBuildingById(id: string): Building | null {
     const operatorId = RequestContext.getOperatorId();
     const db = getDatabase();
@@ -269,6 +360,12 @@ export class PropertiesRepository {
     return row || null;
   }
 
+  /**
+   * Create a new building record scoped to the active operator.
+   *
+   * @param data - Initial building creation payload.
+   * @returns The newly created Building entity.
+   */
   public static createBuilding(data: {
     property_id: string;
     name: string;
@@ -301,6 +398,13 @@ export class PropertiesRepository {
     return PropertiesRepository.getBuildingById(id)!;
   }
 
+  /**
+   * Update an existing building within the active operator context.
+   *
+   * @param id - Unique UUIDv7 of the building to update.
+   * @param data - Fields to update.
+   * @returns The updated Building entity or null if not found.
+   */
   public static updateBuilding(id: string, data: Partial<Omit<Building, 'id' | 'operator_id' | 'created_at' | 'updated_at' | 'deleted_at'>>): Building | null {
     const existing = PropertiesRepository.getBuildingById(id);
     if (!existing) return null;
@@ -327,18 +431,40 @@ export class PropertiesRepository {
     return PropertiesRepository.getBuildingById(id);
   }
 
+  /**
+   * Soft-delete a building and decouple linked units within an atomic transaction.
+   *
+   * @param id - Unique UUIDv7 of the building to delete.
+   * @returns True if the building was soft-deleted, false otherwise.
+   */
   public static deleteBuilding(id: string): boolean {
     const operatorId = RequestContext.getOperatorId();
     const db = getDatabase();
     const now = Date.now();
-    const info = db.prepare(`
-      UPDATE buildings SET deleted_at = ?
-      WHERE id = ? AND operator_id = ? AND deleted_at IS NULL
-    `).run(now, id, operatorId);
-    return info.changes > 0;
+
+    return withTransaction((tx) => {
+      tx.prepare(`
+        UPDATE units SET building_id = NULL, updated_at = ?
+        WHERE building_id = ? AND operator_id = ? AND deleted_at IS NULL
+      `).run(now, id, operatorId);
+
+      const info = tx.prepare(`
+        UPDATE buildings SET deleted_at = ?
+        WHERE id = ? AND operator_id = ? AND deleted_at IS NULL
+      `).run(now, id, operatorId);
+
+      return info.changes > 0;
+    }, db);
   }
 
   // --- Units ---
+
+  /**
+   * List active units for the active operator matching optional filters.
+   *
+   * @param filter - Optional filters for property_id, building_id, or status.
+   * @returns Array of active Unit records ordered by unit_number.
+   */
   public static listUnits(filter?: { property_id?: string; building_id?: string; status?: string }): Unit[] {
     const operatorId = RequestContext.getOperatorId();
     const db = getDatabase();
@@ -362,6 +488,12 @@ export class PropertiesRepository {
     return db.prepare(sql).all(...params) as unknown as Unit[];
   }
 
+  /**
+   * Retrieve a single unit by ID within the active operator context.
+   *
+   * @param id - Unique UUIDv7 of the unit.
+   * @returns The unit entity or null if not found.
+   */
   public static getUnitById(id: string): Unit | null {
     const operatorId = RequestContext.getOperatorId();
     const db = getDatabase();
@@ -372,6 +504,14 @@ export class PropertiesRepository {
     return row || null;
   }
 
+  /**
+   * Create a new unit record scoped to the active operator.
+   * Validates that building_id (if supplied) exists and belongs to the property.
+   *
+   * @param data - Initial unit creation payload.
+   * @returns The newly created Unit entity.
+   * @throws Error if building_id is invalid or belongs to a different property.
+   */
   public static createUnit(data: {
     property_id: string;
     building_id?: string | null;
@@ -387,6 +527,13 @@ export class PropertiesRepository {
     const db = getDatabase();
     const id = generateUUIDv7();
     const now = Date.now();
+
+    if (data.building_id) {
+      const building = PropertiesRepository.getBuildingById(data.building_id);
+      if (!building || building.property_id !== data.property_id) {
+        throw new Error('Invalid building_id: building does not exist or does not belong to the specified property');
+      }
+    }
 
     db.prepare(`
       INSERT INTO units (
@@ -413,6 +560,15 @@ export class PropertiesRepository {
     return PropertiesRepository.getUnitById(id)!;
   }
 
+  /**
+   * Update an existing unit within the active operator context.
+   * Validates that building_id (if supplied) exists and belongs to the property.
+   *
+   * @param id - Unique UUIDv7 of the unit to update.
+   * @param data - Fields to update.
+   * @returns The updated Unit entity or null if not found.
+   * @throws Error if building_id is invalid or belongs to a different property.
+   */
   public static updateUnit(id: string, data: Partial<Omit<Unit, 'id' | 'operator_id' | 'tenant_id' | 'created_at' | 'updated_at' | 'deleted_at'>>): Unit | null {
     const existing = PropertiesRepository.getUnitById(id);
     if (!existing) return null;
@@ -421,6 +577,14 @@ export class PropertiesRepository {
     const db = getDatabase();
     const now = Date.now();
     const updated = { ...existing, ...data, updated_at: now };
+
+    const targetPropertyId = updated.property_id;
+    if (updated.building_id) {
+      const building = PropertiesRepository.getBuildingById(updated.building_id);
+      if (!building || building.property_id !== targetPropertyId) {
+        throw new Error('Invalid building_id: building does not exist or does not belong to the specified property');
+      }
+    }
 
     db.prepare(`
       UPDATE units SET
@@ -446,6 +610,13 @@ export class PropertiesRepository {
     return PropertiesRepository.getUnitById(id);
   }
 
+  /**
+   * Update the status of a unit within the active operator context.
+   *
+   * @param id - Unique UUIDv7 of the unit.
+   * @param status - New operational status.
+   * @returns True if updated, false otherwise.
+   */
   public static updateUnitStatus(id: string, status: Unit['status']): boolean {
     const operatorId = RequestContext.getOperatorId();
     const db = getDatabase();
@@ -457,6 +628,12 @@ export class PropertiesRepository {
     return info.changes > 0;
   }
 
+  /**
+   * Soft-delete a unit by ID within the active operator context.
+   *
+   * @param id - Unique UUIDv7 of the unit to delete.
+   * @returns True if a record was soft-deleted, false otherwise.
+   */
   public static deleteUnit(id: string): boolean {
     const operatorId = RequestContext.getOperatorId();
     const db = getDatabase();
@@ -469,6 +646,12 @@ export class PropertiesRepository {
   }
 
   // --- Metrics ---
+
+  /**
+   * Calculate portfolio-wide unit occupancy metrics and market rent totals.
+   *
+   * @returns Aggregated metrics including total, occupied, vacant units, percentage, and rent sum.
+   */
   public static getOccupancyMetrics(): {
     totalUnits: number;
     occupiedUnits: number;

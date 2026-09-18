@@ -166,13 +166,37 @@ export class AttachmentService {
   }
 
   /**
-   * Soft-deletes an attachment record by identifier.
+   * Deletes an attachment by unlinking its physical file from disk and
+   * soft-deleting the corresponding database record to prevent disk exhaustion.
    *
    * @param id - Attachment UUID.
    * @param operatorId - Operator isolation boundary.
    * @returns True if soft deleted, false if not found.
    */
   public static deleteAttachment(id: string, operatorId: string): boolean {
+    const record = AttachmentRepository.getById(id, operatorId);
+    if (!record) {
+      return false;
+    }
+
+    try {
+      const fullPath = this.resolveSafeStoragePath(record.storage_path);
+      if (fs.existsSync(fullPath)) {
+        fs.unlinkSync(fullPath);
+      }
+    } catch {
+      // Proceed to soft-delete even if physical file was already missing
+    }
+
     return AttachmentRepository.softDelete(id, operatorId);
   }
+}
+
+/**
+ * Canonical helper resolving the shared root filesystem directory for document attachments.
+ *
+ * @returns Absolute normalized path to storage root.
+ */
+export function getSharedAttachmentStorageDir(): string {
+  return AttachmentService.getUploadStorageDir();
 }

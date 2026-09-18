@@ -61,13 +61,22 @@ function unpackTar(tarBuffer) {
     }
     if (isEmpty) break;
 
+    // Extract file name (bytes 0-99)
     let nameEnd = 0;
     while (nameEnd < 100 && header[nameEnd] !== 0) nameEnd++;
-    const name = header.toString('utf8', 0, nameEnd).trim();
+    const baseName = header.toString('utf8', 0, nameEnd).trim();
+
+    // Extract prefix if present (bytes 345-499)
+    let prefixEnd = 345;
+    while (prefixEnd < 500 && header[prefixEnd] !== 0) prefixEnd++;
+    const prefix = prefixEnd > 345 ? header.toString('utf8', 345, prefixEnd).trim() : '';
+    const name = prefix.length > 0 ? `${prefix}/${baseName}` : baseName;
 
     const sizeStr = header.toString('ascii', 124, 135).replace(/\0/g, '').trim();
     const size = parseInt(sizeStr, 8);
-    if (Number.isNaN(size) || size < 0) break;
+    if (Number.isNaN(size) || size < 0) {
+      throw new Error(`Corrupted tar archive: invalid size for entry '${name || 'unknown'}'`);
+    }
 
     const typeFlag = header[156];
     offset += 512;
@@ -101,6 +110,11 @@ async function runDisasterRecovery() {
   const shmPath = `${resolvedDbPath}-shm`;
   const tempDbPath = path.resolve(path.dirname(resolvedDbPath), `restore-tmp-${Date.now()}.sqlite`);
 
+  const configuredStorage = process.env['STORAGE_PATH'] || './storage/uploads';
+  const resolvedStorage = path.resolve(configuredStorage);
+  const stagingAttachmentsDir = path.resolve(path.dirname(resolvedStorage), `.restore-media-staging-${Date.now()}`);
+  let stagedAttachmentCount = 0;
+
   try {
     // 1. Decompress if needed and inspect snapshot format
     process.stdout.write(`[1/4] Inspecting and extracting snapshot...\n`);
@@ -110,7 +124,8 @@ async function runDisasterRecovery() {
       rawBuffer = zlib.gunzipSync(rawBuffer);
     }
 
-    if (rawBuffer.length >= 16 && rawBuffer.subarray(0, 15).toString('utf8') === 'SQLite format 3') {
+    const expectedSqliteHeader = Buffer.from('SQLite format 3\0');
+    if (rawBuffer.length >= 16 && rawBuffer.subarray(0, 16).equals(expectedSqliteHeader)) {
       fs.writeFileSync(tempDbPath, rawBuffer);
       process.stdout.write(`      ✔ Valid SQLite database detected.\n`);
     } else {
@@ -119,29 +134,29 @@ async function runDisasterRecovery() {
       if (!dbEntry) {
         throw new Error('Verification failed: Archive does not contain a database snapshot file.');
       }
-      if (dbEntry.data.length < 16 || dbEntry.data.subarray(0, 15).toString('utf8') !== 'SQLite format 3') {
+      if (dbEntry.data.length < 16 || !dbEntry.data.subarray(0, 16).equals(expectedSqliteHeader)) {
         throw new Error('Verification failed: File is not a valid SQLite database format.');
       }
       fs.writeFileSync(tempDbPath, dbEntry.data);
       process.stdout.write(`      ✔ Valid SQLite database detected inside tar archive.\n`);
 
-      // Restore attachments
-      const baseStorage = process.env['STORAGE_PATH'] || './storage';
-      const resolvedBase = path.resolve(baseStorage);
-      const normalizedBase = path.normalize(resolvedBase) + path.sep;
-      let attachmentCount = 0;
+      // Stage media attachments safely
+      fs.mkdirSync(stagingAttachmentsDir, { recursive: true });
+      const normalizedStaging = path.normalize(stagingAttachmentsDir) + path.sep;
+
       for (const entry of entries) {
         if (entry.name.startsWith('attachments/')) {
-          const target = path.resolve(resolvedBase, entry.name);
-          if (target.startsWith(normalizedBase)) {
+          const relPath = entry.name.substring('attachments/'.length);
+          const target = path.resolve(stagingAttachmentsDir, relPath);
+          if (target.startsWith(normalizedStaging)) {
             fs.mkdirSync(path.dirname(target), { recursive: true });
             fs.writeFileSync(target, entry.data);
-            attachmentCount++;
+            stagedAttachmentCount++;
           }
         }
       }
-      if (attachmentCount > 0) {
-        process.stdout.write(`      ✔ Restored ${attachmentCount} media attachment file(s).\n`);
+      if (stagedAttachmentCount > 0) {
+        process.stdout.write(`      ✔ Staged ${stagedAttachmentCount} media attachment file(s) for atomic restore.\n`);
       }
     }
 
@@ -178,11 +193,36 @@ async function runDisasterRecovery() {
       process.stdout.write(`      ✔ Migrations applied: ${applied.length}\n`);
     }
 
+    // 6. Commit staged attachments to live storage directory
+    if (stagedAttachmentCount > 0 && fs.existsSync(stagingAttachmentsDir)) {
+      fs.mkdirSync(resolvedStorage, { recursive: true });
+      const copyRecursive = (src, dest) => {
+        const items = fs.readdirSync(src, { withFileTypes: true });
+        for (const item of items) {
+          const s = path.join(src, item.name);
+          const d = path.join(dest, item.name);
+          if (item.isDirectory()) {
+            fs.mkdirSync(d, { recursive: true });
+            copyRecursive(s, d);
+          } else if (item.isFile()) {
+            fs.mkdirSync(path.dirname(d), { recursive: true });
+            fs.copyFileSync(s, d);
+          }
+        }
+      };
+      copyRecursive(stagingAttachmentsDir, resolvedStorage);
+      fs.rmSync(stagingAttachmentsDir, { recursive: true, force: true });
+      process.stdout.write(`      ✔ Promoted ${stagedAttachmentCount} media attachment(s) to live storage.\n`);
+    }
+
     process.stdout.write(`\n✨ Disaster recovery restore completed successfully!\n`);
     process.exit(0);
   } catch (err) {
     if (fs.existsSync(tempDbPath)) {
       try { fs.unlinkSync(tempDbPath); } catch {}
+    }
+    if (fs.existsSync(stagingAttachmentsDir)) {
+      try { fs.rmSync(stagingAttachmentsDir, { recursive: true, force: true }); } catch {}
     }
     process.stderr.write(`\n❌ Disaster recovery failed: ${err.message}\n`);
     process.exit(1);

@@ -1,5 +1,8 @@
 -- Migration 0004: Universal Document Attachments & Media
 
+-- Safely replace legacy stub from 0001 if present
+DROP TABLE IF EXISTS attachments;
+
 CREATE TABLE IF NOT EXISTS attachments (
     id TEXT PRIMARY KEY,
     operator_id TEXT NOT NULL REFERENCES operators(id),

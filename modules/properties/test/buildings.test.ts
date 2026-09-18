@@ -79,6 +79,71 @@ describe('Properties Module - Building Management & Asset Hierarchy', () => {
       assert.equal(PropertiesRepository.getBuildingById(building.id), null);
       const remainingBuildings = PropertiesRepository.listBuildings(property.id);
       assert.equal(remainingBuildings.length, 0);
+
+      // Verify linked unit has building_id cleared
+      const unlinkedUnit = PropertiesRepository.getUnitById(unit.id);
+      assert.equal(unlinkedUnit?.building_id, null);
+    });
+  });
+
+  it('validates building linkage on unit creation and update', () => {
+    runInOperatorContext('operator-validation-test', () => {
+      const prop1 = PropertiesRepository.createProperty({
+        name: 'Prop 1',
+        property_type: 'multi_family',
+        address_line1: '100 Main St',
+        city: 'Charlotte',
+        state: 'NC',
+        postal_code: '28202',
+      });
+      const prop2 = PropertiesRepository.createProperty({
+        name: 'Prop 2',
+        property_type: 'multi_family',
+        address_line1: '200 Main St',
+        city: 'Charlotte',
+        state: 'NC',
+        postal_code: '28202',
+      });
+      const bldg1 = PropertiesRepository.createBuilding({
+        property_id: prop1.id,
+        name: 'Building 1',
+      });
+
+      // Creating unit in prop2 with building from prop1 must fail
+      assert.throws(() => {
+        PropertiesRepository.createUnit({
+          property_id: prop2.id,
+          building_id: bldg1.id,
+          unit_number: '201',
+          market_rent_cents: 100000,
+        });
+      }, /Invalid building_id/);
+
+      // Creating unit with non-existent building must fail
+      assert.throws(() => {
+        PropertiesRepository.createUnit({
+          property_id: prop1.id,
+          building_id: 'non-existent-id',
+          unit_number: '102',
+          market_rent_cents: 100000,
+        });
+      }, /Invalid building_id/);
+
+      // Creating valid unit succeeds
+      const validUnit = PropertiesRepository.createUnit({
+        property_id: prop1.id,
+        building_id: bldg1.id,
+        unit_number: '103',
+        market_rent_cents: 100000,
+      });
+      assert.equal(validUnit.building_id, bldg1.id);
+
+      // Updating unit with invalid building fails
+      assert.throws(() => {
+        PropertiesRepository.updateUnit(validUnit.id, {
+          building_id: 'invalid-id'
+        });
+      }, /Invalid building_id/);
     });
   });
 

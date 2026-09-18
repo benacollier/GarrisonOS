@@ -24,7 +24,10 @@ import {
   getUserPortfolioAccess,
   setUserPortfolioAccess,
   getUserModuleAccess,
-  setUserModuleAccess
+  setUserModuleAccess,
+  canAssignRole,
+  hasPermission,
+  loadOperatorRoleOverrides
 } from '../core/rbac.js';
 
 const NODE_ENV = process.env['NODE_ENV'] || 'development';
@@ -39,8 +42,11 @@ const HOST = process.env['HOST'] || '127.0.0.1';
 type BackupSchedulerReadiness = 'not-mounted' | 'disabled' | 'running' | 'failed';
 
 interface BackupSchedulerHandle {
+  /** Starts the background scheduled backup timer. */
   start(): void;
+  /** Gracefully stops active backup scheduler timers. */
   stop(): Promise<void>;
+  /** Returns the current scheduler daemon status. */
   getStatus(): { enabled: boolean; running: boolean };
 }
 
@@ -769,6 +775,15 @@ export function createRouter(serverPort: number = PORT): Router {
       return errorResponse(res, 'FORBIDDEN', 'User inactive or not authorized', 403);
     }
 
+    const overrides = loadOperatorRoleOverrides(operatorId, db);
+    const hasAdminAccess = caller.is_system_user === 1 ||
+      ['system_owner', 'system_manager', 'owner', 'manager'].includes(caller.role) ||
+      hasPermission(caller.role, 'system:admin', overrides);
+
+    if (!hasAdminAccess) {
+      return errorResponse(res, 'FORBIDDEN', 'Administrative privileges required to list team members', 403);
+    }
+
     const users = db.prepare(`
       SELECT id, operator_id, email, first_name, last_name, role, is_system_user, created_at, updated_at
       FROM users
@@ -837,6 +852,10 @@ export function createRouter(serverPort: number = PORT): Router {
       return errorResponse(res, 'VALIDATION_ERROR', `Invalid role. Allowed roles: ${allowedRoles.join(', ')}`, 400);
     }
 
+    if (!caller || !canAssignRole(caller.role, cleanRole)) {
+      return errorResponse(res, 'FORBIDDEN', `Cannot assign role '${cleanRole}' exceeding caller privilege ceiling`, 403);
+    }
+
     const existing = db.prepare(
       'SELECT id FROM users WHERE operator_id = ? AND email = ? AND deleted_at IS NULL'
     ).get(operatorId, cleanEmail);
@@ -889,6 +908,23 @@ export function createRouter(serverPort: number = PORT): Router {
     }
 
     const db = getDatabase();
+    const caller = db.prepare(
+      'SELECT role, is_system_user FROM users WHERE id = ? AND deleted_at IS NULL'
+    ).get(callerId) as { role: string; is_system_user?: number } | undefined;
+
+    if (!caller) {
+      return errorResponse(res, 'FORBIDDEN', 'User inactive or not authorized', 403);
+    }
+
+    const overrides = loadOperatorRoleOverrides(operatorId, db);
+    const hasAdminAccess = caller.is_system_user === 1 ||
+      ['system_owner', 'system_manager', 'owner', 'manager'].includes(caller.role) ||
+      hasPermission(caller.role, 'system:admin', overrides);
+
+    if (!hasAdminAccess && callerId !== req.params.id) {
+      return errorResponse(res, 'FORBIDDEN', 'Access denied to user profile', 403);
+    }
+
     const user = db.prepare(`
       SELECT id, operator_id, email, first_name, last_name, role, is_system_user, created_at, updated_at
       FROM users
@@ -944,7 +980,29 @@ export function createRouter(serverPort: number = PORT): Router {
       return errorResponse(res, 'NOT_FOUND', 'User not found', 404);
     }
 
+    // Callers below owner rank cannot modify users of equal or higher rank
+    if (caller && caller.role !== 'owner' && caller.role !== 'system_owner' && caller.is_system_user !== 1) {
+      if (!canAssignRole(caller.role, targetUser.role)) {
+        return errorResponse(res, 'FORBIDDEN', `Cannot modify user with role '${targetUser.role}' exceeding caller privilege ceiling`, 403);
+      }
+    }
+
     const { first_name, last_name, role, password, portfolio_ids, allowed_portfolios, module_ids, allowed_modules } = req.body || {};
+    let cleanRole: string | undefined;
+    if (role !== undefined) {
+      if (typeof role !== 'string') {
+        return errorResponse(res, 'VALIDATION_ERROR', 'Role must be a string identifier', 400);
+      }
+      cleanRole = role.toLowerCase().trim();
+      const allowedRoles = ['owner', 'manager', 'leasing_agent', 'assistant', 'maintenance', 'auditor', 'viewer', 'read_only'];
+      if (!allowedRoles.includes(cleanRole)) {
+        return errorResponse(res, 'VALIDATION_ERROR', `Invalid role. Allowed roles: ${allowedRoles.join(', ')}`, 400);
+      }
+      if (caller && !canAssignRole(caller.role, cleanRole)) {
+        return errorResponse(res, 'FORBIDDEN', `Cannot assign role '${cleanRole}' exceeding caller privilege ceiling`, 403);
+      }
+    }
+
     const now = Date.now();
     const effectivePortfolios = Array.isArray(portfolio_ids) ? portfolio_ids : (Array.isArray(allowed_portfolios) ? allowed_portfolios : undefined);
     const effectiveModules = Array.isArray(module_ids) ? module_ids : (Array.isArray(allowed_modules) ? allowed_modules : undefined);
@@ -954,9 +1012,9 @@ export function createRouter(serverPort: number = PORT): Router {
         tx.prepare('UPDATE users SET first_name = COALESCE(?, first_name), last_name = COALESCE(?, last_name), updated_at = ? WHERE id = ?')
           .run(first_name || null, last_name || null, now, targetUser.id);
       }
-      if (role && typeof role === 'string') {
+      if (cleanRole) {
         tx.prepare('UPDATE users SET role = ?, updated_at = ? WHERE id = ?')
-          .run(role.toLowerCase().trim(), now, targetUser.id);
+          .run(cleanRole, now, targetUser.id);
       }
       if (effectivePortfolios !== undefined) {
         setUserPortfolioAccess(targetUser.id, operatorId, effectivePortfolios, tx);

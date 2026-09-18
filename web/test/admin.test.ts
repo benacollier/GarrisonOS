@@ -103,6 +103,8 @@ describe('Admin Management GUI Suite', () => {
       storageQuotaBytes: 104857600,
       uptimeSeconds: 7200,
       nodeVersion: process.version,
+      cpuUsageMs: { user: 250, system: 50 },
+      dbStatus: 'healthy',
       memoryUsageMb: { rss: 64, heapTotal: 32, heapUsed: 24 },
       rateLimitStats: {
         activeBuckets: 4,
@@ -143,6 +145,8 @@ describe('Admin Management GUI Suite', () => {
     assert.match(htmlString, /System Administration & Governance/);
     assert.match(htmlString, /Active Operators/);
     assert.match(htmlString, /Storage Consumption/);
+    assert.match(htmlString, /System Uptime & CPU/);
+    assert.match(htmlString, /CPU: 300ms/);
     assert.match(htmlString, /Rate Limiter Activity/);
     assert.match(htmlString, /Webhook connection timeout/);
     assert.match(htmlString, /Disk full during vacuum/);

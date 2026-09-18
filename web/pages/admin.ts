@@ -4,7 +4,7 @@ import { getDatabase } from '../../database/client.js';
 import { getLoadedModules } from '../../core/module-loader.js';
 import { eventBus, DeadLetterFailure } from '../../core/events.js';
 import { getRateLimitStats, RateLimitStats } from '../../api/middleware.js';
-import { hasPermission } from '../../core/rbac.js';
+import { hasPermission, loadOperatorRoleOverrides } from '../../core/rbac.js';
 
 /**
  * Telemetry data model compiled for the Admin Management Dashboard.
@@ -22,6 +22,13 @@ export interface AdminDashboardData {
   uptimeSeconds: number;
   /** Node.js runtime version. */
   nodeVersion: string;
+  /** Process CPU usage metrics in milliseconds. */
+  cpuUsageMs: {
+    user: number;
+    system: number;
+  };
+  /** Database health status. */
+  dbStatus: 'healthy' | 'degraded';
   /** Process memory consumption metrics. */
   memoryUsageMb: {
     rss: number;
@@ -169,8 +176,8 @@ export function renderAdminPage(data: AdminDashboardData): SafeHtml {
           <p class="text-muted" style="margin: 0.25rem 0 0 0;">Platform health, resource utilization telemetry, and diagnostic logs.</p>
         </div>
         <div>
-          <span class="badge" style="background: #dcfce7; color: #166534; font-size: 0.9rem; padding: 0.4rem 0.8rem;">
-            ● Engine Online (${data.nodeVersion})
+          <span class="badge" style="background: ${data.dbStatus === 'degraded' ? '#fee2e2' : '#dcfce7'}; color: ${data.dbStatus === 'degraded' ? '#991b1b' : '#166534'}; font-size: 0.9rem; padding: 0.4rem 0.8rem;">
+            ● Engine Online (${data.nodeVersion}) ${data.dbStatus === 'degraded' ? '| DB Degraded' : ''}
           </span>
         </div>
       </div>
@@ -190,9 +197,10 @@ export function renderAdminPage(data: AdminDashboardData): SafeHtml {
         </div>
 
         <div class="card metric-card">
-          <div class="metric-label">System Uptime</div>
+          <div class="metric-label">System Uptime & CPU</div>
           <div class="metric-value font-bold" style="font-size: 2rem; color: #7c3aed;">${formatUptime(data.uptimeSeconds)}</div>
-          <div class="metric-subtitle text-muted">Heap: ${String(data.memoryUsageMb.heapUsed)} MB / RSS: ${String(data.memoryUsageMb.rss)} MB</div>
+          <div class="metric-subtitle text-muted">CPU: ${String(data.cpuUsageMs.user + data.cpuUsageMs.system)}ms (u: ${String(data.cpuUsageMs.user)}ms, s: ${String(data.cpuUsageMs.system)}ms)</div>
+          <div class="metric-subtitle text-muted" style="margin-top: 0.25rem;">Heap: ${String(data.memoryUsageMb.heapUsed)} MB / RSS: ${String(data.memoryUsageMb.rss)} MB</div>
         </div>
 
         <div class="card metric-card">
@@ -290,8 +298,11 @@ export function renderAdminPage(data: AdminDashboardData): SafeHtml {
  * @returns PageResult with rendered HTML or 403 Forbidden.
  */
 export async function handle(ctx: PageContext): Promise<PageResult> {
+  const db = getDatabase();
   const userRole = ctx.session.user?.role || '';
-  const isAuthorized = userRole === 'owner' || hasPermission(userRole, 'system:admin');
+  const operatorId = ctx.session.user?.operator_id || ctx.session.operatorId || '';
+  const overrides = operatorId ? loadOperatorRoleOverrides(operatorId, db) : undefined;
+  const isAuthorized = hasPermission(userRole, 'system:admin', overrides);
 
   if (!isAuthorized) {
     return {
@@ -312,7 +323,7 @@ export async function handle(ctx: PageContext): Promise<PageResult> {
     };
   }
 
-  const db = getDatabase();
+  let dbStatus: 'healthy' | 'degraded' = 'healthy';
 
   // 1. Operator and User counts
   let activeOperatorsCount = 0;
@@ -329,8 +340,11 @@ export async function handle(ctx: PageContext): Promise<PageResult> {
       'SELECT COUNT(*) as cnt FROM users WHERE deleted_at IS NULL'
     ).get() as { cnt: number };
     activeUsersCount = userRow ? userRow.cnt : 0;
-  } catch {
-    // Graceful fallback
+  } catch (err: any) {
+    const msg = String(err?.message || '');
+    if (!msg.includes('no such table')) {
+      dbStatus = 'degraded';
+    }
   }
 
   // 2. Storage used by attachments
@@ -340,8 +354,11 @@ export async function handle(ctx: PageContext): Promise<PageResult> {
       'SELECT COALESCE(SUM(file_size_bytes), 0) as total FROM attachments WHERE deleted_at IS NULL'
     ).get() as { total: number };
     storageUsedBytes = attachRow ? attachRow.total : 0;
-  } catch {
-    // Attachments table might not have rows yet
+  } catch (err: any) {
+    const msg = String(err?.message || '');
+    if (!msg.includes('no such table')) {
+      dbStatus = 'degraded';
+    }
   }
 
   // 3. Failed backups
@@ -354,13 +371,21 @@ export async function handle(ctx: PageContext): Promise<PageResult> {
       ORDER BY created_at DESC
       LIMIT 10
     `).all() as any[];
-  } catch {
-    // Backups table might not exist in light testing
+  } catch (err: any) {
+    const msg = String(err?.message || '');
+    if (!msg.includes('no such table')) {
+      dbStatus = 'degraded';
+    }
   }
 
-  // 4. Memory & Uptime
+  // 4. Memory, CPU & Uptime
   const mem = process.memoryUsage();
+  const cpu = process.cpuUsage();
   const uptimeSeconds = Math.floor(process.uptime());
+  const cpuUsageMs = {
+    user: Math.round(cpu.user / 1000),
+    system: Math.round(cpu.system / 1000)
+  };
 
   // 5. Rate limit telemetry
   const rateLimitStats = getRateLimitStats();
@@ -385,6 +410,8 @@ export async function handle(ctx: PageContext): Promise<PageResult> {
     storageQuotaBytes,
     uptimeSeconds,
     nodeVersion: process.version,
+    cpuUsageMs,
+    dbStatus,
     memoryUsageMb: {
       rss: Math.round(mem.rss / (1024 * 1024)),
       heapTotal: Math.round(mem.heapTotal / (1024 * 1024)),

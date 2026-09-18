@@ -152,9 +152,9 @@ export class BackupService {
         }
       ];
 
-      // Collect media attachment files from STORAGE_PATH/attachments if exists
-      const baseStorage = process.env['STORAGE_PATH'] || './storage';
-      const attachmentsDir = path.resolve(baseStorage, 'attachments');
+      // Collect media attachment files from shared storage directory if exists
+      const configuredStorage = process.env['STORAGE_PATH'] || './storage/uploads';
+      const attachmentsDir = path.resolve(configuredStorage);
       let attachmentCount = 0;
 
       if (fs.existsSync(attachmentsDir)) {
@@ -165,6 +165,15 @@ export class BackupService {
             if (item.isDirectory()) {
               collectFilesRecursively(fullPath, baseDir);
             } else if (item.isFile()) {
+              if (
+                item.name.endsWith('.sqlite') ||
+                item.name.endsWith('.sqlite-wal') ||
+                item.name.endsWith('.sqlite-shm') ||
+                item.name.endsWith('.sqlite-journal') ||
+                item.name.endsWith('.tar.gz')
+              ) {
+                continue;
+              }
               const relPath = path.relative(baseDir, fullPath).replace(/\\/g, '/');
               const data = fs.readFileSync(fullPath);
               entries.push({
@@ -612,14 +621,18 @@ export class BackupService {
 
     const tempDbPath = path.resolve(path.dirname(resolvedDbPath), `restore-tmp-${Date.now()}.sqlite`);
     try {
+      // 1. Close active database connections upfront before touching files
+      closeDatabase();
+
       let rawBuffer = fs.readFileSync(sourcePath);
       const isGzip = sourcePath.endsWith('.gz') || (rawBuffer.length > 2 && rawBuffer[0] === 0x1f && rawBuffer[1] === 0x8b);
       if (isGzip) {
         rawBuffer = zlib.gunzipSync(rawBuffer);
       }
 
-      // 1. Check if buffer is direct SQLite database snapshot
-      if (rawBuffer.length >= 16 && rawBuffer.subarray(0, 15).toString('utf8') === 'SQLite format 3') {
+      // 2. Check if buffer is direct SQLite database snapshot (first 16 bytes: "SQLite format 3\0")
+      const expectedSqliteHeader = Buffer.from('SQLite format 3\0');
+      if (rawBuffer.length >= 16 && rawBuffer.subarray(0, 16).equals(expectedSqliteHeader)) {
         fs.writeFileSync(tempDbPath, rawBuffer);
       } else {
         // Parse as POSIX TAR archive containing database.sqlite and optional attachments
@@ -629,20 +642,21 @@ export class BackupService {
           throw new Error('Invalid backup archive: missing database snapshot entry');
         }
 
-        if (dbEntry.data.length < 16 || dbEntry.data.subarray(0, 15).toString('utf8') !== 'SQLite format 3') {
+        if (dbEntry.data.length < 16 || !dbEntry.data.subarray(0, 16).equals(expectedSqliteHeader)) {
           throw new Error('Invalid SQLite database header in restored snapshot');
         }
 
         fs.writeFileSync(tempDbPath, dbEntry.data);
 
-        // Restore media attachments to STORAGE_PATH if present
-        const baseStorage = process.env['STORAGE_PATH'] || './storage';
-        const resolvedBaseStorage = path.resolve(baseStorage);
+        // Restore media attachments to shared storage root if present
+        const configuredStorage = process.env['STORAGE_PATH'] || './storage/uploads';
+        const resolvedBaseStorage = path.resolve(configuredStorage);
         const normalizedBase = path.normalize(resolvedBaseStorage) + path.sep;
 
         for (const entry of entries) {
           if (entry.name.startsWith('attachments/')) {
-            const targetPath = path.resolve(resolvedBaseStorage, entry.name);
+            const relPath = entry.name.substring('attachments/'.length);
+            const targetPath = path.resolve(resolvedBaseStorage, relPath);
             if (targetPath.startsWith(normalizedBase)) {
               fs.mkdirSync(path.dirname(targetPath), { recursive: true });
               fs.writeFileSync(targetPath, entry.data);
@@ -651,18 +665,15 @@ export class BackupService {
         }
       }
 
-      // 2. Verify SQLite header magic bytes (first 16 bytes: "SQLite format 3\0")
+      // 3. Verify SQLite header magic bytes (first 16 bytes: "SQLite format 3\0")
       const fd = fs.openSync(tempDbPath, 'r');
       const headerBuf = Buffer.alloc(16);
       fs.readSync(fd, headerBuf, 0, 16, 0);
       fs.closeSync(fd);
 
-      if (headerBuf.toString('utf8', 0, 15) !== 'SQLite format 3') {
+      if (!headerBuf.equals(expectedSqliteHeader)) {
         throw new Error('Invalid SQLite database header in restored snapshot');
       }
-
-      // 3. Close active database connections
-      closeDatabase();
 
       // 4. Remove stale WAL and SHM files
       if (fs.existsSync(walPath)) {
