@@ -58,11 +58,13 @@ COPY --chown=garrison:garrison VERSION /app/VERSION
 ENV NODE_ENV=production \
     PORT=3000 \
     HOST=0.0.0.0 \
+    WEB_PORT=8080 \
+    WEB_HOST=0.0.0.0 \
     SQLITE_PATH=/app/data/garrison.sqlite \
     STORAGE_PATH=/app/storage
 
-# Expose HTTP port
-EXPOSE 3000
+# Expose API (3000) and Web Presentation (8080) ports
+EXPOSE 3000 8080
 
 # Declare persistent volumes
 VOLUME ["/app/data", "/app/storage"]

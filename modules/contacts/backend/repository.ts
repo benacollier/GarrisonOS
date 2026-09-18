@@ -23,6 +23,16 @@ export interface Contact {
   deleted_at?: number | null;
 }
 
+/**
+ * Permitted IRS tax classifications for vendor contacts.
+ */
+export const VALID_TAX_CLASSIFICATIONS = ['individual', 'llc', 'corporation', 'partnership', 'other'] as const;
+
+/**
+ * Union type representing valid IRS tax classifications.
+ */
+export type TaxClassification = typeof VALID_TAX_CLASSIFICATIONS[number];
+
 export class ContactsRepository {
   public static listContacts(filter?: { contact_type?: string; query?: string }): Contact[] {
     const operatorId = RequestContext.getOperatorId();
@@ -74,6 +84,10 @@ export class ContactsRepository {
     const id = generateUUIDv7();
     const now = Date.now();
 
+    if (data.tax_classification && !VALID_TAX_CLASSIFICATIONS.includes(data.tax_classification as any)) {
+      throw new Error(`Invalid tax_classification: "${data.tax_classification}". Allowed values: ${VALID_TAX_CLASSIFICATIONS.join(', ')}`);
+    }
+
     db.prepare(`
       INSERT INTO contacts (
         id, operator_id, contact_type, first_name, last_name,
@@ -109,6 +123,11 @@ export class ContactsRepository {
     const operatorId = RequestContext.getOperatorId();
     const db = getDatabase();
     const now = Date.now();
+
+    if (data.tax_classification && !VALID_TAX_CLASSIFICATIONS.includes(data.tax_classification as any)) {
+      throw new Error(`Invalid tax_classification: "${data.tax_classification}". Allowed values: ${VALID_TAX_CLASSIFICATIONS.join(', ')}`);
+    }
+
     const updated = { ...existing, ...data, updated_at: now };
 
     db.prepare(`

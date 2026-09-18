@@ -50,6 +50,16 @@ describe('Contacts Module - Directory & Vendor Registry', () => {
       });
       assert.equal(updatedVendor?.w9_received, 1);
 
+      // Verify invalid tax_classification rejection
+      assert.throws(() => {
+        ContactsRepository.createContact({
+          contact_type: 'vendor',
+          first_name: 'Invalid',
+          last_name: 'Tax',
+          tax_classification: 'unsupported_type' as any
+        });
+      }, /Invalid tax_classification/);
+
       // 3. Filter contacts by contact_type
       const vendors = ContactsRepository.listContacts({ contact_type: 'vendor' });
       assert.ok(vendors.some((c) => c.id === vendorContact.id));

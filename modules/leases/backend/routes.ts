@@ -57,7 +57,25 @@ export function registerRoutes(router: Router): void {
   });
 
   router.post('/api/v1/leases/:id/terminate', (req, res) => {
-    const lease = LeasesRepository.updateLeaseStatus(req.params.id!, 'terminated');
+    const { notice_date, move_out_date } = req.body || {};
+    let parsedNoticeDate: number | undefined;
+    let parsedMoveOutDate: number | undefined;
+
+    if (notice_date !== undefined && notice_date !== null && notice_date !== '') {
+      parsedNoticeDate = Number(notice_date);
+      if (!Number.isFinite(parsedNoticeDate) || parsedNoticeDate <= 0) {
+        return errorResponse(res, 'VALIDATION_ERROR', 'notice_date must be a valid positive epoch timestamp', 400);
+      }
+    }
+
+    if (move_out_date !== undefined && move_out_date !== null && move_out_date !== '') {
+      parsedMoveOutDate = Number(move_out_date);
+      if (!Number.isFinite(parsedMoveOutDate) || parsedMoveOutDate <= 0) {
+        return errorResponse(res, 'VALIDATION_ERROR', 'move_out_date must be a valid positive epoch timestamp', 400);
+      }
+    }
+
+    const lease = LeasesRepository.updateLeaseStatus(req.params.id!, 'terminated', parsedNoticeDate, parsedMoveOutDate);
     if (!lease) {
       return errorResponse(res, 'NOT_FOUND', 'Lease not found', 404);
     }

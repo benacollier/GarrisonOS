@@ -134,6 +134,13 @@ export async function handleWebRequest(
   const host = req.headers.host || 'localhost';
   const url = new URL(req.url || '/', `http://${host}`);
 
+  // Native health check endpoint
+  if (url.pathname === '/health') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ status: 'healthy', uptime: process.uptime() }));
+    return;
+  }
+
   // Serve static assets
   if (url.pathname.startsWith('/public/')) {
     const handled = handleStaticFile(req, res);

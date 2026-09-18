@@ -25,8 +25,8 @@
         -Server
     }
 
-    # Proxy all traffic to the GarrisonOS Node.js engine
-    reverse_proxy {$GARRISON_UPSTREAM:127.0.0.1:3000} {
+    # Proxy all traffic to the GarrisonOS web presentation server (port 8080)
+    reverse_proxy {$GARRISON_UPSTREAM:127.0.0.1:8080} {
         header_up Host {host}
         header_up X-Real-IP {remote_host}
         header_up X-Forwarded-For {remote_host}

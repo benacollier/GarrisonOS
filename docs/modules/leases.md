@@ -49,13 +49,15 @@ Residential tenancies frequently involve multiple roommates, co-signers, and non
 * `rent_due_day` (INTEGER): Day of month rent is due (defaults to `1`).
 * `late_fee_grace_days` (INTEGER): Grace period days before late fees apply (defaults to `5`).
 * `late_fee_amount_cents` (INTEGER cents): Flat late charge applied when delinquent.
+* `notice_date` (INTEGER ms): Epoch timestamp when formal notice of termination was delivered.
+* `move_out_date` (INTEGER ms): Epoch timestamp when resident surrendered physical possession.
 
 ---
 
 ## 4. Lease Renewal & Move-Out Termination Workflows
 
-* **Lease Renewal Modal**: Operators can execute a formal lease renewal (`renew_lease` action) specifying a new end date and revised monthly rent. The action updates status to `active` or records renewal details while maintaining full audit trail.
-* **Move-Out & Termination Modal**: Tenancy conclusion (`terminate_lease` action) captures formal notice dates and scheduled move-out dates. It flags the unit for turnover inspection and prepares the statutory security deposit disposition workflow to reconcile deposit refunds or deductions against the tenant ledger.
+* **Lease Renewal Modal**: Operators can execute a formal lease renewal (`renew_lease` action) specifying a validated expiration date and revised monthly rent. The action updates status to `active` or records renewal details while maintaining full audit trail.
+* **Move-Out & Termination Modal**: Tenancy conclusion (`terminate_lease` action) captures and persists formal notice dates (`notice_date`) and scheduled move-out dates (`move_out_date`). It transitions the lease to `terminated`, automatically flags the unit for turnover inspection, and prepares the statutory security deposit disposition workflow to reconcile deposit refunds or deductions against the tenant ledger within legal jurisdiction deadlines.
 
 ---
 
@@ -65,5 +67,6 @@ Residential tenancies frequently involve multiple roommates, co-signers, and non
 * `POST /api/v1/leases`: Create a new lease with signatories
 * `GET /api/v1/leases/:id`: Get full lease details, signatories, terms, and current ledger balance
 * `PUT /api/v1/leases/:id`: Update lease terms or status
+* `POST /api/v1/leases/:id/terminate`: Terminate lease contract (accepts optional `notice_date` and `move_out_date` epoch ms)
 * `POST /api/v1/leases/:id/signatories`: Add signatory to lease
 * `DELETE /api/v1/leases/:id/signatories/:contactId`: Remove signatory from lease

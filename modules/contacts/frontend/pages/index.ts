@@ -2,6 +2,13 @@ import { PageContext, PageResult } from '../../../../web/lib/page-context.js';
 import { html, raw, SafeHtml } from '../../../../web/lib/html.js';
 import { csrfField, validateCsrf } from '../../../../web/lib/csrf.js';
 
+/**
+ * Handles presentation requests for listing contacts with type filtering,
+ * full-text search, and creating new contacts.
+ *
+ * @param ctx - The active web page request context.
+ * @returns A promise resolving to the rendered PageResult or redirect.
+ */
 export async function handle(ctx: PageContext): Promise<PageResult> {
   const typeFilter = ctx.query['type'] || '';
   const searchQuery = ctx.query['q'] || '';

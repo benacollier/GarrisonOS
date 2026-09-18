@@ -32,6 +32,10 @@ export interface Lease {
   late_fee_grace_days: number;
   /** Fixed late fee amount in integer cents. */
   late_fee_amount_cents: number;
+  /** Formal notice date of move-out/termination in epoch milliseconds. */
+  notice_date?: number | null;
+  /** Scheduled or actual move-out date in epoch milliseconds. */
+  move_out_date?: number | null;
   /** Created timestamp in epoch milliseconds. */
   created_at: number;
   /** Updated timestamp in epoch milliseconds. */
@@ -269,6 +273,7 @@ export class LeasesRepository {
         unit_id = ?, status = ?, start_date = ?, end_date = ?,
         rent_amount_cents = ?, security_deposit_cents = ?, deposit_held_cents = ?,
         rent_due_day = ?, late_fee_grace_days = ?, late_fee_amount_cents = ?,
+        notice_date = ?, move_out_date = ?,
         updated_at = ?
       WHERE id = ? AND operator_id = ? AND deleted_at IS NULL
     `).run(
@@ -282,6 +287,8 @@ export class LeasesRepository {
       updated.rent_due_day,
       updated.late_fee_grace_days,
       updated.late_fee_amount_cents,
+      updated.notice_date || null,
+      updated.move_out_date || null,
       now,
       id,
       operatorId
@@ -291,21 +298,39 @@ export class LeasesRepository {
   }
 
   /**
-   * Transition the status of a lease contract.
+   * Transition the status of a lease contract with optional termination dates.
    *
    * @param id - Lease identifier.
    * @param status - Target status enum.
+   * @param noticeDate - Optional formal notice date in epoch milliseconds.
+   * @param moveOutDate - Optional scheduled or actual move-out date in epoch milliseconds.
    * @returns Updated lease or null if not found.
    */
-  public static updateLeaseStatus(id: string, status: Lease['status']): LeaseWithDetails | null {
+  public static updateLeaseStatus(
+    id: string,
+    status: Lease['status'],
+    noticeDate?: number | null,
+    moveOutDate?: number | null
+  ): LeaseWithDetails | null {
     const operatorId = RequestContext.getOperatorId();
     const db = getDatabase();
     const now = Date.now();
 
-    db.prepare(`
-      UPDATE leases SET status = ?, updated_at = ?
-      WHERE id = ? AND operator_id = ? AND deleted_at IS NULL
-    `).run(status, now, id, operatorId);
+    if (status === 'terminated' && (noticeDate !== undefined || moveOutDate !== undefined)) {
+      db.prepare(`
+        UPDATE leases SET
+          status = ?,
+          notice_date = COALESCE(?, notice_date),
+          move_out_date = COALESCE(?, move_out_date),
+          updated_at = ?
+        WHERE id = ? AND operator_id = ? AND deleted_at IS NULL
+      `).run(status, noticeDate ?? null, moveOutDate ?? null, now, id, operatorId);
+    } else {
+      db.prepare(`
+        UPDATE leases SET status = ?, updated_at = ?
+        WHERE id = ? AND operator_id = ? AND deleted_at IS NULL
+      `).run(status, now, id, operatorId);
+    }
 
     return LeasesRepository.getLeaseById(id);
   }

@@ -123,6 +123,6 @@ This document provides a technical critique of the GarrisonOS architecture, runt
 | **Medium** | **Frontend API** | Sequential overhead on composite pages | Provide composite/batch API endpoint (`/api/v1/batch`) | Sprint 1 | **Resolved** (PR #19) |
 | **Medium** | **Packaging** | Lack of production supervision & containerization | Add Systemd service unit, Dockerfile & docker-compose | Sprint 2 | **Resolved** |
 | **Medium** | **HTTP Router** | Linear regex matching order sensitivity | Introduce static-first segment precedence in route dispatcher | Sprint 2 | **Resolved** |
-| **Medium** | **Security** | Legacy HMAC tokens without `tv` cannot be revoked | Enforce `token_version` requirement across all tokens | Sprint 2 | **Resolved** |
+| **Medium** | **Security** | Legacy HMAC tokens without `tv` cannot be revoked | Enforce `token_version` requirement in database-backed verification (`verifyTokenWithDatabase`) | Sprint 2 | **Resolved** |
 | **Medium** | **Multi-Tenancy** | Tenant lifecycle governance | Add tenant provisioning, deactivation & storage quotas | Sprint 3 | **Planned** |
 | **Low** | **Accounting** | Ledger running balance performance | Introduce periodic balance snapshotting / checkpointing | Sprint 4 | **Planned** |

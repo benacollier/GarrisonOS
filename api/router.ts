@@ -113,6 +113,14 @@ export class Router {
     this.middlewares.push(middleware);
   }
 
+  /**
+   * Registers a route pattern and associated handlers for the specified HTTP method.
+   *
+   * @param method - HTTP verb (e.g. GET, POST, PUT, DELETE).
+   * @param pattern - URL pattern string.
+   * @param handlers - Sequence of handlers to execute.
+   * @param batchSafe - Whether this route can be invoked within batch transactions.
+   */
   private register(method: string, pattern: string, handlers: Handler[], batchSafe = false): void {
     const paramNames: string[] = [];
     const normalizedPattern = pattern.startsWith('/') ? pattern : `/${pattern}`;
@@ -140,6 +148,10 @@ export class Router {
     this.sortRoutes();
   }
 
+  /**
+   * Sorts registered routes by HTTP method and route specificity,
+   * ensuring static routes take priority over parameterized routes.
+   */
   private sortRoutes(): void {
     this.routes.sort((a, b) => {
       if (a.method !== b.method) {

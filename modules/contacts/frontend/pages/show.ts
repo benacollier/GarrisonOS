@@ -1,6 +1,13 @@
 import { PageContext, PageResult } from '../../../../web/lib/page-context.js';
 import { html, raw, SafeHtml } from '../../../../web/lib/html.js';
 
+/**
+ * Handles presentation requests for viewing a single contact detail view,
+ * including contact metadata, tax classification, and vendor information.
+ *
+ * @param ctx - The active web page request context.
+ * @returns A promise resolving to the rendered PageResult or redirect.
+ */
 export async function handle(ctx: PageContext): Promise<PageResult> {
   const id = ctx.query['id'] || '';
   if (!id) {

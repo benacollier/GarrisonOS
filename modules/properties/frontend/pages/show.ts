@@ -2,6 +2,13 @@ import { PageContext, PageResult } from '../../../../web/lib/page-context.js';
 import { html, raw, SafeHtml } from '../../../../web/lib/html.js';
 import { csrfField, validateCsrf } from '../../../../web/lib/csrf.js';
 
+/**
+ * Handles presentation requests for viewing a single property detail page,
+ * managing its units, initiating turnover flows, and updating unit statuses.
+ *
+ * @param ctx - The active web page request context.
+ * @returns A promise resolving to the rendered PageResult or redirect.
+ */
 export async function handle(ctx: PageContext): Promise<PageResult> {
   const id = ctx.query['id'] || '';
   if (!id) {
@@ -63,12 +70,12 @@ export async function handle(ctx: PageContext): Promise<PageResult> {
               title: `Turnover Make-Ready: Unit ${unitNumber}`,
               description: `Standard turnover inspection, deep cleaning, paint touch-ups, and lock rekeying for Unit ${unitNumber}.`,
               priority: 'medium',
-              category: 'make_ready',
+              category: 'cosmetic',
               estimated_cost_cents: 35000
             });
             ctx.session.addFlash('success', `Unit ${unitNumber} placed in turnover and make-ready work order generated`);
-          } catch {
-            ctx.session.addFlash('success', `Unit ${unitNumber} placed in turnover`);
+          } catch (workOrderErr: any) {
+            ctx.session.addFlash('warning', `Unit ${unitNumber} placed in turnover, but make-ready work order could not be generated: ${workOrderErr.message || 'Unknown error'}`);
           }
         } else {
           ctx.session.addFlash('success', `Unit ${unitNumber} placed in turnover status`);
@@ -117,7 +124,7 @@ export async function handle(ctx: PageContext): Promise<PageResult> {
         let statusActionBtn = raw('');
         if (u.status === 'vacant') {
           statusActionBtn = html`
-            <button class="btn btn-sm btn-secondary" onclick="openTurnoverModal('${u.id}', '${u.unit_number}')">Start Turnover</button>
+            <button class="btn btn-sm btn-secondary" data-unit-id="${u.id}" data-unit-number="${u.unit_number}" onclick="openTurnoverModal(this.dataset.unitId, this.dataset.unitNumber)">Start Turnover</button>
           `;
         } else if (u.status === 'turnover') {
           statusActionBtn = html`

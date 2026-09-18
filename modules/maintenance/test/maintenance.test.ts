@@ -37,7 +37,26 @@ describe('Maintenance Module - Work Orders & Event Dispatch', () => {
         first_name: 'Carlos',
         last_name: 'Santana',
         company_name: 'Santana HVAC Experts',
-        vendor_specialty: 'hvac'
+        vendor_specialty: 'hvac',
+        w9_received: 1
+      });
+
+      const unverifiedVendor = ContactsRepository.createContact({
+        contact_type: 'vendor',
+        first_name: 'Unverified',
+        last_name: 'Tech',
+        company_name: 'Pending Tech LLC',
+        vendor_specialty: 'hvac',
+        w9_received: 0
+      });
+
+      const plumberVendor = ContactsRepository.createContact({
+        contact_type: 'vendor',
+        first_name: 'Paul',
+        last_name: 'Plumber',
+        company_name: 'All Plumbing LLC',
+        vendor_specialty: 'plumbing',
+        w9_received: 1
       });
 
       // 2. Create high-priority work order
@@ -55,7 +74,23 @@ describe('Maintenance Module - Work Orders & Event Dispatch', () => {
       assert.equal(wo.status, 'open');
       assert.equal(wo.priority, 'high');
 
-      // 3. Assign vendor and schedule repair
+      // Reject dispatch if vendor has pending W-9
+      assert.throws(() => {
+        MaintenanceRepository.updateWorkOrder(wo.id, {
+          vendor_contact_id: unverifiedVendor.id,
+          status: 'assigned'
+        });
+      }, /W-9 form is pending verification/);
+
+      // Reject dispatch if vendor specialty does not match work order category
+      assert.throws(() => {
+        MaintenanceRepository.updateWorkOrder(wo.id, {
+          vendor_contact_id: plumberVendor.id,
+          status: 'assigned'
+        });
+      }, /is not eligible for/);
+
+      // 3. Assign verified matching vendor and schedule repair
       const scheduledDate = Date.now() + 86400000;
       const assignedWo = MaintenanceRepository.updateWorkOrder(wo.id, {
         vendor_contact_id: vendor.id,
@@ -74,6 +109,18 @@ describe('Maintenance Module - Work Orders & Event Dispatch', () => {
       const completedWo = MaintenanceRepository.completeWorkOrder(wo.id, 42000);
       assert.equal(completedWo?.status, 'completed');
       assert.equal(completedWo?.actual_cost_cents, 42000);
+
+      // Verify cancelled work order guardrails
+      const cancelledWo = MaintenanceRepository.createWorkOrder({
+        property_id: prop.id,
+        title: 'Cancelled Test Order',
+        description: 'Testing cancelled guardrail',
+        category: 'other',
+        status: 'cancelled'
+      });
+      assert.throws(() => {
+        MaintenanceRepository.updateWorkOrder(cancelledWo.id, { status: 'assigned' });
+      }, /Cannot update or dispatch cancelled work order/);
     });
   });
 

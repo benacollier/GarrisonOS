@@ -29,7 +29,7 @@ Every contact entity (`contacts`) is classified by role:
 * `email` (TEXT), `phone` (TEXT), `secondary_phone` (TEXT)
 * `tax_id_last4` (TEXT): For Form 1099-NEC or SSN recordkeeping
 * `vendor_specialty` (TEXT): Trade specialization (e.g. `plumbing`, `electrical`, `hvac`, `carpentry`, `roofing`, `general_contracting`)
-* `tax_classification` (TEXT): Legal tax status (e.g. `individual_sole_proprietorship`, `llc`, `c_corp`, `s_corp`, `partnership`)
+* `tax_classification` (TEXT): Legal tax status (`individual`, `llc`, `corporation`, `partnership`, `other`)
 * `w9_received` (INTEGER): W-9 on file status (`0` = Pending, `1` = Verified)
 * `notes` (TEXT)
 * `created_at`, `updated_at`, `deleted_at`
@@ -42,7 +42,7 @@ The contacts module tracks vendor compliance and independent contractor taxation
 
 * **W-9 Tracking**: Contacts table displays visual indicators (`W-9 Verified` green badge vs `W-9 Pending` amber alert badge) to safeguard operators against non-compliant disbursements.
 * **Trade Specialization**: Allows the maintenance dispatch workflow to filter and assign qualified vendors matching the required trade.
-* **Tax Classification**: Captures legal structure (`sole_proprietorship`, `llc`, `corporation`) to automate Form 1099-NEC reporting thresholds.
+* **Tax Classification**: Captures legal structure classification (`individual`, `llc`, `corporation`, `partnership`, `other`) as metadata alongside W-9 compliance and tax ID records for Form 1099-NEC preparation.
 
 ---
 

@@ -319,7 +319,17 @@ describe('End-to-End Property Management Lifecycle (E2E)', () => {
       // ----------------------------------------------------------------------
       // Step 8: Lease Termination, Event-Driven Turnover & Deposit Disposition
       // ----------------------------------------------------------------------
-      LeasesRepository.updateLeaseStatus(lease.id, 'terminated');
+      const noticeDateMs = Date.UTC(2026, 7, 1);
+      const moveOutDateMs = Date.UTC(2026, 7, 31);
+      const terminatedLease = LeasesRepository.updateLeaseStatus(lease.id, 'terminated', noticeDateMs, moveOutDateMs);
+      assert.equal(terminatedLease?.status, 'terminated');
+      assert.equal(terminatedLease?.notice_date, noticeDateMs);
+      assert.equal(terminatedLease?.move_out_date, moveOutDateMs);
+
+      const fetchedLease = LeasesRepository.getLeaseById(lease.id);
+      assert.equal(fetchedLease?.status, 'terminated');
+      assert.equal(fetchedLease?.notice_date, noticeDateMs);
+      assert.equal(fetchedLease?.move_out_date, moveOutDateMs);
 
       // Publish lease.terminated event and verify unit automatically transitions to 'turnover'
       await eventBus.publish('lease.terminated', {

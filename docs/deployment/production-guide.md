@@ -144,7 +144,7 @@ If running native Systemd or using a host-level web server:
 
 ### Option A: Caddy (Recommended)
 
-Copy [deploy/caddy/Caddyfile](file:///e:/projects/GarrisonOS/deploy/caddy/Caddyfile) to `/etc/caddy/Caddyfile` and replace `{$DOMAIN}` with your domain name:
+Copy [deploy/caddy/Caddyfile](../../deploy/caddy/Caddyfile) to `/etc/caddy/Caddyfile` and replace `{$DOMAIN}` with your domain name:
 
 ```bash
 sudo cp deploy/caddy/Caddyfile /etc/caddy/Caddyfile
@@ -153,7 +153,7 @@ sudo systemctl reload caddy
 
 ### Option B: Nginx
 
-Copy [deploy/nginx/nginx.conf](file:///e:/projects/GarrisonOS/deploy/nginx/nginx.conf) to `/etc/nginx/conf.d/garrison.conf`, configure your SSL certificates, and reload:
+Copy [deploy/nginx/nginx.conf](../../deploy/nginx/nginx.conf) to `/etc/nginx/conf.d/garrison.conf`, configure your SSL certificates, and reload:
 
 ```bash
 sudo nginx -t
@@ -164,7 +164,7 @@ sudo systemctl reload nginx
 
 ## 5. Automated Backups & Disaster Recovery
 
-GarrisonOS features an in-process, zero-dependency `BackupScheduler` daemon that guarantees zero-data-loss snapshots.
+GarrisonOS features an in-process, zero-dependency `BackupScheduler` daemon that executes periodic snapshots (default interval: 360 minutes / 6 hours, configured via `BACKUP_INTERVAL_MINUTES`), providing a recovery-point objective (RPO) based on the latest available snapshot.
 
 ### Operational Backup Behaviors
 
@@ -198,7 +198,7 @@ sudo systemctl start garrison.service
 
 Before exposing the instance to production users, verify:
 
-- [ ] `APP_SECRET` is at least 32 characters long and kept confidential.
+- [ ] `APP_SECRET` contains at least 64 hexadecimal characters (32 bytes) and is kept confidential.
 - [ ] Direct network ingress to port 3000 is blocked by host firewall (`ufw` or `iptables`); only reverse proxy access on ports 80/443 is permitted.
 - [ ] TLS certificate is active with strict HTTPS redirection enabled.
 - [ ] System initial setup (`/setup`) is completed and owner account credentials are saved in a password manager.
