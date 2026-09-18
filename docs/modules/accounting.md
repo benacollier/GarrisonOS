@@ -118,6 +118,44 @@ $$\text{NOI} = \text{Operating Income (Rent, Fees)} - \text{Operating Expenses (
 * `GET /api/v1/accounting/export/quickbooks/desktop.iif`: Export QuickBooks Desktop IIF format
 * `GET /api/v1/accounting/export/quickbooks/bank-feed.qbo`: Export Web Connect (.QBO) bank feed
 
+### 4.5. Accounts Payable: Vendor Bills & Recurring Templates
+
+* `GET /api/v1/accounting/bills`: List vendor bills with status, approval, and vendor filters
+* `POST /api/v1/accounting/bills`: Create vendor bill with split property/unit allocations
+* `GET /api/v1/accounting/bills/:id`: Get bill details and allocation line items
+* `PUT /api/v1/accounting/bills/:id`: Update draft bill
+* `POST /api/v1/accounting/bills/:id/approve`: Approve bill for disbursement
+* `POST /api/v1/accounting/bills/:id/void`: Void bill and reverse journal allocations
+* `GET /api/v1/accounting/bills/recurring`: List scheduled recurring bill templates
+* `POST /api/v1/accounting/bills/recurring`: Create recurring bill template
+
+### 4.6. Vendor Check Register & Check Printing
+
+* `GET /api/v1/accounting/vendor-checks`: List printed and draft vendor checks from register
+* `POST /api/v1/accounting/vendor-checks`: Record paper check payment settling one or more bills
+* `GET /api/v1/accounting/vendor-checks/:id`: Get check details and bill settlements
+* `POST /api/v1/accounting/vendor-checks/:id/void`: Void check and restore unpaid bill balances
+
+### 4.7. Vendor Credit Memos & Bill Applications
+
+* `GET /api/v1/accounting/vendor-credits`: List vendor credit memos
+* `POST /api/v1/accounting/vendor-credits`: Record vendor credit memo / refund
+* `POST /api/v1/accounting/vendor-credits/:id/apply`: Apply credit memo balance against open vendor bills
+
+### 4.8. Bank Deposits & Undeposited Funds Clearing
+
+* `GET /api/v1/accounting/deposits`: List bank deposit batches
+* `POST /api/v1/accounting/deposits`: Create bank deposit grouping payments into bank clearing account
+
+### 4.9. Client Accounting & Management Fee Automation
+
+* `GET /api/v1/accounting/client-contributions`: List client owner capital contributions
+* `POST /api/v1/accounting/client-contributions`: Record investor/owner capital infusion
+* `GET /api/v1/accounting/client-distributions`: List client owner draw disbursements
+* `POST /api/v1/accounting/client-distributions`: Execute client draw disbursement
+* `POST /api/v1/accounting/management-fees/calculate`: Preview management fees across portfolios
+* `POST /api/v1/accounting/management-fees/post`: Post management fee journal entries
+
 ---
 
 ## 5. QuickBooks Compatibility Architecture
@@ -164,3 +202,22 @@ Property managers must report annual non-employee compensation ($2,000 or more b
 ### 6.4. Statutory Move-Out Deduction Timelines
 
 State laws establish strict statutory windows within which an itemized statement of deductions and remaining deposit refund must be delivered to a vacated tenant. GarrisonOS maintains verified statutory rules for supported jurisdictions (including NY [14 days], AZ [14 days], FL [15 days], CA [21 days], WA [21 days], CO [30 days], TX [30 days], IL [30 days], MA [30 days], NJ [30 days], and PA [30 days]), computing real-time countdown alerts and flagging overdue dispositions. Generic fallback (`US`) defaults to 30 days while unsupported state codes are explicitly rejected.
+
+---
+
+## 7. Accounts Payable, Banking & Client Accounting Engine
+
+### 7.1. Vendor Invoicing & Split Allocations
+Vendor bills represent formal obligations to pay third-party service providers. Bills support split line allocations across multiple properties, units, and GL expense accounts. Approving a bill posts a balanced double-entry transaction debiting the specified expense accounts and crediting Accounts Payable (`#2010`).
+
+### 7.2. Check Register & MICR Printing
+Physical checks printed through GarrisonOS adhere to standard MICR layout guidelines (top voucher, middle voucher, bottom check). Voiding a printed check automatically reverses the cash disbursement, restores the unpaid balances on the associated bills, and posts an audit log entry.
+
+### 7.3. Vendor Credit Memos
+Supplier rebates, overpayment adjustments, and vendor concessions are tracked as vendor credit memos. Credits may be partially or fully applied against outstanding vendor bills, reducing the remaining cash disbursement liability.
+
+### 7.4. Bank Deposit Batching
+Customer and tenant payments initially accumulate in `1015 Undeposited Funds`. The Bank Deposit workflow bundles multiple receipts into a single bank statement batch, debiting `1010 Operating Checking` and crediting `1015 Undeposited Funds` to mirror physical bank deposits.
+
+### 7.5. Client Accounting & Automated Management Fees
+For third-party property management operators, GarrisonOS segregates property revenues by client portfolio. Capital contributions record owner equity infusions, while owner draws track periodic profit distributions. Management fee agreements automatically calculate operator earned revenue based on collected rent percentages or unit counts, posting monthly inter-company entries debiting client operating funds and crediting management fee revenue.
