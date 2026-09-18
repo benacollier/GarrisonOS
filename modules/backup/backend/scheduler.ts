@@ -309,7 +309,6 @@ export class BackupScheduler {
     return RequestContext.run(
       {
         operatorId,
-        tenantId: operatorId,
         correlationId
       },
       async () => {
@@ -348,7 +347,6 @@ export class BackupScheduler {
         eventBus.publish('backup.scheduled.completed', {
           backupId: record.id,
           operatorId: record.operator_id,
-          tenantId: record.operator_id,
           filename: record.filename,
           fileSizeBytes: record.file_size_bytes,
           checksumSha256: record.checksum_sha256,
@@ -397,7 +395,6 @@ export class BackupScheduler {
     return RequestContext.run(
       {
         operatorId,
-        tenantId: operatorId,
         correlationId
       },
       async () => {

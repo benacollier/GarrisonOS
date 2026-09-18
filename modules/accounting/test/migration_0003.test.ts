@@ -1,6 +1,6 @@
 import { test, describe, it, before, after } from 'node:test';
 import * as assert from 'node:assert/strict';
-import { createTestDb, runInTenantContext } from '../../../test/helpers.js';
+import { createTestDb, runInOperatorContext } from '../../../test/helpers.js';
 import { AccountingRepository } from '../backend/repository.js';
 import { JournalService } from '../backend/journal.js';
 import { closeDatabase, getDatabase } from '../../../database/client.js';
@@ -16,7 +16,7 @@ describe('Accounting Module - Migration 0003 & Backfill Verification', () => {
   });
 
   it('backfills historical single-entry transactions into balanced journal entries', () => {
-    runInTenantContext('tenant-backfill-test', () => {
+    runInOperatorContext('tenant-backfill-test', () => {
       const db = getDatabase();
       const now = Date.now();
 
@@ -67,7 +67,7 @@ describe('Accounting Module - Migration 0003 & Backfill Verification', () => {
   });
 
   it('skips soft-deleted legacy transactions during backfill', () => {
-    runInTenantContext('tenant-backfill-deleted-test', () => {
+    runInOperatorContext('tenant-backfill-deleted-test', () => {
       const db = getDatabase();
       const now = Date.now();
 

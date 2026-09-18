@@ -87,7 +87,7 @@ describe('Web Presentation - WebRouter Subsystem', () => {
 
   it('handles logout by clearing session and redirecting to /login', async () => {
     const { ctx, res } = createMockContext('/logout', {
-      user: { id: 'u1', email: 'test@garrison.local', first_name: 'Test', last_name: 'User', role: 'admin', tenant_id: 't1' }
+      user: { id: 'u1', email: 'test@garrison.local', first_name: 'Test', last_name: 'User', role: 'admin', operator_id: 't1' }
     });
     await WebRouter.dispatch(ctx);
 
@@ -98,7 +98,7 @@ describe('Web Presentation - WebRouter Subsystem', () => {
 
   it('renders 404 page for unknown routes when authenticated', async () => {
     const { ctx, res, getOutput } = createMockContext('/nonexistent-module/xyz', {
-      user: { id: 'u1', email: 'test@garrison.local', first_name: 'Test', last_name: 'User', role: 'admin', tenant_id: 't1' }
+      user: { id: 'u1', email: 'test@garrison.local', first_name: 'Test', last_name: 'User', role: 'admin', operator_id: 't1' }
     });
     await WebRouter.dispatch(ctx);
 
@@ -110,7 +110,7 @@ describe('Web Presentation - WebRouter Subsystem', () => {
   for (const inheritedPath of ['/constructor', '/toString', '/valueOf']) {
     it(`renders 404 for inherited object member ${inheritedPath}`, async () => {
       const { ctx, res, getOutput } = createMockContext(inheritedPath, {
-        user: { id: 'u1', email: 'test@garrison.local', first_name: 'Test', last_name: 'User', role: 'admin', tenant_id: 't1' }
+        user: { id: 'u1', email: 'test@garrison.local', first_name: 'Test', last_name: 'User', role: 'admin', operator_id: 't1' }
       });
       await WebRouter.dispatch(ctx);
 

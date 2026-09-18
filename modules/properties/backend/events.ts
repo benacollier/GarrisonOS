@@ -9,15 +9,15 @@ import { RequestContext } from '../../../core/context.js';
  */
 export function registerSubscribers(eventBus: EventBus): void {
   eventBus.subscribe('lease.activated', async (event) => {
-    const activeOperator = event.operatorId || event.tenantId || RequestContext.tryGet()?.operatorId || '';
-    RequestContext.run({ operatorId: activeOperator, tenantId: activeOperator, correlationId: 'event-lease-activated' }, () => {
+    const activeOperator = event.operatorId || RequestContext.tryGet()?.operatorId || '';
+    RequestContext.run({ operatorId: activeOperator, correlationId: 'event-lease-activated' }, () => {
       PropertiesRepository.updateUnitStatus(event.unitId, 'occupied');
     });
   });
 
   eventBus.subscribe('lease.terminated', async (event) => {
-    const activeOperator = event.operatorId || event.tenantId || RequestContext.tryGet()?.operatorId || '';
-    RequestContext.run({ operatorId: activeOperator, tenantId: activeOperator, correlationId: 'event-lease-terminated' }, () => {
+    const activeOperator = event.operatorId || RequestContext.tryGet()?.operatorId || '';
+    RequestContext.run({ operatorId: activeOperator, correlationId: 'event-lease-terminated' }, () => {
       PropertiesRepository.updateUnitStatus(event.unitId, 'turnover');
     });
   });

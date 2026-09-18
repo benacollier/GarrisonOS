@@ -11,7 +11,7 @@ import { SessionUser } from '../lib/session.js';
 export function renderHeader(user: SessionUser | null, operatorId: string): SafeHtml {
   return html`
     <header class="topbar">
-      <div class="operator-selector tenant-selector">
+      <div class="operator-selector">
         <span>🏢 <strong>${operatorId}</strong></span>
       </div>
       <div class="user-profile">

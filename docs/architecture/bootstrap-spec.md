@@ -18,10 +18,10 @@ This document serves as the canonical architectural blueprint, engineering stand
    - Commit messages must follow standard conventional commit syntax (e.g., `feat(core): add request context store`).
 
 3. **Strict Multi-Operator Isolation & Row-Level Protection:**
-   - Every operational database table MUST include an `operator_id TEXT NOT NULL` column (with backward-compatible `tenants` view).
+   - Every operational database table MUST include an `operator_id TEXT NOT NULL` column.
    - Distinguishes software system multi-tenancy (**Operator**) from real-estate rental occupants (**Tenants**), reserving **Organization** for commercial property portfolios.
-   - Operator context must be resolved via `AsyncLocalStorage` from the `X-Operator-ID` (or legacy `X-Tenant-ID`) header.
-   - Business services and repositories must NEVER accept `operator_id` or `tenant_id` from request bodies or URL parameters; it must always be pulled implicitly from the request execution context.
+   - Operator context must be resolved via `AsyncLocalStorage` from the `X-Operator-ID` header, token opid claim, or operator host/path routing.
+   - Business services and repositories must NEVER accept `operator_id` from request bodies or URL parameters; it must always be pulled implicitly from the request execution context.
    - All database queries must enforce operator isolation in `WHERE` clauses, supported by compound indexes `(operator_id, ...)`.
 
 4. **Identity & Data Representation Standards:**
@@ -37,7 +37,7 @@ This document serves as the canonical architectural blueprint, engineering stand
 
 6. **Decoupled API-First Architecture:**
    - The web presentation layer MUST NOT connect directly to the SQLite database.
-   - The web frontend communicates with the Core Engine purely via internal HTTP REST calls, forwarding session authentication, user context, and the active `X-Operator-ID` (or `X-Tenant-ID`).
+   - The web frontend communicates with the Core Engine purely via internal HTTP REST calls, forwarding session authentication, user context, and the active `X-Operator-ID`.
 
 7. **Security & Session Hygiene:**
    - State-modifying requests submitted from the web presentation layer require cryptographically secure session CSRF tokens (`validateCsrf()`).
@@ -208,11 +208,6 @@ CREATE TABLE IF NOT EXISTS operators (
     updated_at INTEGER NOT NULL,
     deleted_at INTEGER
 );
-
--- Backward-compatibility view mapping legacy 'tenants' queries to 'operators'
-CREATE VIEW IF NOT EXISTS tenants AS
-SELECT id, name, subdomain, currency, created_at, updated_at, deleted_at
-FROM operators;
 
 -- System operators and users
 CREATE TABLE IF NOT EXISTS users (
@@ -526,14 +521,13 @@ Encapsulates request isolation via `node:async_hooks.AsyncLocalStorage`.
 
 ```typescript
 export interface RequestContextData {
-  operatorId: string;
-  tenantId: string; // Backward compatibility alias for operatorId
+  operatorId?: string;
   userId?: string;
   correlationId: string;
 }
 ```
 
-- Methods: `RequestContext.run(context, fn)`, `RequestContext.get(): RequestContextData`, `RequestContext.tryGet(): RequestContextData | undefined`, `RequestContext.getOperatorId(): string`, `RequestContext.getTenantId(): string`.
+- Methods: `RequestContext.run(context, fn)`, `RequestContext.get(): RequestContextData`, `RequestContext.tryGet(): RequestContextData | undefined`, `RequestContext.getOperatorId(): string`.
 - Throws `Error('No active request context')` if accessed outside an active context.
 
 ### 5.2. Native RFC 9562 UUIDv7 & Cryptography (`core/crypto.ts`)
@@ -545,18 +539,18 @@ export interface RequestContextData {
    - **Bits 64–65**: Variant `2` (`0b10`).
    - **Bits 66–127**: 62-bit random entropy.
 2. **Password Hashing**: Formats hashes as `$scrypt$N=16384,r=8,p=1$salt$hash` using `node:crypto.scrypt` with 16-byte random salt and constant-time comparison via `node:crypto.timingSafeEqual`.
-3. **Session Tokens**: Stateless HMAC-SHA256 tokens signed with `APP_SECRET` containing operator claims (`opid` / `tid`).
+3. **Session Tokens**: Stateless HMAC-SHA256 tokens signed with `APP_SECRET` containing operator claims (`opid`).
 
 ### 5.3. In-Process Event Bus (`core/events.ts`)
 
 Decoupled asynchronous cross-module messaging using `node:events.EventEmitter`:
 
-- Automatically stamps `operatorId` and `tenantId` onto published payloads.
+- Automatically stamps `operatorId` onto published payloads.
 - Standard event catalog:
-  - `lease.activated`: `{ leaseId, unitId, operatorId, tenantId, rentAmountCents }`
-  - `lease.terminated`: `{ leaseId, unitId, operatorId, tenantId }`
-  - `payment.recorded`: `{ transactionId, leaseId, amountCents, operatorId, tenantId }`
-  - `work_order.completed`: `{ workOrderId, propertyId, unitId, actualCostCents, operatorId, tenantId }`
+  - `lease.activated`: `{ leaseId, unitId, operatorId, rentAmountCents }`
+  - `lease.terminated`: `{ leaseId, unitId, operatorId }`
+  - `payment.recorded`: `{ transactionId, leaseId, amountCents, operatorId }`
+  - `work_order.completed`: `{ workOrderId, propertyId, unitId, actualCostCents, operatorId }`
     *(Auto-triggers optional recording of an accounting expense transaction).*
 
 ### 5.4. Local Storage Driver (`core/storage.ts`)
@@ -612,11 +606,11 @@ All REST endpoints return standardized JSON structures:
 
 ### 6.3. Middleware Pipeline (`api/middleware.ts`)
 
-1. **Correlation ID**: Extract `X-Request-ID` or generate new UUIDv7.
-2. **Security Headers**: Set `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Content-Security-Policy: default-src 'self'`.
-3. **Sliding-Window Rate Limiting**: In-memory IP rate limiter on `/api/v1/auth/*` (max 5 failed attempts per 15 minutes).
-4. **Operator Resolution**: Extract `X-Operator-ID` (or legacy `X-Tenant-ID`). If missing on operator-scoped routes, reject immediately with `400 Bad Request` (`OPERATOR_REQUIRED`).
-5. **Execution Wrapper**: Wrap downstream handler inside `RequestContext.run({ operatorId, tenantId, userId, correlationId }, handler)`.
+1. **Security Headers**: Set `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Content-Security-Policy: default-src 'self'`.
+2. **Correlation ID**: Extract `X-Request-ID` or generate new UUIDv7.
+3. **Sliding-Window Rate Limiting**: In-memory rate limiter applying across all routes, selecting operator, auth, or public buckets (auth default set to 10 requests per 15 minutes).
+4. **Operator Resolution**: Extract `X-Operator-ID`, bearer token claims, or route/host subdomain. If missing on operator-scoped routes, reject immediately with `400 Bad Request` (`OPERATOR_REQUIRED`).
+5. **Execution Wrapper**: Wrap downstream handler inside `RequestContext.run({ operatorId, userId, correlationId }, handler)`.
 6. **Global Error Trap**: Catch unhandled exceptions and format safe 500 JSON responses.
 
 ### 6.4. Data Portability & Backup Endpoints
@@ -647,7 +641,7 @@ All REST endpoints return standardized JSON structures:
 ### 7.2. Native API Client & Session (`web/lib/api-client.ts`, `web/lib/session.ts`)
 
 - Client abstraction for internal REST API communication at `http://127.0.0.1:3000`.
-- Forwards `X-Operator-ID` (and `X-Tenant-ID`) from HMAC-signed cookie session, along with `Authorization: Bearer <token>`.
+- Forwards `X-Operator-ID` from HMAC-signed cookie session, along with `Authorization: Bearer <token>`.
 - Automatically unwraps JSON envelopes and handles authentication failures with session invalidation.
 
 ### 7.3. UI Navigation & Extension Slots

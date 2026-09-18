@@ -3,7 +3,7 @@ import * as assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { EventEmitter } from 'node:events';
-import { createTestDb, runInTenantContext } from '../../../test/helpers.js';
+import { createTestDb, runInOperatorContext } from '../../../test/helpers.js';
 import { BackupScheduler } from '../backend/scheduler.js';
 import { BackupService } from '../backend/service.js';
 import { BackupRepository } from '../backend/repository.js';
@@ -303,7 +303,7 @@ describe('Backup Module - Automated Scheduler, Vacuum & Retention Daemon', () =>
     assert.ok(fs.existsSync(oldFilePath));
 
     // Execute scheduled backup which prunes records older than retentionDays (14 days)
-    await runInTenantContext(testTenant, async () => {
+    await runInOperatorContext(testTenant, async () => {
       const pruned = BackupService.pruneOldBackups(14);
       assert.ok(pruned >= 1);
 

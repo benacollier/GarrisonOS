@@ -8,19 +8,18 @@ The GarrisonOS REST API is exposed by the headless Node.js backend (`api/server.
 
 | Header | Required | Description |
 | :--- | :--- | :--- |
-| `X-Operator-ID` | Conditional | UUIDv7 of the active operator context (preferred header for operational routes) |
-| `X-Tenant-ID` | Optional | Legacy alias for `X-Operator-ID` supported for backward compatibility |
+| `X-Operator-ID` | Conditional | UUIDv7 of the active operator context for operational routes |
 | `Authorization` | Optional | `Bearer <signed_hmac_token>` for authenticated endpoints |
 | `X-Request-ID` | Optional | Client correlation ID (generated automatically if omitted) |
 | `Content-Type` | Optional | `application/json` for state-modifying requests |
 | `Origin` | Optional | Must match an origin in `CORS_ALLOWED_ORIGINS` for browser cross-origin access |
 
 ### Operator Resolution Rules
-1. **Header Precedence**: When inspecting request headers, `X-Operator-ID` takes precedence over `X-Tenant-ID`.
-2. **Token Fallback**: If neither header is provided, non-batch operational endpoints resolve operator identity from the verified Bearer token's `opid` (or `tid`) claim.
+1. **Header Resolution**: When inspecting request headers, `X-Operator-ID` establishes operator identity for operational endpoints.
+2. **Token Fallback**: If `X-Operator-ID` is not provided in headers, non-batch operational endpoints resolve operator identity from the verified Bearer token's `opid` claim.
 3. **Mismatch Enforcement**: If an operator header is provided alongside a Bearer token, the header identity and token claim must agree. Mismatches return `401 UNAUTHORIZED`.
 4. **Missing Operator**: If no operator identity can be resolved on non-public endpoints, the server returns `400 OPERATOR_REQUIRED`.
-5. **Batch Processing**: `/api/v1/batch` strictly ignores both `X-Operator-ID` and `X-Tenant-ID` headers; operator and user identities are derived exclusively from the verified Bearer token.
+5. **Batch Processing**: `/api/v1/batch` strictly ignores `X-Operator-ID` header; operator and user identities are derived exclusively from the verified Bearer token.
 
 ---
 
@@ -79,8 +78,10 @@ All JSON responses conform to standardized envelopes:
 | :--- | :--- | :--- | :--- |
 | `GET` | `/health` | Public | Liveness check returning status and uptime |
 | `GET` | `/ready` | Public | Readiness check verifying SQLite database connectivity |
-| `POST` | `/api/v1/auth/login` | Public (Rate Limited) | Authenticate user credentials and return signed HMAC token |
-| `POST` | `/api/v1/batch` | Authenticated | Execute up to 10 authenticated `GET` requests concurrently. Tenant and user identity come only from the verified bearer token; each response is indexed as `response_N`. Non-JSON responses return `NON_JSON_RESPONSE` for that item without failing the complete batch. |
+| `POST` | `/api/v1/auth/login` | Public (Rate Limited) | Authenticate user credentials and return signed HMAC token with `opid` |
+| `POST` | `/api/v1/system/setup` | Public | Initial system bootstrap provisioning first operator and owner user |
+| `POST` | `/api/v1/system/operators` | Admin / System Secret | Provision a new operator and owner user with configurable storage quota, seeding Chart of Accounts |
+| `POST` | `/api/v1/batch` | Authenticated | Execute up to 10 authenticated `GET` requests concurrently. Operator and user identity come only from the verified bearer token; each response is indexed as `response_N`. Non-JSON responses return `NON_JSON_RESPONSE` for that item without failing the complete batch. |
 | `GET` | `/api/v1/system/backup` | Admin | Trigger WAL checkpoint and create database snapshot |
 
 ---

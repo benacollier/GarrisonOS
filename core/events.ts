@@ -8,8 +8,6 @@ import { generateUUIDv7 } from './crypto.js';
 export interface BaseEventPayload {
   /** Primary operator isolation identifier. */
   operatorId?: string;
-  /** Legacy tenant isolation identifier (backward-compatibility alias). */
-  tenantId?: string;
 }
 
 /**
@@ -96,9 +94,9 @@ export class EventBus {
   public publish<T>(event: string, payload: T): void;
   public publish(event: string, payload: unknown): void {
     // Extract operatorId from payload if available
-    const basePayload = (payload && typeof payload === 'object') ? (payload as { operatorId?: string; tenantId?: string }) : {};
+    const basePayload = (payload && typeof payload === 'object') ? payload as BaseEventPayload : {};
     const currentContext = RequestContext.tryGet();
-    const operatorId = basePayload.operatorId || basePayload.tenantId || currentContext?.operatorId || currentContext?.tenantId || 'system';
+    const operatorId = basePayload.operatorId || currentContext?.operatorId || 'system';
     const correlationId = currentContext?.correlationId || generateUUIDv7();
     const userId = currentContext?.userId;
 
@@ -106,14 +104,13 @@ export class EventBus {
     if (payload && typeof payload === 'object') {
       const p = payload as Record<string, unknown>;
       if (!p['operatorId']) p['operatorId'] = operatorId;
-      if (!p['tenantId']) p['tenantId'] = operatorId;
     }
 
     // Dispatch asynchronously on next tick to decouple producer from consumers
     // Wrap emission in RequestContext to preserve operator isolation
     setImmediate(() => {
       RequestContext.run(
-        { operatorId, tenantId: operatorId, correlationId, userId },
+        { operatorId, correlationId, userId },
         () => this.emitter.emit(event, payload)
       );
     });

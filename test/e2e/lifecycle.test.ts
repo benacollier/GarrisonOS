@@ -176,7 +176,6 @@ describe('End-to-End Property Management Lifecycle (E2E)', () => {
         leaseId: lease.id,
         unitId: unit.id,
         operatorId,
-        tenantId: operatorId,
         rentAmountCents: 185000
       });
 
@@ -335,8 +334,7 @@ describe('End-to-End Property Management Lifecycle (E2E)', () => {
       await eventBus.publish('lease.terminated', {
         leaseId: lease.id,
         unitId: unit.id,
-        operatorId,
-        tenantId: operatorId
+        operatorId
       });
 
       await new Promise((resolve) => setTimeout(resolve, 50));

@@ -1,6 +1,6 @@
 import { test, describe, it, before, after } from 'node:test';
 import * as assert from 'node:assert/strict';
-import { createTestDb, runInTenantContext } from '../../../test/helpers.js';
+import { createTestDb, runInOperatorContext } from '../../../test/helpers.js';
 import { PropertiesRepository } from '../../properties/backend/repository.js';
 import { ContactsRepository } from '../../contacts/backend/repository.js';
 import { MaintenanceRepository } from '../backend/repository.js';
@@ -21,7 +21,7 @@ describe('Maintenance Module - Work Orders & Event Dispatch', () => {
   });
 
   it('manages work order lifecycle, priority triage, vendor assignment, and metrics', () => {
-    runInTenantContext('tenant-maint-test', () => {
+    runInOperatorContext('tenant-maint-test', () => {
       // 1. Setup property and vendor
       const prop = PropertiesRepository.createProperty({
         name: 'Valley View Apartments',
@@ -125,7 +125,7 @@ describe('Maintenance Module - Work Orders & Event Dispatch', () => {
   });
 
   it('triggers accounting expense creation when work_order.completed event is published', async () => {
-    await runInTenantContext('tenant-maint-test', async () => {
+    await runInOperatorContext('tenant-maint-test', async () => {
       const prop = PropertiesRepository.createProperty({
         name: 'Event Bus Test Property',
         property_type: 'single_family',
@@ -153,7 +153,7 @@ describe('Maintenance Module - Work Orders & Event Dispatch', () => {
 
       // Emit work_order.completed event through EventBus
       eventBus.publish('work_order.completed', {
-        tenantId: 'tenant-maint-test',
+        operatorId: 'tenant-maint-test',
         workOrderId: wo.id,
         propertyId: prop.id,
         unitId: null,
@@ -174,7 +174,7 @@ describe('Maintenance Module - Work Orders & Event Dispatch', () => {
   it('rejects work order creation with cross-operator property or contact ID (IDOR protection)', () => {
     // 1. Create property in operator A
     let propAId = '';
-    runInTenantContext('operator-a', () => {
+    runInOperatorContext('operator-a', () => {
       const propA = PropertiesRepository.createProperty({
         name: 'Operator A Manor',
         property_type: 'single_family',
@@ -187,7 +187,7 @@ describe('Maintenance Module - Work Orders & Event Dispatch', () => {
     });
 
     // 2. Attempt to create work order in operator B referencing operator A's property
-    runInTenantContext('operator-b', () => {
+    runInOperatorContext('operator-b', () => {
       assert.throws(
         () => {
           MaintenanceRepository.createWorkOrder({

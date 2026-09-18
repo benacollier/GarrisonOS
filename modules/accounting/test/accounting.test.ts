@@ -1,6 +1,6 @@
 import { test, describe, it, before, after } from 'node:test';
 import * as assert from 'node:assert/strict';
-import { createTestDb, runInTenantContext } from '../../../test/helpers.js';
+import { createTestDb, runInOperatorContext } from '../../../test/helpers.js';
 import { AccountingRepository } from '../backend/repository.js';
 import { closeDatabase, getDatabase } from '../../../database/client.js';
 
@@ -15,7 +15,7 @@ describe('Accounting Module - Repository & Financial Workflows', () => {
   });
 
   it('creates and lists financial transactions with category and date filtering', () => {
-    runInTenantContext('tenant-acct-test', () => {
+    runInOperatorContext('tenant-acct-test', () => {
       const now = Date.now();
 
       // Create income transaction
@@ -62,7 +62,7 @@ describe('Accounting Module - Repository & Financial Workflows', () => {
   });
 
   it('executes processDepositDisposition atomically with deductions and refund', () => {
-    runInTenantContext('tenant-acct-test', () => {
+    runInOperatorContext('tenant-acct-test', () => {
       const db = getDatabase();
       const now = Date.now();
       const leaseId = 'lease-disp-test';
@@ -108,7 +108,7 @@ describe('Accounting Module - Repository & Financial Workflows', () => {
   });
 
   it('fails deleteTransaction and rolls back if linked journal entry does not exist', () => {
-    runInTenantContext('tenant-acct-test', () => {
+    runInOperatorContext('tenant-acct-test', () => {
       const now = Date.now();
       const db = getDatabase();
 
@@ -139,7 +139,7 @@ describe('Accounting Module - Repository & Financial Workflows', () => {
   });
 
   it('throws and preserves state if processDepositDisposition targets nonexistent lease', () => {
-    runInTenantContext('tenant-acct-test', () => {
+    runInOperatorContext('tenant-acct-test', () => {
       assert.throws(() => {
         AccountingRepository.processDepositDisposition('non-existent-lease');
       }, /Lease not found/);

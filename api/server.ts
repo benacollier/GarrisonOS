@@ -1,4 +1,5 @@
 import { createServer as createHttpServer, Server as HttpServer, IncomingMessage, ServerResponse } from 'node:http';
+import { randomBytes } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
@@ -8,7 +9,7 @@ import {
   correlationMiddleware,
   rateLimitMiddleware,
   operatorContextMiddleware,
-  tenantContextMiddleware
+  RESERVED_SUBDOMAINS
 } from './middleware.js';
 import { successResponse, errorResponse } from './response.js';
 import { getDatabase, closeDatabase, withTransaction } from '../database/client.js';
@@ -43,17 +44,15 @@ let backupSchedulerReadiness: BackupSchedulerReadiness = 'not-mounted';
  *
  * @param nodeEnv Runtime environment name.
  * @param appSecret Candidate HMAC secret.
- * @throws Error when a non-development environment has an invalid secret.
+ * @throws Error if secret length is below minimum outside development or test.
  */
 export function validateEnvironment(nodeEnv: string, appSecret: string | undefined): void {
-  if (
-    nodeEnv !== 'development' &&
-    nodeEnv !== 'test' &&
-    !/^(?:[a-f0-9]{2}){32,}$/i.test(appSecret?.trim() ?? '')
-  ) {
-    throw new Error(
-      'APP_SECRET must contain at least 32 bytes encoded as hexadecimal before starting the server outside development and test environments'
-    );
+  if (nodeEnv !== 'development' && nodeEnv !== 'test') {
+    if (!appSecret || appSecret.length < 64 || !/^[0-9a-fA-F]{64,}$/.test(appSecret)) {
+      throw new Error(
+        'APP_SECRET must contain at least 32 bytes encoded as hexadecimal before starting the server outside development and test environments'
+      );
+    }
   }
 }
 
@@ -203,12 +202,12 @@ export function createRouter(serverPort: number = PORT): Router {
 
   // Authentication: Operator Login
   router.post('/api/v1/auth/login', async (req, res) => {
-    const { email, password, operator_id, tenant_id } = req.body || {};
+    const { email, password, operator_id } = req.body || {};
     if (!email || !password) {
       return errorResponse(res, 'VALIDATION_ERROR', 'Email and password are required', 400);
     }
 
-    const operatorId = operator_id || tenant_id;
+    const operatorId = operator_id;
     const db = getDatabase();
     let query = 'SELECT * FROM users WHERE email = ? AND deleted_at IS NULL';
     const params: any[] = [email];
@@ -233,7 +232,6 @@ export function createRouter(serverPort: number = PORT): Router {
       {
         sub: user.id,
         opid: user.operator_id,
-        tid: user.operator_id, // Backward-compatible claim
         role: user.role,
         exp: Math.floor(Date.now() / 1000) + 86400,
         tv: user.token_version || 1
@@ -264,7 +262,6 @@ export function createRouter(serverPort: number = PORT): Router {
       user: {
         id: user.id,
         operator_id: user.operator_id,
-        tenant_id: user.operator_id, // Backward-compatible field
         email: user.email,
         first_name: user.first_name,
         last_name: user.last_name,
@@ -438,7 +435,6 @@ export function createRouter(serverPort: number = PORT): Router {
         {
           sub: userId,
           opid: operatorId,
-          tid: operatorId, // Backward-compatible claim
           role: 'owner',
           exp: Math.floor(Date.now() / 1000) + 86400,
           tv: 1
@@ -451,7 +447,6 @@ export function createRouter(serverPort: number = PORT): Router {
         user: {
           id: userId,
           operator_id: operatorId,
-          tenant_id: operatorId, // Backward-compatible field
           email: cleanEmail,
           first_name: cleanFirst,
           last_name: cleanLast,
@@ -460,6 +455,217 @@ export function createRouter(serverPort: number = PORT): Router {
       }, 201);
     } catch (err: any) {
       errorResponse(res, 'SETUP_FAILED', `Failed to initialize system: ${err.message}`, 500);
+    }
+  });
+
+  // System Administration: Provision Operator
+  router.post('/api/v1/system/operators', async (req, res) => {
+    const {
+      name,
+      organization_name,
+      email,
+      contact_email,
+      password,
+      admin_password,
+      storage_quota_bytes,
+      storage_quota,
+      first_name,
+      last_name,
+      subdomain,
+      slug,
+      path_slug,
+      currency
+    } = req.body || {};
+
+    const cleanName = typeof name === 'string' && name.trim()
+      ? name.trim()
+      : (typeof organization_name === 'string' ? organization_name.trim() : '');
+    const cleanEmail = typeof email === 'string' && email.trim()
+      ? email.trim().toLowerCase()
+      : (typeof contact_email === 'string' ? contact_email.trim().toLowerCase() : '');
+    const cleanPassword = typeof password === 'string'
+      ? password
+      : (typeof admin_password === 'string' ? admin_password : '');
+    const cleanFirst = typeof first_name === 'string' && first_name.trim() ? first_name.trim() : 'Admin';
+    const cleanLast = typeof last_name === 'string' && last_name.trim() ? last_name.trim() : 'User';
+    const cleanCurrency = typeof currency === 'string' && currency.trim() ? currency.trim().toUpperCase() : 'USD';
+
+    if (!cleanName) {
+      return errorResponse(res, 'VALIDATION_ERROR', 'Operator name is required', 400);
+    }
+    if (!cleanEmail || !cleanEmail.includes('@') || !cleanEmail.includes('.')) {
+      return errorResponse(res, 'VALIDATION_ERROR', 'A valid email address is required', 400);
+    }
+    if (cleanPassword.length < 8) {
+      return errorResponse(res, 'VALIDATION_ERROR', 'Password must be at least 8 characters long', 400);
+    }
+
+    const hasExplicitSubdomain = (
+      subdomain !== undefined ||
+      slug !== undefined ||
+      path_slug !== undefined
+    );
+    const rawSubdomainCandidate = subdomain !== undefined ? subdomain : (slug !== undefined ? slug : path_slug);
+
+    let cleanSubdomain: string;
+    if (hasExplicitSubdomain) {
+      const rawStr = typeof rawSubdomainCandidate === 'string' ? rawSubdomainCandidate.trim() : '';
+      const normalized = rawStr
+        .toLowerCase()
+        .replace(/[^a-z0-9-]/g, '-')
+        .replace(/-+/g, '-')
+        .replace(/^-+|-+$/g, '')
+        .slice(0, 32);
+
+      if (!normalized || RESERVED_SUBDOMAINS.has(normalized)) {
+        return errorResponse(res, 'VALIDATION_ERROR', 'The specified subdomain or slug is invalid or reserved', 400);
+      }
+      cleanSubdomain = normalized;
+    } else {
+      let derived = cleanName
+        .toLowerCase()
+        .replace(/[^a-z0-9]/g, '-')
+        .replace(/-+/g, '-')
+        .replace(/^-+|-+$/g, '')
+        .slice(0, 32);
+
+      if (!derived || RESERVED_SUBDOMAINS.has(derived)) {
+        derived = derived ? `${derived.slice(0, 23)}-operator` : `op-${generateUUIDv7().slice(0, 8)}`;
+      }
+      cleanSubdomain = derived;
+    }
+
+    const defaultQuota = Number(process.env['DEFAULT_STORAGE_QUOTA_BYTES']) || 10737418240; // 10 GB default
+    const rawQuota = storage_quota_bytes !== undefined ? storage_quota_bytes : storage_quota;
+    let cleanQuota = defaultQuota;
+    if (rawQuota !== undefined && rawQuota !== null) {
+      const parsedQuota = Number(rawQuota);
+      if (!Number.isInteger(parsedQuota) || parsedQuota <= 0) {
+        return errorResponse(res, 'VALIDATION_ERROR', 'Storage quota must be a positive integer in bytes', 400);
+      }
+      cleanQuota = parsedQuota;
+    }
+
+    const now = Date.now();
+    const operatorId = generateUUIDv7();
+    const userId = generateUUIDv7();
+    const passwordHash = await hashPassword(cleanPassword);
+    const db = getDatabase();
+
+    try {
+      withTransaction((tx) => {
+        // Check duplicate email
+        const existingUser = tx.prepare(
+          'SELECT id FROM users WHERE email = ? AND deleted_at IS NULL'
+        ).get(cleanEmail);
+        if (existingUser) {
+          const err: any = new Error('A user with this email address already exists');
+          err.code = 'CONFLICT';
+          throw err;
+        }
+
+        // Check duplicate subdomain or path slug
+        const existingSubdomain = tx.prepare(
+          'SELECT id FROM operators WHERE subdomain = ? AND deleted_at IS NULL'
+        ).get(cleanSubdomain);
+
+        if (existingSubdomain) {
+          if (hasExplicitSubdomain) {
+            const err: any = new Error(`Subdomain or path '${cleanSubdomain}' is already in use`);
+            err.code = 'CONFLICT';
+            throw err;
+          } else {
+            // Auto-generated from name: disambiguate with random hex suffix
+            cleanSubdomain = `${cleanSubdomain.slice(0, 26)}-${randomBytes(2).toString('hex')}`;
+          }
+        }
+
+        // 1. Insert into operators
+        tx.prepare(`
+          INSERT INTO operators (id, name, subdomain, currency, storage_quota_bytes, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?)
+        `).run(operatorId, cleanName, cleanSubdomain, cleanCurrency, cleanQuota, now, now);
+
+        // 2. Insert owner user
+        tx.prepare(`
+          INSERT INTO users (id, operator_id, email, password_hash, first_name, last_name, role, token_version, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, 'owner', 1, ?, ?)
+        `).run(userId, operatorId, cleanEmail, passwordHash, cleanFirst, cleanLast, now, now);
+
+        // 3. Seed default Chart of Accounts
+        const tableCheck = tx.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='chart_of_accounts'").get();
+        if (tableCheck) {
+          const defaultAccounts: [string, string, string, string, string, string][] = [
+            ['1010', 'Operating Checking', 'Bank', 'Bank', 'operating_bank', 'Primary operating account for rent collection and property operations'],
+            ['1020', 'Trust Checking', 'Bank', 'Bank', 'trust_bank', 'Dedicated escrow/trust account for security deposits'],
+            ['1100', 'Accounts Receivable', 'AccountsReceivable', 'AccountsReceivable', 'accounts_receivable', 'Uncollected tenant rent and utility charges'],
+            ['2010', 'Security Deposits Liability', 'OtherCurrentLiability', 'OtherCurrentLiability', 'security_deposits_liability', 'Tenant security deposits held in trust'],
+            ['3010', "Owner's Equity", 'Equity', 'Equity', 'owner_equity', 'Owner invested capital and cumulative retained earnings'],
+            ['4010', 'Rental Income', 'Income', 'Income', 'rental_income', 'Gross monthly residential and commercial rent receipts'],
+            ['4020', 'Late Fee Income', 'Income', 'Income', 'late_fee_income', 'Assessed tenant late payment penalties'],
+            ['5100', 'Repairs & Maintenance', 'Expense', 'Expense', 'repairs_maintenance', 'Day-to-day property repairs, handyman services, and routine turnover expenses'],
+            ['5110', 'Management Fees', 'Expense', 'Expense', 'management_fees', 'Professional property management fee disbursements']
+          ];
+          for (const [num, acctName, type, qbType, mapping, desc] of defaultAccounts) {
+            tx.prepare(`
+              INSERT INTO chart_of_accounts (
+                id, operator_id, account_number, account_name, account_type,
+                qb_account_type, category_mapping, description, is_system_default,
+                is_active, created_at, updated_at
+              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, 1, ?, ?)
+            `).run(generateUUIDv7(), operatorId, num, acctName, type, qbType, mapping, desc, now, now);
+          }
+        }
+
+        // 4. Audit log
+        const auditTableCheck = tx.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='audit_logs'").get();
+        if (auditTableCheck) {
+          tx.prepare(`
+            INSERT INTO audit_logs (id, operator_id, user_id, entity_type, entity_id, action, changes_json, ip_address, created_at)
+            VALUES (?, ?, ?, 'system', ?, 'create', ?, ?, ?)
+          `).run(
+            generateUUIDv7(),
+            operatorId,
+            userId,
+            operatorId,
+            JSON.stringify({ name: cleanName, email: cleanEmail, storage_quota_bytes: cleanQuota, subdomain: cleanSubdomain }),
+            (() => {
+              const rawIp = (req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress || '127.0.0.1';
+              return (rawIp.includes(',') ? rawIp.split(',')[0]!.trim() : rawIp.trim()) || '127.0.0.1';
+            })(),
+            now
+          );
+        }
+      }, db);
+
+      successResponse(
+        res,
+        {
+          operator: {
+            id: operatorId,
+            name: cleanName,
+            subdomain: cleanSubdomain,
+            currency: cleanCurrency,
+            storage_quota_bytes: cleanQuota,
+            created_at: now
+          },
+          user: {
+            id: userId,
+            operator_id: operatorId,
+            email: cleanEmail,
+            role: 'owner',
+            first_name: cleanFirst,
+            last_name: cleanLast,
+            created_at: now
+          }
+        },
+        201
+      );
+    } catch (err: any) {
+      if (err.code === 'CONFLICT') {
+        return errorResponse(res, 'CONFLICT', err.message, 409);
+      }
+      errorResponse(res, 'INTERNAL_ERROR', 'Failed to provision operator', 500);
     }
   });
 

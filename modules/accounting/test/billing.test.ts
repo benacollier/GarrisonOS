@@ -1,7 +1,7 @@
 import { test, describe, it, before, after } from 'node:test';
 import * as assert from 'node:assert/strict';
 import { calculateProratedRent, generateMonthlyRentCharges } from '../backend/billing.js';
-import { createTestDb, runInTenantContext } from '../../../test/helpers.js';
+import { createTestDb, runInOperatorContext } from '../../../test/helpers.js';
 import { PropertiesRepository } from '../../properties/backend/repository.js';
 import { LeasesRepository } from '../../leases/backend/repository.js';
 import { AccountingRepository } from '../backend/repository.js';
@@ -30,7 +30,7 @@ describe('Accounting Module - Monthly Billing & Proration', () => {
   });
 
   it('generates recurring rent charges idempotently', () => {
-    runInTenantContext('tenant-billing-test', () => {
+    runInOperatorContext('tenant-billing-test', () => {
       // 1. Create property, unit, and active lease
       const prop = PropertiesRepository.createProperty({
         name: 'Billing Test House',

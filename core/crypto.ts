@@ -113,9 +113,7 @@ export interface TokenPayload {
   /** Subject identifier (user UUID). */
   sub: string;
   /** Primary operator isolation identifier. */
-  opid?: string;
-  /** Legacy tenant isolation identifier (backward-compatibility alias). */
-  tid?: string;
+  opid: string;
   /** Role assigned to user (e.g. owner, manager, assistant, read_only). */
   role: string;
   /** Issued-at timestamp in seconds. */
@@ -135,8 +133,6 @@ export interface TokenInput {
   sub: string;
   /** Primary operator isolation identifier. */
   opid?: string;
-  /** Legacy tenant isolation identifier. */
-  tid?: string;
   /** Role assigned to user. */
   role: string;
   /** Expiration timestamp in seconds. */
@@ -148,28 +144,25 @@ export interface TokenInput {
 
 /**
  * Create a signed HMAC-SHA256 session token.
- * Requires a non-empty operator claim (`opid` or `tid`).
+ * Requires a non-empty operator claim (`opid`).
  *
  * @param payload - Token claims and configuration.
  * @param secret - Cryptographic secret key used for HMAC signing.
  * @returns Serialized JWT string.
- * @throws {Error} When neither `opid` nor `tid` is provided as a non-empty string.
+ * @throws {Error} When `opid` is not provided as a non-empty string.
  */
 export function createToken(payload: TokenInput, secret: string): string {
   const operatorClaim = (
     (typeof payload.opid === 'string' && payload.opid.trim().length > 0 ? payload.opid.trim() : '') ||
-    (typeof payload.tid === 'string' && payload.tid.trim().length > 0 ? payload.tid.trim() : '') ||
-    (typeof payload['operatorId'] === 'string' && (payload['operatorId'] as string).trim().length > 0 ? (payload['operatorId'] as string).trim() : '') ||
-    (typeof payload['tenantId'] === 'string' && (payload['tenantId'] as string).trim().length > 0 ? (payload['tenantId'] as string).trim() : '')
+    (typeof payload['operatorId'] === 'string' && (payload['operatorId'] as string).trim().length > 0 ? (payload['operatorId'] as string).trim() : '')
   );
 
   if (!operatorClaim) {
-    throw new Error('createToken requires a non-empty operator claim (opid or tid)');
+    throw new Error('createToken requires a non-empty operator claim (opid)');
   }
 
   const fullPayload: TokenPayload = Object.assign({}, payload, {
     opid: payload.opid || operatorClaim,
-    tid: payload.tid || operatorClaim,
     iat: Math.floor(Date.now() / 1000)
   });
 

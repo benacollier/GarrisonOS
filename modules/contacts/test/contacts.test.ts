@@ -1,6 +1,6 @@
 import { test, describe, it, before, after } from 'node:test';
 import * as assert from 'node:assert/strict';
-import { createTestDb, runInTenantContext } from '../../../test/helpers.js';
+import { createTestDb, runInOperatorContext } from '../../../test/helpers.js';
 import { ContactsRepository } from '../backend/repository.js';
 import { closeDatabase, getDatabase } from '../../../database/client.js';
 
@@ -15,7 +15,7 @@ describe('Contacts Module - Directory & Vendor Registry', () => {
   });
 
   it('creates, filters, updates, and soft-deletes contacts across all role categories', () => {
-    runInTenantContext('tenant-contact-test', () => {
+    runInOperatorContext('tenant-contact-test', () => {
       // 1. Create a tenant contact
       const tenantContact = ContactsRepository.createContact({
         contact_type: 'tenant',

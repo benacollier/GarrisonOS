@@ -7,15 +7,6 @@ describe('RequestContext & Multi-Operator Store Subsystem', () => {
   it('propagates operator context synchronously', () => {
     RequestContext.run({ operatorId: 'operator-100', correlationId: 'req-1' }, () => {
       assert.equal(RequestContext.getOperatorId(), 'operator-100');
-      assert.equal(RequestContext.getTenantId(), 'operator-100');
-      assert.equal(RequestContext.getCorrelationId(), 'req-1');
-    });
-  });
-
-  it('supports legacy tenantId fallback synchronously', () => {
-    RequestContext.run({ tenantId: 'tenant-100', correlationId: 'req-1' }, () => {
-      assert.equal(RequestContext.getOperatorId(), 'tenant-100');
-      assert.equal(RequestContext.getTenantId(), 'tenant-100');
       assert.equal(RequestContext.getCorrelationId(), 'req-1');
     });
   });
@@ -27,41 +18,41 @@ describe('RequestContext & Multi-Operator Store Subsystem', () => {
   });
 
   it('maintains strict context isolation across concurrent asynchronous operations', async () => {
-    const runTask = async (tenantId: string, delayMs: number): Promise<string> => {
-      return RequestContext.run({ tenantId, correlationId: `req-${tenantId}` }, async () => {
+    const runTask = async (operatorId: string, delayMs: number): Promise<string> => {
+      return RequestContext.run({ operatorId, correlationId: `req-${operatorId}` }, async () => {
         await new Promise((resolve) => setTimeout(resolve, delayMs));
-        return RequestContext.getTenantId();
+        return RequestContext.getOperatorId();
       });
     };
 
     const results = await Promise.all([
-      runTask('tenant-A', 50),
-      runTask('tenant-B', 20),
-      runTask('tenant-C', 35),
-      runTask('tenant-D', 10)
+      runTask('operator-A', 50),
+      runTask('operator-B', 20),
+      runTask('operator-C', 35),
+      runTask('operator-D', 10)
     ]);
 
-    assert.deepEqual(results, ['tenant-A', 'tenant-B', 'tenant-C', 'tenant-D']);
+    assert.deepEqual(results, ['operator-A', 'operator-B', 'operator-C', 'operator-D']);
   });
 
-  it('propagates tenant context through EventBus async publish', async () => {
-    let receivedTenantId: string | undefined;
+  it('propagates operator context through EventBus async publish', async () => {
+    let receivedOperatorId: string | undefined;
     let receivedCorrelationId: string | undefined;
 
     const testEventBus = new EventBus();
     const eventHandled = new Promise<void>((resolve) => {
       testEventBus.subscribe('test.event', (payload: BaseEventPayload & { data: string }) => {
-        receivedTenantId = RequestContext.tryGet()?.tenantId;
+        receivedOperatorId = RequestContext.tryGet()?.operatorId;
         receivedCorrelationId = RequestContext.tryGet()?.correlationId;
         resolve();
       });
     });
 
     await RequestContext.run(
-      { tenantId: 'tenant-event-test', correlationId: 'corr-123', userId: undefined },
+      { operatorId: 'operator-event-test', correlationId: 'corr-123', userId: undefined },
       async () => {
         testEventBus.publish('test.event', {
-          tenantId: 'tenant-event-test',
+          operatorId: 'operator-event-test',
           data: 'test-data'
         });
       }
@@ -69,19 +60,21 @@ describe('RequestContext & Multi-Operator Store Subsystem', () => {
 
     await eventHandled;
 
-    assert.equal(receivedTenantId, 'tenant-event-test', 'Tenant ID should be propagated through EventBus');
+    assert.equal(receivedOperatorId, 'operator-event-test', 'Operator ID should be propagated through EventBus');
     assert.ok(receivedCorrelationId, 'Correlation ID should be propagated through EventBus');
   });
 
-  it('propagates active RequestContext when payload omits tenantId', async () => {
-    let receivedTenantId: string | undefined;
+  it('propagates active RequestContext when payload omits operatorId', async () => {
+    let receivedPayloadOperatorId: string | undefined;
+    let receivedOperatorId: string | undefined;
     let receivedCorrelationId: string | undefined;
     let receivedUserId: string | undefined;
 
     const testEventBus = new EventBus();
     const eventHandled = new Promise<void>((resolve) => {
-      testEventBus.subscribe('test.no_tenant', (payload: any) => {
-        receivedTenantId = RequestContext.tryGet()?.tenantId;
+      testEventBus.subscribe('test.no_operator', (payload: any) => {
+        receivedPayloadOperatorId = payload?.operatorId;
+        receivedOperatorId = RequestContext.tryGet()?.operatorId;
         receivedCorrelationId = RequestContext.tryGet()?.correlationId;
         receivedUserId = RequestContext.tryGet()?.userId;
         resolve();
@@ -89,19 +82,19 @@ describe('RequestContext & Multi-Operator Store Subsystem', () => {
     });
 
     await RequestContext.run(
-      { tenantId: 'tenant-inherited', correlationId: 'corr-inherited', userId: 'user-inherited' },
+      { operatorId: 'operator-inherited', correlationId: 'corr-inherited', userId: 'user-inherited' },
       async () => {
-        testEventBus.publish('test.no_tenant', {
-          data: 'test-data-without-explicit-tenant'
+        testEventBus.publish('test.no_operator', {
+          data: 'test-data-without-explicit-operator'
         });
       }
     );
 
     await eventHandled;
 
-    assert.equal(receivedTenantId, 'tenant-inherited');
+    assert.equal(receivedPayloadOperatorId, 'operator-inherited', 'Payload operatorId should match active context');
+    assert.equal(receivedOperatorId, 'operator-inherited');
     assert.equal(receivedCorrelationId, 'corr-inherited');
     assert.equal(receivedUserId, 'user-inherited');
   });
 });
-

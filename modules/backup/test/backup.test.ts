@@ -3,7 +3,7 @@ import * as assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as zlib from 'node:zlib';
-import { createTestDb, runInTenantContext } from '../../../test/helpers.js';
+import { createTestDb, runInOperatorContext } from '../../../test/helpers.js';
 import { BackupRepository } from '../backend/repository.js';
 import { BackupService } from '../backend/service.js';
 import { closeDatabase, getDatabase } from '../../../database/client.js';
@@ -31,7 +31,7 @@ describe('Backup Module - Snapshots, Exports, and Integrity Verification', () =>
   });
 
   it('creates and lists backup records in the repository', () => {
-    runInTenantContext(testTenant, () => {
+    runInOperatorContext(testTenant, () => {
       const created = BackupRepository.create({
         backup_type: 'tenant_data',
         filename: 'test-backup.json.gz',
@@ -58,7 +58,7 @@ describe('Backup Module - Snapshots, Exports, and Integrity Verification', () =>
       assert.ok(list.items.some((b) => b.id === created.id));
 
       // Multi-tenancy isolation check
-      runInTenantContext(otherTenant, () => {
+      runInOperatorContext(otherTenant, () => {
         const otherList = BackupRepository.list();
         assert.equal(otherList.items.some((b) => b.id === created.id), false);
       });
@@ -66,7 +66,7 @@ describe('Backup Module - Snapshots, Exports, and Integrity Verification', () =>
   });
 
   it('creates a tenant data export archive and verifies its content and checksum', async () => {
-    await runInTenantContext(testTenant, async () => {
+    await runInOperatorContext(testTenant, async () => {
       // Seed a sample record in a tenant table
       const db = getDatabase();
       db.prepare(`
@@ -102,7 +102,7 @@ describe('Backup Module - Snapshots, Exports, and Integrity Verification', () =>
   });
 
   it('restores tenant data with clean_slate and merge options', async () => {
-    await runInTenantContext(testTenant, async () => {
+    await runInOperatorContext(testTenant, async () => {
       const db = getDatabase();
 
       // 1. Establish initial state
@@ -149,7 +149,7 @@ describe('Backup Module - Snapshots, Exports, and Integrity Verification', () =>
   });
 
   it('handles compound unique constraint conflicts during merge restore', async () => {
-    await runInTenantContext(testTenant, async () => {
+    await runInOperatorContext(testTenant, async () => {
       const db = getDatabase();
       const now = Date.now();
 
@@ -206,13 +206,13 @@ describe('Backup Module - Snapshots, Exports, and Integrity Verification', () =>
 
   it('rejects cross-tenant data restoration attempts', async () => {
     let backupId = '';
-    await runInTenantContext(testTenant, async () => {
+    await runInOperatorContext(testTenant, async () => {
       const backup = await BackupService.createTenantExport();
       backupId = backup.id;
     });
 
     // Attempt to restore testTenant's archive while operating under otherTenant context
-    await runInTenantContext(otherTenant, async () => {
+    await runInOperatorContext(otherTenant, async () => {
       await assert.rejects(async () => {
         await BackupService.restoreTenantData({ backupId });
       }, /not found|prohibited/);
@@ -226,7 +226,7 @@ describe('Backup Module - Snapshots, Exports, and Integrity Verification', () =>
   });
 
   it('deletes backup record and removes physical archive from disk', async () => {
-    await runInTenantContext(testTenant, async () => {
+    await runInOperatorContext(testTenant, async () => {
       const backup = await BackupService.createTenantExport();
       const filePath = BackupService.resolveSafeBackupPath(backup.relative_path);
       assert.ok(fs.existsSync(filePath));
@@ -247,7 +247,7 @@ describe('Backup Module - Snapshots, Exports, and Integrity Verification', () =>
     registerRoutes(router);
 
     const dispatch = async (query: string): Promise<{ status: number; body: any }> => {
-      return runInTenantContext(testTenant, async () => {
+      return runInOperatorContext(testTenant, async () => {
         let statusCode = 200;
         let responseBody = '';
 

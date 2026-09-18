@@ -30,11 +30,6 @@ export interface LayoutOptions {
   operatorId?: string;
 
   /**
-   * Legacy alias for operatorId.
-   */
-  tenantId?: string;
-
-  /**
    * Registered navigation items to render in the sidebar.
    */
   navItems: NavigationItem[];
@@ -59,7 +54,7 @@ export interface LayoutOptions {
 export function renderLayout(options: LayoutOptions): string {
   const pageTitle = options.title ? `${options.title} – GarrisonOS` : 'GarrisonOS Property Management';
   const sidebar = renderSidebar(options.navItems, options.currentPath);
-  const header = renderHeader(options.user, options.operatorId || options.tenantId || 'operator-demo');
+  const header = renderHeader(options.user, options.operatorId || 'operator-demo');
   const flash = renderFlash(options.flashMessages || []);
   const bodyContent = typeof options.content === 'string' ? raw(options.content) : options.content;
 

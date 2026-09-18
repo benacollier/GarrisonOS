@@ -1,6 +1,6 @@
 import { test, describe, it, before, after } from 'node:test';
 import * as assert from 'node:assert/strict';
-import { createTestDb, runInTenantContext } from '../../../test/helpers.js';
+import { createTestDb, runInOperatorContext } from '../../../test/helpers.js';
 import { closeDatabase, getDatabase } from '../../../database/client.js';
 import { AccountingRepository } from '../backend/repository.js';
 import { ChartOfAccountsRepository } from '../backend/chart_of_accounts.js';
@@ -17,7 +17,7 @@ describe('Accounting Module - QuickBooks Compatibility & Double-Entry GL', () =>
   });
 
   it('automatically seeds default Chart of Accounts for property management and IRS Schedule E', () => {
-    runInTenantContext('tenant-qb-test', () => {
+    runInOperatorContext('tenant-qb-test', () => {
       const accounts = ChartOfAccountsRepository.listAccounts();
       assert.ok(accounts.length >= 20, 'Should seed at least 20 default accounts');
 
@@ -39,7 +39,7 @@ describe('Accounting Module - QuickBooks Compatibility & Double-Entry GL', () =>
   });
 
   it('synthesizes balanced double-entry debits and credits for all transaction types', () => {
-    runInTenantContext('tenant-qb-test', () => {
+    runInOperatorContext('tenant-qb-test', () => {
       const now = Date.now();
 
       // 1. Tenant rent charge
@@ -96,7 +96,7 @@ describe('Accounting Module - QuickBooks Compatibility & Double-Entry GL', () =>
   });
 
   it('generates valid QuickBooks Online (QBO) Journal CSV format', () => {
-    runInTenantContext('tenant-qb-test', () => {
+    runInOperatorContext('tenant-qb-test', () => {
       const now = Date.now();
       const tx = AccountingRepository.createTransaction({
         transaction_type: 'payment',
@@ -118,7 +118,7 @@ describe('Accounting Module - QuickBooks Compatibility & Double-Entry GL', () =>
   });
 
   it('generates valid QuickBooks Desktop (IIF) format with TRNS/SPL blocks', () => {
-    runInTenantContext('tenant-qb-test', () => {
+    runInOperatorContext('tenant-qb-test', () => {
       const now = Date.now();
       const tx = AccountingRepository.createTransaction({
         transaction_type: 'expense',
@@ -141,7 +141,7 @@ describe('Accounting Module - QuickBooks Compatibility & Double-Entry GL', () =>
   });
 
   it('generates valid OFX/QBO Web Connect format for bank feeds', () => {
-    runInTenantContext('tenant-qb-test', () => {
+    runInOperatorContext('tenant-qb-test', () => {
       const now = Date.now();
       const tx = AccountingRepository.createTransaction({
         transaction_type: 'payment',
@@ -162,7 +162,7 @@ describe('Accounting Module - QuickBooks Compatibility & Double-Entry GL', () =>
   });
 
   it('tracks export logs and flags transactions as exported', () => {
-    runInTenantContext('tenant-qb-test', () => {
+    runInOperatorContext('tenant-qb-test', () => {
       const now = Date.now();
       const tx = AccountingRepository.createTransaction({
         transaction_type: 'payment',
@@ -185,15 +185,15 @@ describe('Accounting Module - QuickBooks Compatibility & Double-Entry GL', () =>
   });
 
   it('allows expense transactions without requiring unrelated accounts', () => {
-    runInTenantContext('tenant-qb-expense-scope-test', () => {
+    runInOperatorContext('tenant-qb-expense-scope-test', () => {
       const db = getDatabase();
-      const tenantId = 'tenant-qb-expense-scope-test';
+      const operatorId = 'tenant-qb-expense-scope-test';
 
       db.prepare(`
         UPDATE chart_of_accounts
         SET is_active = 0
         WHERE operator_id = ? AND category_mapping IN ('trust_bank', 'accounts_receivable', 'security_deposit')
-      `).run(tenantId);
+      `).run(operatorId);
 
       assert.doesNotThrow(() => {
         AccountingRepository.createTransaction({
@@ -208,7 +208,7 @@ describe('Accounting Module - QuickBooks Compatibility & Double-Entry GL', () =>
   });
 
   it('skips deleted transactions even when they retain a stale journal_entry_id', () => {
-    runInTenantContext('tenant-qb-deleted-test', () => {
+    runInOperatorContext('tenant-qb-deleted-test', () => {
       const now = Date.now();
       const tx = AccountingRepository.createTransaction({
         transaction_type: 'payment',
@@ -227,7 +227,7 @@ describe('Accounting Module - QuickBooks Compatibility & Double-Entry GL', () =>
   });
 
   it('returns empty journal entries array when given an empty transactions list', () => {
-    runInTenantContext('tenant-qb-empty-test', () => {
+    runInOperatorContext('tenant-qb-empty-test', () => {
       // When explicitly passing empty array (filtered query returned 0 results)
       const entries = QuickBooksService.generateJournalEntries([]);
       assert.equal(entries.length, 0);

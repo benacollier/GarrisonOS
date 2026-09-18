@@ -8,7 +8,7 @@ export function registerSubscribers(eventBus: EventBus): void {
 
     RequestContext.run(
       {
-        tenantId: event.tenantId,
+        operatorId: event.operatorId,
         correlationId: `event-work-order-${event.workOrderId}`
       },
       () => {
