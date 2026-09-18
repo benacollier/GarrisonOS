@@ -203,57 +203,73 @@ GarrisonOS is a **zero-dependency property management system** built on native N
 | 8 | Pure TypeScript SSR presentation rebase (removed PHP) | 16h | High | ✅ Resolved (PR #24) |
 
 ### Sprint 2 (Weeks 3–4): Production Readiness, Operator Workflows & Release Candidate
-> **Status**: In Planning / Next Sprint | **Target**: v0.1.0-RC1 | **Effort**: ~42 hours | **Outcome**: Turnkey deployment & verified E2E user journeys
+> **Status**: Completed (2026-09-17) | **Target**: v0.1.0-alpha.2 | **Effort**: 42 hours | **Outcome**: Turnkey deployment & verified E2E user journeys
 
 | Priority | Task | Effort | Impact | Status |
-| ---------- | ------ | -------- | -------- | :---: |
-| 9 | Production packaging (Systemd, Docker Compose, Caddy/Nginx) | 8h | High | Planned |
-| 10 | Interactive operator workflows in TS SSR (unit turns, lease actions) | 12h | High | Planned |
-| 11 | Vendor specialization badges & W-9 verification flags in UI | 4h | Medium | Planned |
-| 12 | HTTP Router static segment precedence over parameterized wildcards | 4h | Medium | Planned |
-| 13 | Comprehensive End-to-End (E2E) integration test suite | 14h | High | Planned |
+| :---: | :--- | :---: | :---: | :---: |
+| 9 | Production packaging (Systemd, Docker Compose, Caddy/Nginx) | 8h | High | ✅ Resolved (PR #26) |
+| 10 | Interactive operator workflows in TS SSR (unit turns, lease actions) | 12h | High | ✅ Resolved (PR #26) |
+| 11 | Vendor specialization badges & W-9 verification flags in UI | 4h | Medium | ✅ Resolved (PR #26) |
+| 12 | HTTP Router static segment precedence over parameterized wildcards | 4h | Medium | ✅ Resolved (PR #26) |
+| 13 | Comprehensive End-to-End (E2E) integration test suite | 14h | High | ✅ Resolved (PR #26) |
 
-### Sprint 3 (Weeks 5–6): Tenant Lifecycle, Security Audit & General Availability
-> **Status**: Planned | **Target**: v0.1.0 (MVP GA) | **Effort**: ~36 hours | **Outcome**: Production-ready self-hosted GA release
+### Sprint 3 (Weeks 5–6): Operator Administration, Universal Attachments & Backup Integration
+> **Status**: In Progress / Planned | **Target**: v0.1.0-alpha | **Effort**: ~44 hours | **Outcome**: Multi-operator administration, Admin GUI & safe document attachments
 
 | Priority | Task | Effort | Impact | Status |
-| ---------- | ------ | -------- | -------- | :---: |
-| 14 | Tenant lifecycle administration API & organization provisioning | 8h | High | Planned |
+| :---: | :--- | :---: | :---: | :---: |
+| 14 | Operator lifecycle administration API (`POST /api/v1/system/operators`) & storage quota governance | 8h | High | Planned |
 | 15 | Global sliding-window rate limiting across all operational routes | 6h | High | Planned |
-| 16 | Formal pre-release security review & penetration audit | 8h | Critical | Planned |
-| 17 | Automated GitHub Actions release pipeline with SHA-256 signatures | 6h | High | Planned |
-| 18 | Self-Hosting Administrator Handbook & deployment runbooks | 8h | Medium | Planned |
+| 16 | Admin Management GUI Subsystem (error reporting, health telemetry, dynamic module status) | 10h | High | Planned |
+| 17 | Highly Configurable Role-Based Access Control (RBAC) permission matrix (`resource:action`) | 6h | High | Planned |
+| 18 | Universal Attachments Subsystem & Document Safety (PDF script sanitization, EXIF stripping) | 8h | High | Planned |
+| 19 | Media & Attachment Backup Engine Integration (packaging physical media in backup archives) | 6h | High | Planned |
 
-### Sprint 4 (Weeks 7–8): Tenant Self-Service, Preventative Maintenance & Communications
-> **Status**: Planned | **Target**: v0.2.0 | **Effort**: ~38 hours | **Outcome**: Enhanced self-service & automated notifications
-
-| Priority | Task | Effort | Impact | Status |
-| ---------- | ------ | -------- | -------- | :---: |
-| 19 | Magic-link authenticated Tenant Self-Service Portal | 12h | High | Planned |
-| 20 | Zero-dependency notification dispatcher (SMTP / webhook) | 8h | High | Planned |
-| 21 | Move-in / move-out condition inspection checklists | 8h | Medium | Planned |
-| 22 | Recurring preventative maintenance scheduling engine | 6h | Medium | Planned |
-| 23 | Periodic balance snapshotting & checkpointing for long tenancies | 4h | Medium | Planned |
-
-### Sprint 5 (Weeks 9–10): Dual-Engine Architecture & Native PostgreSQL Integration
-> **Status**: Planned | **Target**: v0.3.0 | **Effort**: ~44 hours | **Outcome**: Enterprise database backend & horizontal scalability
+### Sprint 4 (Weeks 7–8): Financial Modernization, Client Accounting & Policy Engine
+> **Status**: Planned | **Target**: v0.1.0-beta | **Effort**: ~44 hours | **Outcome**: Single-entry legacy sunset, Client Accounting & Leasing AR policy engine
 
 | Priority | Task | Effort | Impact | Status |
-| ---------- | ------ | -------- | -------- | :---: |
-| 24 | Native PostgreSQL driver adapter implementing zero-dependency boundary | 16h | High | Planned |
-| 25 | Dual-engine migration validation harness (SQLite & PostgreSQL) | 10h | High | Planned |
-| 26 | Multi-instance clustering support behind load balancers | 10h | Medium | Planned |
-| 27 | S3-compatible shared object storage driver | 8h | Medium | Planned |
+| :---: | :--- | :---: | :---: | :---: |
+| 20 | Deprecation & Removal of Legacy Single-Entry Accounting & Abandoned Aliases (`transactions` sunset) | 8h | High | Planned |
+| 21 | Client Accounting & Management Fees (capital contributions, net cash draws, fee agreements) | 10h | High | Planned |
+| 22 | Leasing AR & Fee Policy Engine (recurring lease charges, late fee policy rules, concessions, refunds) | 10h | High | Planned |
+| 23 | Universal Conversations & Notes Subsystem (polymorphic threaded entity notes) | 6h | Medium | Planned |
+| 24 | Zero-dependency notification dispatcher (SMTP / webhook) & preventative maintenance scheduling | 6h | High | Planned |
+| 25 | Periodic balance snapshotting & checkpointing for high-volume tenancies | 4h | Medium | Planned |
 
-### Sprint 6 (Weeks 11–12): Commercial Real Estate (CRE) & Integrated Banking Rails
-> **Status**: Planned | **Target**: v0.4.0 | **Effort**: ~40 hours | **Outcome**: Commercial leases & automated bank feed ingestion
+### Sprint 5 (Weeks 9–10): Foundational General Availability MVP Release
+> **Status**: Planned | **Target**: v0.1.0 GA (Foundational MVP) | **Effort**: ~56 hours | **Outcome**: Packaged GUI installers, public tenant portal, AP & PDF checks
 
 | Priority | Task | Effort | Impact | Status |
-| ---------- | ------ | -------- | -------- | :---: |
-| 28 | Triple Net (NNN) leases & Common Area Maintenance (CAM) engine | 14h | High | Planned |
-| 29 | CPI-indexed and fixed-percentage annual lease escalation schedules | 8h | Medium | Planned |
-| 30 | Direct OFX/QBO bank statement import parser & reconciliation engine | 12h | High | Planned |
-| 31 | Payment processor webhook ingestion & settlement journal entries | 6h | Medium | Planned |
+| :---: | :--- | :---: | :---: | :---: |
+| 26 | Packaged GUI Installers (turnkey click-through setup wizards for Windows, macOS, Linux) | 8h | High | Planned |
+| 27 | Public-Facing Tenant Self-Service Portal on isolated subdomain (`portal.<domain>`) with magic links | 12h | High | Planned |
+| 28 | Safe Mobile Photo Upload Pipeline (EXIF stripping, bounded downsampling to WebP/JPEG) | 6h | High | Planned |
+| 29 | Accounts Payable (AP) Core Subsystem (bills lifecycle, payment terms, work order expense recovery) | 10h | High | Planned |
+| 30 | Multi-Entity Bill Allocations & Recurring Bills (portfolio/unit allocations, recurring intervals) | 6h | High | Planned |
+| 31 | Zero-Dependency PDF Vendor Check Printing (ANSI X9.100-140 standard check layouts) | 6h | High | Planned |
+| 32 | Bank Deposits & Batched Clearing (3-way reconciliation deposit slip batches) | 4h | High | Planned |
+| 33 | Dynamic Custom Fields Engine (validated JSON custom fields on primary entities) | 4h | Medium | Planned |
+
+### Sprint 6 (Weeks 11–12): Dual-Engine Architecture & Native PostgreSQL Integration
+> **Status**: Planned | **Target**: v0.2.0 | **Effort**: ~44 hours | **Outcome**: Enterprise database backend & horizontal scalability
+
+| Priority | Task | Effort | Impact | Status |
+| :---: | :--- | :---: | :---: | :---: |
+| 34 | Native PostgreSQL driver adapter implementing zero-dependency boundary | 16h | High | Planned |
+| 35 | Dual-engine migration validation harness (SQLite & PostgreSQL) | 10h | High | Planned |
+| 36 | Multi-instance clustering support behind load balancers with connection pooling | 10h | Medium | Planned |
+| 37 | S3-compatible shared object storage driver for multi-node deployments | 8h | Medium | Planned |
+
+### Sprint 7 (Weeks 13–14): Commercial Real Estate (CRE) & Integrated Banking Rails
+> **Status**: Planned | **Target**: v0.3.0 | **Effort**: ~40 hours | **Outcome**: Commercial leases & automated bank feed ingestion
+
+| Priority | Task | Effort | Impact | Status |
+| :---: | :--- | :---: | :---: | :---: |
+| 38 | Triple Net (NNN) leases & Common Area Maintenance (CAM) reconciliation engine | 14h | High | Planned |
+| 39 | CPI-indexed and fixed-percentage annual lease escalation schedules | 8h | Medium | Planned |
+| 40 | Direct OFX/QBO bank statement import parser & reconciliation matching | 12h | High | Planned |
+| 41 | Payment processor webhook ingestion & settlement journal entries | 6h | Medium | Planned |
 
 ---
 
@@ -395,12 +411,14 @@ npm run check:hygiene   # Secret scanning
   - Migration ordering fixed with topological dependency sorting.
   - Token stateless revocation fixed with `token_version` tracking.
   - Presentation layer unified with 100% pure TypeScript SSR rebase.
-- **Active Focus for Sprint 2**:
-  - Production deployment packaging (systemd service unit, turnkey docker-compose).
-  - Operator UI workflow actions (vacant-unit turns, lease renewals/terminations).
+- **Completed in Sprint 2**:
+  - Production deployment packaging (Systemd service unit, turnkey Docker Compose, Caddy/Nginx).
+  - Operator UI workflow actions (vacant-unit turns, lease renewals/terminations, vendor trade dispatch).
   - Comprehensive E2E test suite (`test/e2e/lifecycle.test.ts`).
 - **Active Focus for Sprint 3**:
-  - Multi-tenant organization administration API and lifecycle workflows.
+  - Multi-operator administration API and storage quota governance.
+  - Admin Management GUI Subsystem & Configurable RBAC permission matrix.
+  - Universal Attachments Subsystem & Backup media packaging.
   - Pre-release third-party security verification and signed release automation.
 
 ---
@@ -409,14 +427,18 @@ npm run check:hygiene   # Secret scanning
 
 - [x] All P0 critical issues resolved (Sprint 1 - PR #17)
 - [x] All P1 high priority issues resolved (Sprint 1 - PR #18, #19)
-- [ ] All MVP features functional and tested (Sprint 2)
-- [ ] Production packaging complete (Sprint 2)
-- [ ] E2E tests passing (Sprint 2)
-- [ ] Tenant lifecycle administration complete (Sprint 3)
-- [ ] Security review passed (Sprint 3)
-- [ ] Documentation complete & deployment runbooks published (Sprint 3)
+- [x] Production packaging complete (Sprint 2 - PR #26)
+- [x] Operator interactive workflows & E2E tests passing (Sprint 2 - PR #26)
+- [ ] Operator administration, Admin GUI & RBAC complete (Sprint 3)
+- [ ] Universal document attachments with safety sanitization & backup integration (Sprint 3)
+- [ ] Single-entry accounting sunset & Client Portfolio Accounting complete (Sprint 4)
+- [ ] Leasing AR & Fee Policy Engine complete (Sprint 4)
+- [ ] Public-facing Tenant Self-Service Portal on subdomain `portal.<domain>` (Sprint 5)
+- [ ] Accounts Payable (AP), PDF Check Printing & Bank Deposit clearing complete (Sprint 5)
+- [ ] Packaged GUI Installers (Windows/macOS/Linux click-through wizards) complete (Sprint 5)
+- [ ] Documentation complete & deployment runbooks published (Sprint 3-5)
 
-**Estimated Time to MVP**: 2-4 weeks remaining across Sprints 2 & 3
+**Estimated Time to Foundational MVP**: 6 weeks remaining across Sprints 3, 4 & 5 (Target: v0.1.0 GA)
 
 ---
 
@@ -424,23 +446,22 @@ npm run check:hygiene   # Secret scanning
 
 ### For Project Maintainers
 
-1. **Prioritize the 3 P0 issues** - They block any production use
-2. **Establish regular sprint cadence** - 2-week sprints with clear deliverables
-3. **Implement code review checklist** - Ensure all AGENTS.md guardrails are verified
-4. **Set up CI for main branch** - Automated testing on PRs
+1. **Maintain regular sprint cadence** - 2-week execution sprints with clear deliverables
+2. **Enforce code review checklist** - Ensure all AGENTS.md guardrails and clean-room specifications are verified
+3. **Automate CI release pipelines** - Cryptographic SHA-256 verification on tag builds
 
 ### For Contributors
 
-1. **Start with P1 issues** - Good first contributions
-2. **Follow AGENTS.md strictly** - Zero exceptions
+1. **Consult canonical specifications** - Refer directly to `docs/architecture/domain-models.md` and `docs/architecture/api-spec.md`
+2. **Follow AGENTS.md strictly** - Zero external runtime dependencies, integer cents, UUIDv7, UTC epoch ms
 3. **Write tests with all code** - 100% test coverage requirement
 4. **Use conventional commits** - Maintain clean git history
 
 ### For Future Users
 
-1. **Wait for MVP announcement** - Not production-ready yet
-2. **Review security posture** - Before self-hosting
-3. **Plan for Node.js 22+ and PHP 8.2+** - Runtime requirements
+1. **Wait for Foundational MVP announcement** - Production GA at v0.1.0 (End of Sprint 5)
+2. **Review security posture** - Fail-closed secrets and operator isolation
+3. **Plan for Node.js 22+ LTS** - Pure zero-dependency runtime requirement
 
 ---
 

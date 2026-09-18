@@ -504,6 +504,18 @@ CREATE INDEX IF NOT EXISTS idx_work_orders_operator_status ON work_orders(operat
 CREATE INDEX IF NOT EXISTS idx_work_orders_operator_property ON work_orders(operator_id, property_id, unit_id);
 ```
 
+### 4.7. Expanded Foundational MVP Domain Models
+
+For complete SQL schema definitions, constraints, indexes, and double-entry invariants across the full Foundational MVP scope, refer directly to the canonical [Domain Models Specification](domain-models.md) and [API Specification](api-spec.md):
+
+- **Universal Document Attachments & Safety (`attachments`)**: Pre-MVP document storage across leases, properties, contacts, and work orders with automated EXIF stripping and PDF script sanitization (Sprint 3).
+- **Client Portfolio Accounting (`client_capital_contributions`, `client_distributions`, `management_fee_agreements`)**: Fiduciary portfolio/property cash accounting, client contributions, net cash draws, and automated management fees (Sprint 4).
+- **Leasing AR & Policy Engine (`recurring_lease_charges`, `late_fee_policies`, `lease_credits_and_concessions`, `security_deposit_refunds`)**: Itemized recurring rent/utility charges, late fee policy rules, concessions, and deposit refunds (Sprint 4).
+- **Accounts Payable (AP) & Invoicing (`bills`, `bill_allocations`, `recurring_bills`)**: Vendor bill lifecycle, multi-unit expense allocations, and scheduled recurring bills (Sprint 5).
+- **Zero-Dependency PDF Check Printing (`bill_disbursements`)**: Server-rendered ANSI X9.100-140 business and voucher check vector stream generator (Sprint 5).
+- **Bank Deposits & Batched Clearing (`bank_deposits`, `bank_deposit_lines`)**: Deposit batching grouping multiple payments for Three-Way Bank Reconciliation (Sprint 5).
+- **Dynamic Custom Fields (`custom_field_definitions`)**: Schema-free validated JSON attributes on parent operational entities (Sprint 5).
+
 ---
 
 ## 5. Core Engine & Subsystems Architecture

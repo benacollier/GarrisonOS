@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **Foundational MVP Roadmap Re-Alignment & Clean-Room Architecture**:
+  - Re-indexed upcoming sprints (Sprints 3 through 7) and formally established the completion of **Sprint 5 (`v0.1.0 GA`)** as the Foundational General Availability MVP milestone.
+  - Authored canonical clean-room architecture specifications: `docs/architecture/domain-models.md` (complete SQL DDL, column definitions, check constraints, foreign keys, and indexes) and `docs/architecture/api-spec.md` (complete REST endpoint contracts, query parameters, payload schemas, and EventBus topics).
+  - Incorporated **Client Portfolio Accounting & Management Fees** (portfolio fiduciary accounting, capital contributions, client distributions, and fee agreements) into the Foundational MVP scope (Sprint 4).
+  - Scheduled pre-MVP **Universal Attachments Subsystem** with document safety hygiene (automated EXIF stripping, bounded downsampling, PDF executable script sanitization) and **Media Backup Integration** in Sprint 3.
+  - Scheduled **Public-Facing Tenant Self-Service Portal** on an isolated subdomain (`portal.<domain>`), **Packaged GUI Installers** (turnkey click-through Windows/macOS/Linux setup wizards), **Accounts Payable (AP)**, **Zero-Dependency PDF Vendor Check Printing** (ANSI X9.100-140 standard check stock), and **Bank Deposit Batching** in Sprint 5.
+  - Scheduled **Admin Management GUI Subsystem** (error reporting, health telemetry, dynamic module status) and **Configurable Role-Based Access Control (RBAC)** in Sprint 3.
+  - Scheduled **Deprecation & Removal of Legacy Single-Entry Accounting** (`transactions` table sunset and `tenants` view cleanup) in Sprint 4.
+  - Cataloged clean-room Post-MVP Future Horizons (SMS Messaging Rails, Client Portal, Property Inspections, Prospects CRM, Work Order Tasks & Timecards, Enterprise Bulk APIs).
+  - Synchronized `docs/ROADMAP.md`, `docs/LLMREVIEW20260915.md`, `docs/architecture/bootstrap-spec.md`, `docs/modules/overview.md`, and `docs/README.md`.
+
 - **Sprint 2: Production Readiness, Operator Workflows & Release Candidate (v0.1.0-RC1)**:
   - **Turnkey Production Packaging**: Introduced production-grade Systemd service unit (`deploy/systemd/garrison.service`) with full security sandboxing, multi-stage zero-dependency Alpine Dockerfile (`Dockerfile`) executing under an unprivileged `garrison` system user, turnkey `docker-compose.yml`, production reverse proxy configurations for automatic Let's Encrypt TLS in Caddy (`deploy/caddy/Caddyfile`) and hardened Nginx (`deploy/nginx/nginx.conf`), and a comprehensive Self-Hosting Operator Runbook (`docs/deployment/production-guide.md`).
   - **Interactive Operator Workflows**: Added native TypeScript SSR interactive workflows and modal dialogs for vacant-unit turnover (`vacant` $\leftrightarrow$ `turnover` $\leftrightarrow$ `maintenance_hold`) with auto-generated make-ready work orders in `modules/properties/frontend/pages/show.ts`, lease renewals and statutory move-out dispositions in `modules/leases/frontend/pages/show.ts`, and direct contractor dispatch in `modules/maintenance/frontend/pages/show.ts`.
