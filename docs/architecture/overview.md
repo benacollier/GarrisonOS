@@ -86,12 +86,12 @@ The frontend communicates with the backend exclusively via internal loopback HTT
 
 | Layer | Primary Location | Key Responsibilities |
 | :--- | :--- | :--- |
-| **Context Store** | [`core/context.ts`](file:///e:/projects/GarrisonOS/core/context.ts) | Stores operator ID, user ID, and correlation ID using `AsyncLocalStorage`. |
-| **Cryptography** | [`core/crypto.ts`](file:///e:/projects/GarrisonOS/core/crypto.ts) | Generates RFC 9562 UUIDv7 identifiers, scrypt hashes, and HMAC tokens. |
-| **Event Bus** | [`core/events.ts`](file:///e:/projects/GarrisonOS/core/events.ts) | Handles asynchronous domain event publication and subscriptions. |
-| **Storage Driver** | [`core/storage.ts`](file:///e:/projects/GarrisonOS/core/storage.ts) | Manages local disk uploads with path traversal sanitization. |
-| **Module Loader** | [`core/module-loader.ts`](file:///e:/projects/GarrisonOS/core/module-loader.ts) | Auto-discovers manifests, routes, migrations, and event hooks. |
-| **HTTP Layer** | [`api/`](file:///e:/projects/GarrisonOS/api/) | Manages routing, rate limiting, authentication, and standard JSON envelopes. |
-| **Database** | [`database/`](file:///e:/projects/GarrisonOS/database/) | SQLite client, WAL mode settings, migrations runner, and seeder. |
-| **Modules** | [`modules/`](file:///e:/projects/GarrisonOS/modules/) | Self-contained domain modules (`properties`, `contacts`, `leases`, `accounting`, `maintenance`, `backup`). |
-| **Presentation** | [`web/`](file:///e:/projects/GarrisonOS/web/) | TypeScript SSR templates, layouts, dynamic hook registry, and vanilla CSS. |
+| **Context Store** | [`core/context.ts`](../../core/context.ts) | Stores operator ID, user ID, and correlation ID using `AsyncLocalStorage`. |
+| **Cryptography** | [`core/crypto.ts`](../../core/crypto.ts) | Generates RFC 9562 UUIDv7 identifiers, scrypt hashes, and HMAC tokens. |
+| **Event Bus** | [`core/events.ts`](../../core/events.ts) | Handles asynchronous domain event publication and subscriptions. |
+| **Storage Driver** | [`core/storage.ts`](../../core/storage.ts) | Manages local disk uploads with path traversal sanitization. |
+| **Module Loader** | [`core/module-loader.ts`](../../core/module-loader.ts) | Auto-discovers manifests, routes, migrations, and event hooks. |
+| **HTTP Layer** | [`api/`](../../api/) | Manages routing, rate limiting, authentication, and standard JSON envelopes. |
+| **Database** | [`database/`](../../database/) | SQLite client, WAL mode settings, migrations runner, and seeder. |
+| **Modules** | [`modules/`](../../modules/) | Self-contained domain modules (`properties`, `contacts`, `leases`, `accounting`, `maintenance`, `backup`). |
+| **Presentation** | [`web/`](../../web/) | TypeScript SSR templates, layouts, dynamic hook registry, and vanilla CSS. |

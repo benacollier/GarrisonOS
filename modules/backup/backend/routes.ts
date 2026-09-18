@@ -6,6 +6,11 @@ import { BackupService, RestoreTenantOptions } from './service.js';
 import { BackupScheduler } from './scheduler.js';
 import { eventBus } from '../../../core/events.js';
 
+/**
+ * Registers all backup and disaster recovery HTTP endpoints on the router.
+ *
+ * @param router - HTTP router instance.
+ */
 export function registerRoutes(router: Router): void {
   // Scheduler status
   router.getBatchSafe('/api/v1/backups/scheduler/status', (_req, res) => {

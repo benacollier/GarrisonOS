@@ -20,21 +20,6 @@ CREATE TABLE IF NOT EXISTS operators (
 -- Backward compatibility view for legacy queries
 CREATE VIEW IF NOT EXISTS tenants AS SELECT * FROM operators;
 
-CREATE TRIGGER IF NOT EXISTS trg_tenants_insert
-INSTEAD OF INSERT ON tenants
-BEGIN
-    INSERT INTO operators (id, name, subdomain, currency, created_at, updated_at, deleted_at)
-    VALUES (NEW.id, NEW.name, NEW.subdomain, COALESCE(NEW.currency, 'USD'), NEW.created_at, NEW.updated_at, NEW.deleted_at);
-END;
-
-CREATE TRIGGER IF NOT EXISTS trg_tenants_update
-INSTEAD OF UPDATE ON tenants
-BEGIN
-    UPDATE operators
-    SET name = NEW.name, subdomain = NEW.subdomain, currency = NEW.currency, updated_at = NEW.updated_at, deleted_at = NEW.deleted_at
-    WHERE id = OLD.id;
-END;
-
 -- System operators and users
 CREATE TABLE IF NOT EXISTS users (
     id TEXT PRIMARY KEY,

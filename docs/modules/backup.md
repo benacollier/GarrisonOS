@@ -9,9 +9,9 @@ The **Backup & Disaster Recovery Module** (`modules/backup/`) provides zero-depe
 | Capability | Scope | Mechanism |
 | :--- | :--- | :--- |
 | **Full System Database Backup** | Instance Level (Admin) | SQLite WAL checkpoint + `VACUUM INTO` + Gzip stream (`.sqlite.gz`) |
-| **Tenant Data Export** | Tenant Level | Dynamic tenant table extraction + JSON formatting + Gzip (`.json.gz`) |
+| **Operator Data Export** | Operator Level | Dynamic operator table extraction + JSON formatting + Gzip (`.json.gz`) (accepts `operator_data` or legacy `tenant_data`) |
 | **Integrity Verification** | Both | SHA-256 hash computed on completion, validated on-demand |
-| **Tenant Data Restore** | Tenant Level | Atomic import (`withTransaction`) with **Clean-Slate** or **Merge** options |
+| **Operator Data Restore** | Operator Level | Atomic import (`withTransaction`) with **Clean-Slate** or **Merge** options |
 | **Disaster Recovery Restore** | Instance Level | Offline CLI script (`scripts/restore.js`) with binary header check and WAL cache wipe |
 
 ---
@@ -91,16 +91,16 @@ The module includes an in-process, zero-dependency background daemon (`BackupSch
 
 ## 5. Restoration Modes
 
-### Tenant-Level Restoration (`tenant_data`)
+### Operator-Level Restoration (`operator_data` / `tenant_data`)
 
 1. **Clean-Slate (Replace)**:
-   - Deletes existing tenant records in the backed-up tables before inserting snapshot records.
+   - Deletes existing operator records in the backed-up tables before inserting snapshot records.
    - Ideal for rolling back unintentional data alterations or deletions.
 2. **Merge / Upsert**:
    - Updates or inserts matching records from the snapshot by primary key.
    - Preserves newly created records added since the backup was taken.
-3. **Multi-Tenancy Guard**:
-   - The backup metadata is strictly validated against `RequestContext.getTenantId()`. A tenant is strictly barred from restoring another tenant's archive.
+3. **Multi-Operator Guard**:
+   - The backup metadata is strictly validated against `RequestContext.getOperatorId()` (or `RequestContext.getTenantId()`). An operator is strictly barred from restoring another operator's archive.
 
 ### Full System Disaster Recovery (`full_system`)
 

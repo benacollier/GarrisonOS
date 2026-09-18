@@ -1,7 +1,18 @@
 import http from 'node:http';
 import https from 'node:https';
 
+/**
+ * Exception raised when an internal API request encounters an HTTP error or protocol failure.
+ */
 export class ApiException extends Error {
+  /**
+   * Creates an ApiException instance.
+   *
+   * @param message - Human-readable error description.
+   * @param errorCode - Machine-readable error code string.
+   * @param statusCode - HTTP status code.
+   * @param details - Optional error details or validation violations.
+   */
   constructor(
     message: string,
     public readonly errorCode: string = 'API_ERROR',
@@ -13,14 +24,40 @@ export class ApiException extends Error {
   }
 }
 
+/**
+ * Configuration options for initializing an ApiClient instance.
+ */
 export interface ApiClientOptions {
+  /**
+   * Base URL of the core engine HTTP service.
+   */
   baseUrl?: string;
+
+  /**
+   * Operator isolation ID forwarded in X-Operator-ID header.
+   */
   operatorId?: string;
+
+  /**
+   * Legacy alias for operatorId.
+   */
   tenantId?: string;
+
+  /**
+   * Bearer authentication token.
+   */
   authToken?: string | null;
+
+  /**
+   * Authenticated user ID forwarded in X-User-ID header.
+   */
   userId?: string | null;
 }
 
+/**
+ * HTTP client for communicating natively with the internal GarrisonOS Core Engine API.
+ * Forwards operator and user context headers with loopback security checks.
+ */
 export class ApiClient {
   private baseUrl: string;
   private operatorId: string;
@@ -28,6 +65,11 @@ export class ApiClient {
   private authToken: string | null;
   private userId: string | null;
 
+  /**
+   * Initializes a new ApiClient instance.
+   *
+   * @param options - Optional client configuration options.
+   */
   constructor(options?: ApiClientOptions) {
     const port = process.env['PORT'] || '3000';
     const host = process.env['HOST'] || '127.0.0.1';
@@ -38,6 +80,16 @@ export class ApiClient {
     this.userId = options?.userId ?? null;
   }
 
+  /**
+   * Dispatches an HTTP request to the internal API and deserializes the JSON response envelope.
+   *
+   * @typeParam T - Expected response envelope or data type.
+   * @param method - HTTP verb ('GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH').
+   * @param path - Relative API endpoint path.
+   * @param data - Optional JSON serializable body payload.
+   * @returns Deserialized API response.
+   * @throws ApiException if request fails or non-2xx status code returned.
+   */
   public async request<T = any>(
     method: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH',
     path: string,
@@ -125,22 +177,59 @@ export class ApiClient {
     });
   }
 
+  /**
+   * Dispatches an HTTP GET request to the internal API.
+   *
+   * @typeParam T - Expected response payload type.
+   * @param path - Relative API endpoint path.
+   * @returns Deserialized API response.
+   */
   public get<T = any>(path: string): Promise<T> {
     return this.request<T>('GET', path);
   }
 
+  /**
+   * Dispatches an HTTP POST request to the internal API.
+   *
+   * @typeParam T - Expected response payload type.
+   * @param path - Relative API endpoint path.
+   * @param data - Optional request body payload.
+   * @returns Deserialized API response.
+   */
   public post<T = any>(path: string, data?: unknown): Promise<T> {
     return this.request<T>('POST', path, data);
   }
 
+  /**
+   * Dispatches an HTTP PUT request to the internal API.
+   *
+   * @typeParam T - Expected response payload type.
+   * @param path - Relative API endpoint path.
+   * @param data - Optional request body payload.
+   * @returns Deserialized API response.
+   */
   public put<T = any>(path: string, data?: unknown): Promise<T> {
     return this.request<T>('PUT', path, data);
   }
 
+  /**
+   * Dispatches an HTTP DELETE request to the internal API.
+   *
+   * @typeParam T - Expected response payload type.
+   * @param path - Relative API endpoint path.
+   * @param data - Optional request body payload.
+   * @returns Deserialized API response.
+   */
   public delete<T = any>(path: string, data?: unknown): Promise<T> {
     return this.request<T>('DELETE', path, data);
   }
 
+  /**
+   * Dispatches a batch aggregation request for multiple GET endpoints.
+   *
+   * @param paths - Array of relative GET endpoint paths.
+   * @returns Map of endpoint paths to API responses.
+   */
   public async batch(paths: string[]): Promise<Record<string, any>> {
     if (paths.length === 0) return {};
     const res = await this.post('/api/v1/batch', { requests: paths });

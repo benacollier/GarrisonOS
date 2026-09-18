@@ -10,21 +10,56 @@ import { RequestContext } from '../../../core/context.js';
 import { getApplicationVersion } from '../../../core/version.js';
 import { BackupRecord, BackupRepository } from './repository.js';
 
+/**
+ * Options configuring an operator-level data restoration.
+ */
 export interface RestoreOperatorOptions {
+  /**
+   * Restoration strategy: 'clean_slate' wipes existing records, 'merge' upserts by primary/natural key.
+   */
   mode: 'clean_slate' | 'merge';
 }
 
+/**
+ * Backward-compatible alias for RestoreOperatorOptions.
+ */
 export type RestoreTenantOptions = RestoreOperatorOptions;
 
+/**
+ * Outcome of an operator data restoration run.
+ */
 export interface RestoreOperatorResult {
+  /**
+   * Whether the restoration completed successfully.
+   */
   success: boolean;
+
+  /**
+   * Map of table names to row count inserted or updated.
+   */
   restoredTables: { [tableName: string]: number };
+
+  /**
+   * Mode utilized during restoration.
+   */
   mode: 'clean_slate' | 'merge';
 }
 
+/**
+ * Backward-compatible alias for RestoreOperatorResult.
+ */
 export type RestoreTenantResult = RestoreOperatorResult;
 
+/**
+ * Core service executing full database snapshots, scoped operator data exports,
+ * SHA-256 integrity verification, retention pruning, and point-in-time restores.
+ */
 export class BackupService {
+  /**
+   * Returns the absolute path to the local backup storage directory, creating it if needed.
+   *
+   * @returns Absolute path string.
+   */
   public static getBackupDir(): string {
     const baseStorage = process.env['STORAGE_PATH'] || './storage';
     const backupDir = path.resolve(baseStorage, 'backups');
@@ -32,6 +67,13 @@ export class BackupService {
     return backupDir;
   }
 
+  /**
+   * Resolves a relative backup path and defends against directory traversal attacks.
+   *
+   * @param relativePath - Relative path to file inside backup directory.
+   * @returns Absolute sanitized file path.
+   * @throws Error if path escapes the backup directory.
+   */
   public static resolveSafeBackupPath(relativePath: string): string {
     const backupDir = this.getBackupDir();
     const resolvedPath = path.resolve(backupDir, relativePath);
@@ -42,6 +84,12 @@ export class BackupService {
     return resolvedPath;
   }
 
+  /**
+   * Computes the SHA-256 hex digest of a physical file using streaming crypto.
+   *
+   * @param filePath - Path to file to hash.
+   * @returns SHA-256 hex digest string.
+   */
   public static async calculateSha256(filePath: string): Promise<string> {
     const hash = crypto.createHash('sha256');
     const stream = fs.createReadStream(filePath);
@@ -52,6 +100,12 @@ export class BackupService {
     });
   }
 
+  /**
+   * Creates a full SQLite database snapshot using VACUUM INTO, compressed with gzip,
+   * with SHA-256 checksum and metadata registration.
+   *
+   * @returns Completed BackupRecord.
+   */
   public static async createFullDatabaseBackup(): Promise<BackupRecord> {
     const operatorId = RequestContext.getOperatorId();
     const timestamp = Date.now();
@@ -117,6 +171,11 @@ export class BackupService {
     }
   }
 
+  /**
+   * Generates a compressed JSON export containing all records belonging to the active operator.
+   *
+   * @returns Completed BackupRecord representing the operator export.
+   */
   public static async createOperatorExport(): Promise<BackupRecord> {
     const operatorId = RequestContext.getOperatorId();
     const timestamp = Date.now();
@@ -198,10 +257,21 @@ export class BackupService {
     }
   }
 
+  /**
+   * Backward-compatible alias for createOperatorExport.
+   *
+   * @returns Completed BackupRecord representing the export.
+   */
   public static async createTenantExport(): Promise<BackupRecord> {
     return this.createOperatorExport();
   }
 
+  /**
+   * Verifies the cryptographic SHA-256 integrity of a stored backup archive against its recorded checksum.
+   *
+   * @param backupId - Unique backup identifier.
+   * @returns Integrity verification results including validity boolean and calculated SHA-256 hash.
+   */
   public static async verifyBackupIntegrity(backupId: string): Promise<{ valid: boolean; calculatedSha256: string; record: BackupRecord }> {
     const record = BackupRepository.getById(backupId);
     if (!record) {
@@ -223,6 +293,12 @@ export class BackupService {
     return { valid, calculatedSha256, record };
   }
 
+  /**
+   * Deletes a backup record and unlinks its physical file archive from disk.
+   *
+   * @param backupId - Unique backup identifier.
+   * @returns True if soft deletion was recorded, false if record not found.
+   */
   public static deleteBackup(backupId: string): boolean {
     const record = BackupRepository.getById(backupId);
     if (!record) {
@@ -242,6 +318,12 @@ export class BackupService {
     return BackupRepository.softDelete(backupId);
   }
 
+  /**
+   * Prunes backup archives older than the specified retention period in days.
+   *
+   * @param retentionDays - Retention window threshold in days.
+   * @returns Count of pruned backup archives.
+   */
   public static pruneOldBackups(retentionDays: number): number {
     const oldBackups = BackupRepository.getOldBackups(retentionDays);
     let pruned = 0;
@@ -305,9 +387,10 @@ export class BackupService {
 
   /**
    * Restore operator data from a backup archive buffer or on-disk backup ID.
-   * Options:
-   *  - clean_slate: Replaces all operator records in the backed up tables before inserting.
-   *  - merge: Inserts or replaces records without deleting unmentioned operator records.
+   *
+   * @param source - Object containing either backupId or compressedBuffer.
+   * @param options - Restore options specifying 'clean_slate' or 'merge' mode.
+   * @returns Details of restored tables and row counts.
    */
   public static async restoreOperatorData(
     source: { backupId?: string; compressedBuffer?: Buffer },
@@ -448,6 +531,13 @@ export class BackupService {
     };
   }
 
+  /**
+   * Backward-compatible alias for restoreOperatorData.
+   *
+   * @param source - Object containing either backupId or compressedBuffer.
+   * @param options - Restore options specifying 'clean_slate' or 'merge' mode.
+   * @returns Details of restored tables and row counts.
+   */
   public static async restoreTenantData(
     source: { backupId?: string; compressedBuffer?: Buffer },
     options: RestoreTenantOptions = { mode: 'clean_slate' }
@@ -458,6 +548,8 @@ export class BackupService {
   /**
    * Disaster Recovery: Restores the full SQLite database from a .sqlite.gz snapshot.
    * Safely removes active WAL/SHM handles, swaps files, and re-applies any pending migrations.
+   *
+   * @param sourcePath - Path to the snapshot archive file.
    */
   public static async restoreFullDatabase(sourcePath: string): Promise<void> {
     if (!fs.existsSync(sourcePath)) {

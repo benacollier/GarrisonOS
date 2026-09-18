@@ -5,26 +5,98 @@ import { getDatabase } from '../../../database/client.js';
 import { BackupRecord } from './repository.js';
 import { BackupService } from './service.js';
 
+/**
+ * Configuration options governing the background backup scheduler.
+ */
 export interface SchedulerConfig {
+  /**
+   * Whether the background scheduler is active.
+   */
   enabled: boolean;
+
+  /**
+   * Interval in hours between automated full system backups.
+   */
   intervalHours: number;
+
+  /**
+   * Number of days to retain backups before pruning.
+   */
   retentionDays: number;
+
+  /**
+   * Interval in hours between automated database vacuum and maintenance routines.
+   */
   vacuumIntervalHours: number;
 }
 
+/**
+ * Operational metrics and status details for the background backup scheduler.
+ */
 export interface SchedulerStatus {
+  /**
+   * Whether the scheduler is configured as enabled.
+   */
   enabled: boolean;
+
+  /**
+   * Whether background timers are currently running.
+   */
   running: boolean;
+
+  /**
+   * Configured backup interval in hours.
+   */
   intervalHours: number;
+
+  /**
+   * Configured retention period in days.
+   */
   retentionDays: number;
+
+  /**
+   * Configured vacuum interval in hours.
+   */
   vacuumIntervalHours: number;
+
+  /**
+   * Epoch millisecond timestamp of the last executed backup, or null.
+   */
   lastBackupAt: number | null;
+
+  /**
+   * Status of the last executed backup.
+   */
   lastBackupStatus: 'completed' | 'failed' | null;
+
+  /**
+   * Epoch millisecond timestamp of the last executed vacuum routine, or null.
+   */
   lastVacuumAt: number | null;
+
+  /**
+   * Epoch millisecond timestamp of the next scheduled backup run, or null.
+   */
   nextScheduledBackupAt: number | null;
+
+  /**
+   * Epoch millisecond timestamp of the next scheduled vacuum routine, or null.
+   */
   nextScheduledVacuumAt: number | null;
+
+  /**
+   * Cumulative count of automated backups executed since boot.
+   */
   totalBackupsRun: number;
+
+  /**
+   * Cumulative count of vacuum routines executed since boot.
+   */
   totalVacuumsRun: number;
+
+  /**
+   * Type of maintenance currently in progress, or null if idle.
+   */
   maintenanceInProgress: 'backup' | 'vacuum' | null;
 }
 
@@ -103,6 +175,12 @@ export class BackupScheduler {
     this.config = config;
   }
 
+  /**
+   * Retrieves the singleton BackupScheduler instance, initializing it if necessary.
+   *
+   * @param config - Optional configuration overrides.
+   * @returns The singleton BackupScheduler instance.
+   */
   public static getInstance(config?: Partial<SchedulerConfig>): BackupScheduler {
     if (!BackupScheduler.instance) {
       BackupScheduler.instance = new BackupScheduler(config);

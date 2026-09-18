@@ -62,10 +62,10 @@ This document outlines the high-level roadmap to MVP for **GarrisonOS**, structu
 
 ## Phase 6: Data Portability, Resilience & Backup
 >
-> *Protecting tenant data and enabling self-hosted operational independence.*
+> *Protecting operator data and enabling self-hosted operational independence.*
 
 * Point-in-time database snapshotting and WAL checkpoint management.
-* Tenant data export/import workflows.
+* Operator data export/import workflows.
 * Disaster recovery, automated scheduled backups, and database vacuuming routines.
 
 ---
@@ -74,7 +74,7 @@ This document outlines the high-level roadmap to MVP for **GarrisonOS**, structu
 >
 > *Final release criteria, security verification, and turn-key deployment readiness.*
 
-* End-to-end integration and tenant isolation regression test suites.
+* End-to-end integration and operator isolation regression test suites.
 * Security review (input sanitization, CSP/XSS defense, timing-safe auth checks, and token spoofing prevention).
 * Secure release packaging (Method 2: pre-packaged release archives with cryptographic SHA-256 checksum verification).
 * Production packaging (Systemd / Supervisord configs, reverse proxy templates, and single-command local setup scripts).
@@ -112,12 +112,12 @@ To bridge high-level architectural phases with practical development velocity, G
 
 ---
 
-### Sprint 3 (Weeks 5–6): Tenant Lifecycle Administration, Security Audit & General Availability
+### Sprint 3 (Weeks 5–6): Operator Lifecycle Administration, Security Audit & General Availability
 > **Status**: Planned | **Release Target**: v0.1.0 (MVP GA)
 
 | Work Stream | Key Deliverables | Target Phase |
 | :--- | :--- | :---: |
-| **Tenant Lifecycle Management** | Implement full tenant administration workflows: organization provisioning API (`POST /api/v1/system/tenants`), tenant deactivation, and storage quota governance. | Phase 1 |
+| **Operator Lifecycle Management** | Implement full operator administration workflows: operator provisioning API (`POST /api/v1/system/operators` with legacy `/api/v1/system/tenants` compatibility alias), operator deactivation, and storage quota governance. | Phase 1 |
 | **Global Rate Limiting** | Expand sliding-window in-memory rate limiting across all operational routes, safeguarding against denial-of-service and brute-force ingress. | Phase 1, 7 |
 | **Third-Party Security Audit** | Conduct formal pre-release penetration review: timing-safe cryptographic comparisons, strict CSP enforcement, session replay resistance, and fail-closed installer tests. | Phase 7 |
 | **Automated Release Pipeline** | Implement GitHub Actions workflow building verified release tarballs with cryptographic `SHA256SUMS` and detached GPG/minisign signatures matching installer expectations. | Phase 7 |
@@ -169,4 +169,4 @@ To bridge high-level architectural phases with practical development velocity, G
 * **Native PostgreSQL Driver**: Drop-in PostgreSQL database engine integration leveraging strict ANSI/PostgreSQL DDL standards established in `AGENTS.md`.
 * **Commercial Real Estate (CRE)**: Common Area Maintenance (CAM) reconciliations, Triple Net (NNN) expense pools, and CPI lease escalation schedules.
 * **Integrated Payment Gateways**: Automated ACH debit/credit rails and live bank feed interoperability (OFX/QBO/Plaid).
-* **Multi-Instance Clustering**: Scalable multi-tenant node clusters with centralized connection pooling.
+* **Multi-Instance Clustering**: Scalable multi-operator node clusters with centralized connection pooling.

@@ -32,7 +32,11 @@ const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000; // 15 minutes
 const RATE_LIMIT_MAX_ATTEMPTS = 10;
 
 /**
- * Resolve the response origin without ever reflecting an unconfigured origin.
+ * Resolves the response origin without ever reflecting an unconfigured origin.
+ *
+ * @param origin - The Incoming Origin header value from the client request.
+ * @param allowedOrigins - Set of configured allowed origin URLs.
+ * @returns The matching allowed origin or the first configured fallback origin.
  */
 export function resolveCorsOrigin(origin: string | undefined, allowedOrigins: ReadonlySet<string>): string | undefined {
   if (origin && allowedOrigins.has(origin)) return origin;
@@ -40,7 +44,12 @@ export function resolveCorsOrigin(origin: string | undefined, allowedOrigins: Re
 }
 
 /**
- * Security headers and CORS middleware.
+ * Security headers and CORS middleware. Applies defensive headers (CSP, nosniff, DENY)
+ * and verifies origin against the configured whitelist.
+ *
+ * @param req - The API request object.
+ * @param res - The HTTP server response object.
+ * @param next - Function to invoke the next middleware in the pipeline.
  */
 export const securityHeadersMiddleware: Middleware = async (req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
@@ -59,7 +68,12 @@ export const securityHeadersMiddleware: Middleware = async (req, res, next) => {
 };
 
 /**
- * Correlation ID tracking middleware.
+ * Correlation ID tracking middleware. Extracts incoming X-Request-ID or generates
+ * a new RFC 9562 UUIDv7 for distributed tracing.
+ *
+ * @param req - The API request object.
+ * @param res - The HTTP server response object.
+ * @param next - Function to invoke the next middleware in the pipeline.
  */
 export const correlationMiddleware: Middleware = async (req, res, next) => {
   const headerId = req.headers['x-request-id'];
@@ -70,7 +84,12 @@ export const correlationMiddleware: Middleware = async (req, res, next) => {
 };
 
 /**
- * In-memory sliding-window rate limiter for sensitive authentication routes.
+ * In-memory sliding-window rate limiter for sensitive authentication and setup routes.
+ * Throttles brute-force attempts per IP and endpoint.
+ *
+ * @param req - The API request object.
+ * @param res - The HTTP server response object.
+ * @param next - Function to invoke the next middleware in the pipeline.
  */
 export const rateLimitMiddleware: Middleware = async (req, res, next) => {
   if (req.path.startsWith('/api/v1/auth/') || req.path === '/api/v1/system/setup' || req.path === '/api/v1/system/restore') {
@@ -102,6 +121,12 @@ export const rateLimitMiddleware: Middleware = async (req, res, next) => {
 
 /**
  * Multi-operator resolution and AsyncLocalStorage context execution wrapper.
+ * Resolves operator context from headers and bearer tokens, verifies identity consistency,
+ * and wraps execution within RequestContext.
+ *
+ * @param req - The API request object.
+ * @param res - The HTTP server response object.
+ * @param next - Function to invoke the next middleware in the pipeline.
  */
 export const operatorContextMiddleware: Middleware = async (req, res, next) => {
   const isBatchRoute = req.path === '/api/v1/batch' || req.path === '/api/v1/batch/';

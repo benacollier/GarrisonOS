@@ -2,38 +2,126 @@ import { getDatabase } from '../../../database/client.js';
 import { RequestContext } from '../../../core/context.js';
 import { generateUUIDv7 } from '../../../core/crypto.js';
 
+/**
+ * Maintenance work order entity.
+ */
 export interface WorkOrder {
+  /** Unique work order identifier (UUIDv7). */
   id: string;
+  /** Primary operator isolation identifier. */
   operator_id: string;
+  /** Legacy tenant isolation identifier (backward-compatibility alias). */
   tenant_id?: string;
+  /** Identifier of the associated property. */
   property_id: string;
+  /** Optional identifier of the associated unit. */
   unit_id?: string | null;
+  /** Short summary of the repair or maintenance issue. */
   title: string;
+  /** Detailed description of the requested work. */
   description: string;
+  /** Current workflow status. */
   status: 'open' | 'assigned' | 'in_progress' | 'on_hold' | 'completed' | 'cancelled';
+  /** Urgency level of the work order. */
   priority: 'low' | 'medium' | 'high' | 'emergency';
+  /** Trade or domain classification. */
   category: 'plumbing' | 'electrical' | 'hvac' | 'appliance' | 'structural' | 'cosmetic' | 'pest' | 'other';
+  /** 1 if technician has permission to enter, 0 otherwise. */
   permission_to_enter: number;
+  /** Access instructions or lockbox codes. */
   entry_instructions?: string | null;
+  /** Contact ID of the person who reported the issue. */
   requested_by_contact_id?: string | null;
+  /** Contact ID of the assigned vendor or technician. */
   vendor_contact_id?: string | null;
+  /** Scheduled service timestamp in epoch milliseconds. */
   scheduled_date?: number | null;
+  /** Completion timestamp in epoch milliseconds. */
   completed_date?: number | null;
+  /** Estimated cost in integer cents. */
   estimated_cost_cents: number;
+  /** Actual recorded cost in integer cents. */
   actual_cost_cents: number;
+  /** Created timestamp in epoch milliseconds. */
   created_at: number;
+  /** Last updated timestamp in epoch milliseconds. */
   updated_at: number;
+  /** Soft-deletion timestamp in epoch milliseconds, or null if active. */
   deleted_at?: number | null;
 }
 
+/**
+ * Maintenance work order enriched with joined relation names.
+ */
 export interface WorkOrderWithDetails extends WorkOrder {
+  /** Name of the associated property. */
   property_name?: string;
+  /** Unit number or identifier. */
   unit_number?: string;
+  /** Full name of the assigned vendor. */
   vendor_name?: string;
+  /** Full name of the requesting contact. */
   requested_by_name?: string;
 }
 
+/**
+ * Data access and query repository for maintenance work orders.
+ */
 export class MaintenanceRepository {
+  /**
+   * Validate that all supplied relation IDs belong to the active operator.
+   * Prevents cross-operator Insecure Direct Object References (IDOR).
+   *
+   * @param operatorId - Active operator context identifier.
+   * @param propertyId - Property identifier to validate.
+   * @param unitId - Optional unit identifier to validate against property and operator.
+   * @param requestedByContactId - Optional requesting contact identifier.
+   * @param vendorContactId - Optional vendor contact identifier.
+   */
+  private static validateOwnership(
+    operatorId: string,
+    propertyId?: string,
+    unitId?: string | null,
+    requestedByContactId?: string | null,
+    vendorContactId?: string | null
+  ): void {
+    const db = getDatabase();
+
+    if (propertyId) {
+      const prop = db.prepare('SELECT id FROM properties WHERE id = ? AND operator_id = ? AND deleted_at IS NULL').get(propertyId, operatorId);
+      if (!prop) {
+        throw new Error(`Property ${propertyId} not found or does not belong to the active operator`);
+      }
+    }
+
+    if (unitId && propertyId) {
+      const unit = db.prepare('SELECT id FROM units WHERE id = ? AND operator_id = ? AND property_id = ? AND deleted_at IS NULL').get(unitId, operatorId, propertyId);
+      if (!unit) {
+        throw new Error(`Unit ${unitId} not found or does not belong to property ${propertyId} for the active operator`);
+      }
+    }
+
+    if (requestedByContactId) {
+      const contact = db.prepare('SELECT id FROM contacts WHERE id = ? AND operator_id = ? AND deleted_at IS NULL').get(requestedByContactId, operatorId);
+      if (!contact) {
+        throw new Error(`Contact ${requestedByContactId} not found or does not belong to the active operator`);
+      }
+    }
+
+    if (vendorContactId) {
+      const vendor = db.prepare('SELECT id FROM contacts WHERE id = ? AND operator_id = ? AND deleted_at IS NULL').get(vendorContactId, operatorId);
+      if (!vendor) {
+        throw new Error(`Vendor contact ${vendorContactId} not found or does not belong to the active operator`);
+      }
+    }
+  }
+
+  /**
+   * List all work orders for the active operator, optionally filtered.
+   *
+   * @param filter - Optional criteria for status, priority, property, or unit.
+   * @returns Array of work orders with joined details.
+   */
   public static listWorkOrders(filter?: {
     status?: string;
     priority?: string;
@@ -51,10 +139,10 @@ export class MaintenanceRepository {
         v.first_name || ' ' || v.last_name as vendor_name,
         r.first_name || ' ' || r.last_name as requested_by_name
       FROM work_orders w
-      JOIN properties p ON w.property_id = p.id
-      LEFT JOIN units u ON w.unit_id = u.id
-      LEFT JOIN contacts v ON w.vendor_contact_id = v.id
-      LEFT JOIN contacts r ON w.requested_by_contact_id = r.id
+      JOIN properties p ON w.property_id = p.id AND p.operator_id = w.operator_id AND p.deleted_at IS NULL
+      LEFT JOIN units u ON w.unit_id = u.id AND u.operator_id = w.operator_id AND u.deleted_at IS NULL
+      LEFT JOIN contacts v ON w.vendor_contact_id = v.id AND v.operator_id = w.operator_id AND v.deleted_at IS NULL
+      LEFT JOIN contacts r ON w.requested_by_contact_id = r.id AND r.operator_id = w.operator_id AND r.deleted_at IS NULL
       WHERE w.operator_id = ? AND w.deleted_at IS NULL
     `;
     const params: any[] = [operatorId];
@@ -78,9 +166,19 @@ export class MaintenanceRepository {
 
     sql += " ORDER BY CASE w.priority WHEN 'emergency' THEN 1 WHEN 'high' THEN 2 WHEN 'medium' THEN 3 ELSE 4 END, w.created_at DESC";
 
-    return db.prepare(sql).all(...params) as unknown as WorkOrderWithDetails[];
+    const rows = db.prepare(sql).all(...params) as unknown as WorkOrderWithDetails[];
+    return rows.map((row) => ({
+      ...row,
+      tenant_id: row.operator_id
+    }));
   }
 
+  /**
+   * Retrieve a work order by identifier within the active operator context.
+   *
+   * @param id - Work order identifier.
+   * @returns Detailed work order record or null if not found.
+   */
   public static getWorkOrderById(id: string): WorkOrderWithDetails | null {
     const operatorId = RequestContext.getOperatorId();
     const db = getDatabase();
@@ -93,16 +191,27 @@ export class MaintenanceRepository {
         v.first_name || ' ' || v.last_name as vendor_name,
         r.first_name || ' ' || r.last_name as requested_by_name
       FROM work_orders w
-      JOIN properties p ON w.property_id = p.id
-      LEFT JOIN units u ON w.unit_id = u.id
-      LEFT JOIN contacts v ON w.vendor_contact_id = v.id
-      LEFT JOIN contacts r ON w.requested_by_contact_id = r.id
+      JOIN properties p ON w.property_id = p.id AND p.operator_id = w.operator_id AND p.deleted_at IS NULL
+      LEFT JOIN units u ON w.unit_id = u.id AND u.operator_id = w.operator_id AND u.deleted_at IS NULL
+      LEFT JOIN contacts v ON w.vendor_contact_id = v.id AND v.operator_id = w.operator_id AND v.deleted_at IS NULL
+      LEFT JOIN contacts r ON w.requested_by_contact_id = r.id AND r.operator_id = w.operator_id AND r.deleted_at IS NULL
       WHERE w.id = ? AND w.operator_id = ? AND w.deleted_at IS NULL
     `).get(id, operatorId) as WorkOrderWithDetails | undefined;
 
-    return row || null;
+    if (!row) return null;
+    return {
+      ...row,
+      tenant_id: row.operator_id
+    };
   }
 
+  /**
+   * Create a new maintenance work order.
+   * Validates that property, unit, and contact references belong to the active operator.
+   *
+   * @param data - Work order creation payload.
+   * @returns Created work order with joined details.
+   */
   public static createWorkOrder(data: {
     property_id: string;
     unit_id?: string;
@@ -123,6 +232,15 @@ export class MaintenanceRepository {
     const db = getDatabase();
     const id = generateUUIDv7();
     const now = Date.now();
+
+    // Validate operator ownership of all supplied relation IDs
+    MaintenanceRepository.validateOwnership(
+      operatorId,
+      data.property_id,
+      data.unit_id,
+      data.requested_by_contact_id,
+      data.vendor_contact_id
+    );
 
     db.prepare(`
       INSERT INTO work_orders (
@@ -155,6 +273,14 @@ export class MaintenanceRepository {
     return MaintenanceRepository.getWorkOrderById(id)!;
   }
 
+  /**
+   * Update an existing work order.
+   * Validates ownership of updated property, unit, or contact references.
+   *
+   * @param id - Work order identifier.
+   * @param data - Mutable work order fields.
+   * @returns Updated work order with details or null if not found.
+   */
   public static updateWorkOrder(id: string, data: Partial<Omit<WorkOrder, 'id' | 'operator_id' | 'created_at' | 'updated_at' | 'deleted_at'>>): WorkOrderWithDetails | null {
     const existing = MaintenanceRepository.getWorkOrderById(id);
     if (!existing) return null;
@@ -163,6 +289,15 @@ export class MaintenanceRepository {
     const db = getDatabase();
     const now = Date.now();
     const updated = { ...existing, ...data, updated_at: now };
+
+    // Validate operator ownership of any modified or existing relation IDs
+    MaintenanceRepository.validateOwnership(
+      operatorId,
+      updated.property_id,
+      updated.unit_id,
+      updated.requested_by_contact_id,
+      updated.vendor_contact_id
+    );
 
     db.prepare(`
       UPDATE work_orders SET
@@ -196,6 +331,13 @@ export class MaintenanceRepository {
     return MaintenanceRepository.getWorkOrderById(id);
   }
 
+  /**
+   * Mark a work order as completed and record its final actual cost.
+   *
+   * @param id - Work order identifier.
+   * @param actualCostCents - Final cost in integer cents.
+   * @returns Updated work order or null if not found.
+   */
   public static completeWorkOrder(id: string, actualCostCents?: number): WorkOrderWithDetails | null {
     const existing = MaintenanceRepository.getWorkOrderById(id);
     if (!existing) return null;
@@ -217,6 +359,12 @@ export class MaintenanceRepository {
     return MaintenanceRepository.getWorkOrderById(id);
   }
 
+  /**
+   * Soft-delete a work order.
+   *
+   * @param id - Work order identifier.
+   * @returns True if deleted, false if not found.
+   */
   public static deleteWorkOrder(id: string): boolean {
     const operatorId = RequestContext.getOperatorId();
     const db = getDatabase();
@@ -228,6 +376,11 @@ export class MaintenanceRepository {
     return info.changes > 0;
   }
 
+  /**
+   * Compute aggregated metrics for dashboard presentation.
+   *
+   * @returns Counts of open, emergency, in-progress, and recently completed work orders.
+   */
   public static getMaintenanceMetrics(): {
     openWorkOrders: number;
     emergencyWorkOrders: number;
@@ -250,3 +403,4 @@ export class MaintenanceRepository {
     };
   }
 }
+

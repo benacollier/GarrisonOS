@@ -5,17 +5,57 @@ import { renderSidebar } from './sidebar.js';
 import { renderHeader } from './header.js';
 import { renderFlash } from './flash.js';
 
+/**
+ * Configuration options for rendering the primary application layout wrapper.
+ */
 export interface LayoutOptions {
+  /**
+   * Title of the page.
+   */
   title?: string;
+
+  /**
+   * Inner HTML page body content.
+   */
   content: SafeHtml | string;
+
+  /**
+   * Authenticated user session profile, or null.
+   */
   user: SessionUser | null;
+
+  /**
+   * Active operator isolation identifier.
+   */
   operatorId?: string;
+
+  /**
+   * Legacy alias for operatorId.
+   */
   tenantId?: string;
+
+  /**
+   * Registered navigation items to render in the sidebar.
+   */
   navItems: NavigationItem[];
+
+  /**
+   * Ephemeral flash alert messages to display.
+   */
   flashMessages?: FlashMessage[];
+
+  /**
+   * Current URL path for active link highlighting.
+   */
   currentPath: string;
 }
 
+/**
+ * Renders the primary outer HTML document shell containing sidebar, header, flash alerts, and content.
+ *
+ * @param options - Layout parameters and view contents.
+ * @returns Complete HTML document string.
+ */
 export function renderLayout(options: LayoutOptions): string {
   const pageTitle = options.title ? `${options.title} – GarrisonOS` : 'GarrisonOS Property Management';
   const sidebar = renderSidebar(options.navItems, options.currentPath);

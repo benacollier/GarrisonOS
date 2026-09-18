@@ -82,7 +82,7 @@ garrison-os/
 │   └── legal/
 │
 ├── core/                      # Engine Foundation & Runtime
-│   ├── context.ts             # AsyncLocalStorage tenant & user context
+│   ├── context.ts             # AsyncLocalStorage operator & user context
 │   ├── crypto.ts              # Native RFC 9562 UUIDv7 generator, scrypt hashing, auth tokens
 │   ├── events.ts              # Native EventEmitter event bus
 │   ├── storage.ts             # Native node:fs file storage abstraction & local driver
@@ -91,7 +91,7 @@ garrison-os/
 │
 ├── api/                       # Zero-Dependency HTTP Layer
 │   ├── router.ts              # Native HTTP router (methods, regex/params, body parsing)
-│   ├── middleware.ts          # Tenant resolution, auth verification, CORS, rate limiting
+│   ├── middleware.ts          # Operator resolution, auth verification, CORS, rate limiting
 │   ├── response.ts            # Standardized JSON response envelopes & status codes
 │   ├── server.ts              # Native node:http server harness & health checks
 │   └── index.ts
@@ -110,18 +110,18 @@ garrison-os/
 │   ├── accounting/            # Cash-basis ledger, billing cycles, Schedule E & balances
 │   └── maintenance/           # Work order tracking, vendor dispatch, cost conversion
 │
-├── web/                       # Presentation Layer (Native PHP / Semantic HTML5)
-│   ├── index.php              # Front controller, CSRF validator & dynamic page dispatcher
-│   ├── lib/                   # Native cURL client, auth, CSRF, and slot hooks
+├── web/                       # Presentation Layer (Native TypeScript SSR / Semantic HTML5)
+│   ├── index.ts               # Front controller, CSRF validator & dynamic route dispatcher
+│   ├── lib/                   # Native HTTP client, session, auth, CSRF, and HTML template engine
 │   ├── templates/             # Layouts, navigation, headers, and flash alerts
-│   ├── pages/                 # Dashboard, login, and error pages
+│   ├── pages/                 # Dashboard, login, setup, and module view pages
 │   └── public/                # Design tokens (CSS Custom Properties), styles, minimal JS
 │
 └── test/                      # Native node:test & node:assert Suite
     ├── helpers.ts             # In-memory SQLite fixtures & mock HTTP harnesses
     ├── crypto.test.ts         # UUIDv7 format, bit validation & scrypt hashing tests
     ├── context.test.ts        # AsyncLocalStorage propagation & concurrency tests
-    ├── isolation.test.ts      # Cross-tenant data isolation & leak prevention tests
+    ├── isolation.test.ts      # Cross-operator data isolation & leak prevention tests
     ├── router.test.ts         # Route matching, parameter extraction, body parsing tests
     └── modules.test.ts        # Module auto-discovery & migration runner tests
 ```
@@ -163,16 +163,15 @@ loaded module metadata:
 - **`migrations/`**: Sequentially numbered SQL migrations prefixed with module identifier (e.g., `0001_properties.sql`). Executed automatically on boot.
 - **`routes.ts`**: Exports `registerRoutes(router: Router): void`. Routes are mounted under `/api/v1/[module_id]`.
 - **`events.ts`**: Exports `registerSubscribers(eventBus: EventBus): void`.
-- **`repository.ts`**: Encapsulates all SQL execution, strictly accepting only the tenant context from `RequestContext.get()` and query arguments.
+- **`repository.ts`**: Encapsulates all SQL execution, strictly accepting only the operator context from `RequestContext.get()` and query arguments.
 
 ### 3.3. Frontend Contracts (`frontend/`)
 
-- **`hooks.php`**: Registers navigation links, dashboard summary cards, and detail view tabs with the central hook registry.
-- **`pages/`**: PHP view scripts dispatched dynamically by `web/index.php` when navigating to `/[module_name]/[view]`.
+- Module pages and view extensions are authored using native TypeScript tagged template SSR (`web/lib/html.ts`).
 
 ### 3.4. Test Contracts (`test/`)
 
-- **`[module_name].test.ts`**: Co-located unit and integration test suite executing under native `node:test` and `node:assert`. Covers module repositories, route endpoints, lifecycle states, and tenant context isolation. Automatically discovered and executed on `npm test`.
+- **`[module_name].test.ts`**: Co-located unit and integration test suite executing under native `node:test` and `node:assert`. Covers module repositories, route endpoints, lifecycle states, and operator context isolation. Automatically discovered and executed on `node scripts/test.js [module_name]`.
 
 ---
 
@@ -189,8 +188,8 @@ CREATE TABLE IF NOT EXISTS _migrations (
     applied_at INTEGER NOT NULL
 );
 
--- Multi-tenant accounts
-CREATE TABLE IF NOT EXISTS tenants (
+-- Multi-operator accounts (property management firm / landlord)
+CREATE TABLE IF NOT EXISTS operators (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
     subdomain TEXT UNIQUE,
@@ -200,10 +199,15 @@ CREATE TABLE IF NOT EXISTS tenants (
     deleted_at INTEGER
 );
 
+-- Backward-compatibility view mapping legacy 'tenants' queries to 'operators'
+CREATE VIEW IF NOT EXISTS tenants AS
+SELECT id, name, subdomain, currency, created_at, updated_at, deleted_at
+FROM operators;
+
 -- System operators and users
 CREATE TABLE IF NOT EXISTS users (
     id TEXT PRIMARY KEY,
-    tenant_id TEXT NOT NULL,
+    operator_id TEXT NOT NULL,
     email TEXT NOT NULL,
     password_hash TEXT NOT NULL,
     first_name TEXT NOT NULL,
@@ -212,14 +216,14 @@ CREATE TABLE IF NOT EXISTS users (
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL,
     deleted_at INTEGER,
-    FOREIGN KEY (tenant_id) REFERENCES tenants(id)
+    FOREIGN KEY (operator_id) REFERENCES operators(id)
 );
-CREATE UNIQUE INDEX IF NOT EXISTS idx_users_tenant_email ON users(tenant_id, email) WHERE deleted_at IS NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_users_operator_email ON users(operator_id, email) WHERE deleted_at IS NULL;
 
 -- Immutable Audit Log Trail
 CREATE TABLE IF NOT EXISTS audit_logs (
     id TEXT PRIMARY KEY,
-    tenant_id TEXT NOT NULL,
+    operator_id TEXT NOT NULL,
     user_id TEXT,
     entity_type TEXT NOT NULL,
     entity_id TEXT NOT NULL,
@@ -227,14 +231,14 @@ CREATE TABLE IF NOT EXISTS audit_logs (
     changes_json TEXT,
     ip_address TEXT,
     created_at INTEGER NOT NULL,
-    FOREIGN KEY (tenant_id) REFERENCES tenants(id)
+    FOREIGN KEY (operator_id) REFERENCES operators(id)
 );
-CREATE INDEX IF NOT EXISTS idx_audit_logs_tenant_entity ON audit_logs(tenant_id, entity_type, entity_id);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_operator_entity ON audit_logs(operator_id, entity_type, entity_id);
 
 -- File attachments & document metadata
 CREATE TABLE IF NOT EXISTS attachments (
     id TEXT PRIMARY KEY,
-    tenant_id TEXT NOT NULL,
+    operator_id TEXT NOT NULL,
     entity_type TEXT NOT NULL,
     entity_id TEXT NOT NULL,
     file_name TEXT NOT NULL,
@@ -243,9 +247,9 @@ CREATE TABLE IF NOT EXISTS attachments (
     mime_type TEXT NOT NULL,
     created_at INTEGER NOT NULL,
     deleted_at INTEGER,
-    FOREIGN KEY (tenant_id) REFERENCES tenants(id)
+    FOREIGN KEY (operator_id) REFERENCES operators(id)
 );
-CREATE INDEX IF NOT EXISTS idx_attachments_entity ON attachments(tenant_id, entity_type, entity_id);
+CREATE INDEX IF NOT EXISTS idx_attachments_entity ON attachments(operator_id, entity_type, entity_id);
 ```
 
 ### 4.2. Properties Module (`modules/properties/backend/migrations/0001_properties.sql`)
@@ -254,21 +258,21 @@ CREATE INDEX IF NOT EXISTS idx_attachments_entity ON attachments(tenant_id, enti
 -- Portfolios (Legal ownership entities / LLCs)
 CREATE TABLE IF NOT EXISTS portfolios (
     id TEXT PRIMARY KEY,
-    tenant_id TEXT NOT NULL,
+    operator_id TEXT NOT NULL,
     name TEXT NOT NULL,
     tax_id TEXT,
     notes TEXT,
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL,
     deleted_at INTEGER,
-    FOREIGN KEY (tenant_id) REFERENCES tenants(id)
+    FOREIGN KEY (operator_id) REFERENCES operators(id)
 );
-CREATE INDEX IF NOT EXISTS idx_portfolios_tenant ON portfolios(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_portfolios_operator ON portfolios(operator_id);
 
 -- Physical Properties / Buildings
 CREATE TABLE IF NOT EXISTS properties (
     id TEXT PRIMARY KEY,
-    tenant_id TEXT NOT NULL,
+    operator_id TEXT NOT NULL,
     portfolio_id TEXT,
     name TEXT NOT NULL,
     property_type TEXT NOT NULL CHECK (property_type IN ('single_family', 'multi_family', 'condo', 'townhouse', 'commercial')),
@@ -281,15 +285,15 @@ CREATE TABLE IF NOT EXISTS properties (
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL,
     deleted_at INTEGER,
-    FOREIGN KEY (tenant_id) REFERENCES tenants(id),
+    FOREIGN KEY (operator_id) REFERENCES operators(id),
     FOREIGN KEY (portfolio_id) REFERENCES portfolios(id)
 );
-CREATE INDEX IF NOT EXISTS idx_properties_tenant_portfolio ON properties(tenant_id, portfolio_id);
+CREATE INDEX IF NOT EXISTS idx_properties_operator_portfolio ON properties(operator_id, portfolio_id);
 
 -- Rentable Units
 CREATE TABLE IF NOT EXISTS units (
     id TEXT PRIMARY KEY,
-    tenant_id TEXT NOT NULL,
+    operator_id TEXT NOT NULL,
     property_id TEXT NOT NULL,
     unit_number TEXT NOT NULL,
     status TEXT NOT NULL CHECK (status IN ('vacant', 'occupied', 'notice_given', 'turnover', 'maintenance_hold')),
@@ -301,11 +305,11 @@ CREATE TABLE IF NOT EXISTS units (
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL,
     deleted_at INTEGER,
-    FOREIGN KEY (tenant_id) REFERENCES tenants(id),
+    FOREIGN KEY (operator_id) REFERENCES operators(id),
     FOREIGN KEY (property_id) REFERENCES properties(id)
 );
-CREATE INDEX IF NOT EXISTS idx_units_tenant_property ON units(tenant_id, property_id);
-CREATE INDEX IF NOT EXISTS idx_units_tenant_status ON units(tenant_id, status);
+CREATE INDEX IF NOT EXISTS idx_units_operator_property ON units(operator_id, property_id);
+CREATE INDEX IF NOT EXISTS idx_units_operator_status ON units(operator_id, status);
 ```
 
 ### 4.3. Contacts Module (`modules/contacts/backend/migrations/0001_contacts.sql`)
@@ -314,7 +318,7 @@ CREATE INDEX IF NOT EXISTS idx_units_tenant_status ON units(tenant_id, status);
 -- Individual humans & organizations directory
 CREATE TABLE IF NOT EXISTS contacts (
     id TEXT PRIMARY KEY,
-    tenant_id TEXT NOT NULL,
+    operator_id TEXT NOT NULL,
     contact_type TEXT NOT NULL CHECK (contact_type IN ('tenant', 'owner', 'vendor', 'guarantor', 'prospect', 'emergency')),
     first_name TEXT NOT NULL,
     last_name TEXT NOT NULL,
@@ -328,10 +332,10 @@ CREATE TABLE IF NOT EXISTS contacts (
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL,
     deleted_at INTEGER,
-    FOREIGN KEY (tenant_id) REFERENCES tenants(id)
+    FOREIGN KEY (operator_id) REFERENCES operators(id)
 );
-CREATE INDEX IF NOT EXISTS idx_contacts_tenant_type ON contacts(tenant_id, contact_type);
-CREATE INDEX IF NOT EXISTS idx_contacts_tenant_name ON contacts(tenant_id, last_name, first_name);
+CREATE INDEX IF NOT EXISTS idx_contacts_operator_type ON contacts(operator_id, contact_type);
+CREATE INDEX IF NOT EXISTS idx_contacts_operator_name ON contacts(operator_id, last_name, first_name);
 ```
 
 ### 4.4. Leases Module (`modules/leases/backend/migrations/0001_leases.sql`)
@@ -340,7 +344,7 @@ CREATE INDEX IF NOT EXISTS idx_contacts_tenant_name ON contacts(tenant_id, last_
 -- Lease contracts
 CREATE TABLE IF NOT EXISTS leases (
     id TEXT PRIMARY KEY,
-    tenant_id TEXT NOT NULL,
+    operator_id TEXT NOT NULL,
     unit_id TEXT NOT NULL,
     status TEXT NOT NULL CHECK (status IN ('draft', 'active', 'expiring', 'renewed', 'terminated', 'month_to_month')),
     start_date INTEGER NOT NULL,
@@ -354,27 +358,27 @@ CREATE TABLE IF NOT EXISTS leases (
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL,
     deleted_at INTEGER,
-    FOREIGN KEY (tenant_id) REFERENCES tenants(id),
+    FOREIGN KEY (operator_id) REFERENCES operators(id),
     FOREIGN KEY (unit_id) REFERENCES units(id)
 );
-CREATE INDEX IF NOT EXISTS idx_leases_tenant_unit ON leases(tenant_id, unit_id);
-CREATE INDEX IF NOT EXISTS idx_leases_tenant_status_dates ON leases(tenant_id, status, start_date, end_date);
+CREATE INDEX IF NOT EXISTS idx_leases_operator_unit ON leases(operator_id, unit_id);
+CREATE INDEX IF NOT EXISTS idx_leases_operator_status_dates ON leases(operator_id, status, start_date, end_date);
 
--- Lease-to-Contact Junction (Multi-tenant signing parties)
+-- Lease-to-Contact Junction (Multi-party signing parties)
 CREATE TABLE IF NOT EXISTS lease_contacts (
     id TEXT PRIMARY KEY,
-    tenant_id TEXT NOT NULL,
+    operator_id TEXT NOT NULL,
     lease_id TEXT NOT NULL,
     contact_id TEXT NOT NULL,
     role TEXT NOT NULL CHECK (role IN ('primary_tenant', 'co_tenant', 'guarantor', 'occupant')),
     is_financially_responsible INTEGER NOT NULL DEFAULT 1,
     created_at INTEGER NOT NULL,
     deleted_at INTEGER,
-    FOREIGN KEY (tenant_id) REFERENCES tenants(id),
+    FOREIGN KEY (operator_id) REFERENCES operators(id),
     FOREIGN KEY (lease_id) REFERENCES leases(id),
     FOREIGN KEY (contact_id) REFERENCES contacts(id)
 );
-CREATE UNIQUE INDEX IF NOT EXISTS idx_lease_contacts_unique ON lease_contacts(tenant_id, lease_id, contact_id) WHERE deleted_at IS NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_lease_contacts_unique ON lease_contacts(operator_id, lease_id, contact_id) WHERE deleted_at IS NULL;
 ```
 
 ### 4.5. Accounting Module (`modules/accounting/backend/migrations/0001_accounting.sql`)
@@ -383,7 +387,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_lease_contacts_unique ON lease_contacts(te
 -- Single-entry cash-basis ledger aligned with IRS Schedule E
 CREATE TABLE IF NOT EXISTS transactions (
     id TEXT PRIMARY KEY,
-    tenant_id TEXT NOT NULL,
+    operator_id TEXT NOT NULL,
     transaction_type TEXT NOT NULL CHECK (transaction_type IN (
         'charge',           -- Invoiced amount owed by tenant
         'payment',          -- Inflow payment received from tenant
@@ -414,16 +418,16 @@ CREATE TABLE IF NOT EXISTS transactions (
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL,
     deleted_at INTEGER,
-    FOREIGN KEY (tenant_id) REFERENCES tenants(id),
+    FOREIGN KEY (operator_id) REFERENCES operators(id),
     FOREIGN KEY (property_id) REFERENCES properties(id),
     FOREIGN KEY (unit_id) REFERENCES units(id),
     FOREIGN KEY (lease_id) REFERENCES leases(id),
     FOREIGN KEY (payer_contact_id) REFERENCES contacts(id),
     FOREIGN KEY (payee_contact_id) REFERENCES contacts(id)
 );
-CREATE INDEX IF NOT EXISTS idx_tx_tenant_lease_date ON transactions(tenant_id, lease_id, transaction_date);
-CREATE INDEX IF NOT EXISTS idx_tx_tenant_property_date ON transactions(tenant_id, property_id, transaction_date);
-CREATE INDEX IF NOT EXISTS idx_tx_tenant_type_category ON transactions(tenant_id, transaction_type, category);
+CREATE INDEX IF NOT EXISTS idx_tx_operator_lease_date ON transactions(operator_id, lease_id, transaction_date);
+CREATE INDEX IF NOT EXISTS idx_tx_operator_property_date ON transactions(operator_id, property_id, transaction_date);
+CREATE INDEX IF NOT EXISTS idx_tx_operator_type_category ON transactions(operator_id, transaction_type, category);
 ```
 
 #### Financial Logic & Calculation Standards
@@ -461,7 +465,7 @@ CREATE INDEX IF NOT EXISTS idx_tx_tenant_type_category ON transactions(tenant_id
 -- Work Orders and Repair Tracking
 CREATE TABLE IF NOT EXISTS work_orders (
     id TEXT PRIMARY KEY,
-    tenant_id TEXT NOT NULL,
+    operator_id TEXT NOT NULL,
     property_id TEXT NOT NULL,
     unit_id TEXT,
     title TEXT NOT NULL,
@@ -480,14 +484,14 @@ CREATE TABLE IF NOT EXISTS work_orders (
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL,
     deleted_at INTEGER,
-    FOREIGN KEY (tenant_id) REFERENCES tenants(id),
+    FOREIGN KEY (operator_id) REFERENCES operators(id),
     FOREIGN KEY (property_id) REFERENCES properties(id),
     FOREIGN KEY (unit_id) REFERENCES units(id),
     FOREIGN KEY (requested_by_contact_id) REFERENCES contacts(id),
     FOREIGN KEY (vendor_contact_id) REFERENCES contacts(id)
 );
-CREATE INDEX IF NOT EXISTS idx_work_orders_tenant_status ON work_orders(tenant_id, status);
-CREATE INDEX IF NOT EXISTS idx_work_orders_tenant_property ON work_orders(tenant_id, property_id, unit_id);
+CREATE INDEX IF NOT EXISTS idx_work_orders_operator_status ON work_orders(operator_id, status);
+CREATE INDEX IF NOT EXISTS idx_work_orders_operator_property ON work_orders(operator_id, property_id, unit_id);
 ```
 
 ---
@@ -499,14 +503,15 @@ CREATE INDEX IF NOT EXISTS idx_work_orders_tenant_property ON work_orders(tenant
 Encapsulates request isolation via `node:async_hooks.AsyncLocalStorage`.
 
 ```typescript
-export interface RequestContext {
-  tenantId: string;
+export interface RequestContextData {
+  operatorId: string;
+  tenantId: string; // Backward compatibility alias for operatorId
   userId?: string;
   correlationId: string;
 }
 ```
 
-- Methods: `RequestContext.run(context, fn)`, `RequestContext.get(): RequestContext`, `RequestContext.getTenantId(): string`.
+- Methods: `RequestContext.run(context, fn)`, `RequestContext.get(): RequestContextData`, `RequestContext.tryGet(): RequestContextData | undefined`, `RequestContext.getOperatorId(): string`, `RequestContext.getTenantId(): string`.
 - Throws `Error('No active request context')` if accessed outside an active context.
 
 ### 5.2. Native RFC 9562 UUIDv7 & Cryptography (`core/crypto.ts`)
@@ -518,17 +523,18 @@ export interface RequestContext {
    - **Bits 64–65**: Variant `2` (`0b10`).
    - **Bits 66–127**: 62-bit random entropy.
 2. **Password Hashing**: Formats hashes as `$scrypt$N=16384,r=8,p=1$salt$hash` using `node:crypto.scrypt` with 16-byte random salt and constant-time comparison via `node:crypto.timingSafeEqual`.
-3. **Session Tokens**: Stateless HMAC-SHA256 tokens signed with `APP_SECRET`.
+3. **Session Tokens**: Stateless HMAC-SHA256 tokens signed with `APP_SECRET` containing operator claims (`opid` / `tid`).
 
 ### 5.3. In-Process Event Bus (`core/events.ts`)
 
 Decoupled asynchronous cross-module messaging using `node:events.EventEmitter`:
 
+- Automatically stamps `operatorId` and `tenantId` onto published payloads.
 - Standard event catalog:
-  - `lease.activated`: `{ leaseId, unitId, tenantId, rentAmountCents }`
-  - `lease.terminated`: `{ leaseId, unitId, tenantId }`
-  - `payment.recorded`: `{ transactionId, leaseId, amountCents, tenantId }`
-  - `work_order.completed`: `{ workOrderId, propertyId, unitId, actualCostCents, tenantId }`
+  - `lease.activated`: `{ leaseId, unitId, operatorId, tenantId, rentAmountCents }`
+  - `lease.terminated`: `{ leaseId, unitId, operatorId, tenantId }`
+  - `payment.recorded`: `{ transactionId, leaseId, amountCents, operatorId, tenantId }`
+  - `work_order.completed`: `{ workOrderId, propertyId, unitId, actualCostCents, operatorId, tenantId }`
     *(Auto-triggers optional recording of an accounting expense transaction).*
 
 ### 5.4. Local Storage Driver (`core/storage.ts`)
@@ -575,7 +581,7 @@ All REST endpoints return standardized JSON structures:
 {
   "success": false,
   "error": {
-    "code": "VALIDATION_ERROR" | "NOT_FOUND" | "UNAUTHORIZED" | "FORBIDDEN" | "CONFLICT" | "RATE_LIMITED" | "INTERNAL_ERROR",
+    "code": "VALIDATION_ERROR" | "NOT_FOUND" | "UNAUTHORIZED" | "FORBIDDEN" | "CONFLICT" | "OPERATOR_REQUIRED" | "RATE_LIMITED" | "INTERNAL_ERROR",
     "message": "Human-readable description of error",
     "details": []
   }
@@ -586,9 +592,9 @@ All REST endpoints return standardized JSON structures:
 
 1. **Correlation ID**: Extract `X-Request-ID` or generate new UUIDv7.
 2. **Security Headers**: Set `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Content-Security-Policy: default-src 'self'`.
-3. **Sliding-Window Rate Limiting**: In-memory IP/tenant rate limiter on `/api/v1/auth/*` (max 5 failed attempts per 15 minutes).
-4. **Tenant Resolution**: Extract `X-Tenant-ID`. If missing on tenant-scoped routes, reject immediately with `400 Bad Request`.
-5. **Execution Wrapper**: Wrap downstream handler inside `RequestContext.run({ tenantId, userId, correlationId }, handler)`.
+3. **Sliding-Window Rate Limiting**: In-memory IP rate limiter on `/api/v1/auth/*` (max 5 failed attempts per 15 minutes).
+4. **Operator Resolution**: Extract `X-Operator-ID` (or legacy `X-Tenant-ID`). If missing on operator-scoped routes, reject immediately with `400 Bad Request` (`OPERATOR_REQUIRED`).
+5. **Execution Wrapper**: Wrap downstream handler inside `RequestContext.run({ operatorId, tenantId, userId, correlationId }, handler)`.
 6. **Global Error Trap**: Catch unhandled exceptions and format safe 500 JSON responses.
 
 ### 6.4. Data Portability & Backup Endpoints
@@ -605,33 +611,30 @@ All REST endpoints return standardized JSON structures:
 
 ---
 
-## 7. Native PHP Presentation Layer
+## 7. Native TypeScript Presentation Layer
 
-### 7.1. Front Controller & CSRF Protection (`web/index.php`)
+### 7.1. Front Controller & SSR Engine (`web/index.ts`, `web/pages/`)
 
-- Initializes PHP session and loads `web/lib/api.php`, `web/lib/auth.php`, `web/lib/csrf.php`, and `web/lib/hooks.php`.
-- Validates CSRF token on all incoming `POST`, `PUT`, and `DELETE` requests before dispatching.
-- Resolves request URIs:
-  - Static core routes: `/`, `/login`, `/dashboard`.
-  - Dynamic module routes: `/[module_name]/[action]` $\rightarrow$ Dispatches to `modules/[module_name]/frontend/pages/[action].php`.
-- Catches API errors and injects session flash alerts.
+- Direct zero-dependency server-side rendering running on Node.js standard libraries (`node:http`, `node:crypto`, `node:fs`, `node:path`).
+- Validates cryptographic CSRF token on all incoming `POST`, `PUT`, and `DELETE` requests before dispatching (`validateCsrf()`).
+- Resolves presentation routes:
+  - System and auth routes: `/`, `/login`, `/logout`, `/setup`.
+  - Application routes: `/dashboard`, `/properties`, `/contacts`, `/leases`, `/accounting`, `/maintenance`.
+- Automatic XSS-safe tagged template HTML rendering using `html` and `raw` from `web/lib/html.ts`.
 
-### 7.2. Native API Client (`web/lib/api.php`)
+### 7.2. Native API Client & Session (`web/lib/api-client.ts`, `web/lib/session.ts`)
 
-- Wraps PHP `curl_init()` to communicate with Node.js engine at `http://127.0.0.1:3000`.
-- Forwards `X-Tenant-ID` from `$_SESSION['tenant_id']`, `X-User-ID` from `$_SESSION['user_id']`, and `Authorization: Bearer <token>`.
-- Automatically decodes JSON envelopes, raising structured exceptions on API errors.
+- Client abstraction for internal REST API communication at `http://127.0.0.1:3000`.
+- Forwards `X-Operator-ID` (and `X-Tenant-ID`) from HMAC-signed cookie session, along with `Authorization: Bearer <token>`.
+- Automatically unwraps JSON envelopes and handles authentication failures with session invalidation.
 
-### 7.3. UI Slot & Hook System (`web/lib/hooks.php`)
+### 7.3. UI Navigation & Extension Slots
 
-- Scans all `modules/*/frontend/hooks.php` at runtime.
-- Modules register:
-  - **Sidebar Navigation items** (with icons and sort order).
-  - **Dashboard Metric Cards** (Occupancy rate, Delinquent amount, Expiring leases count, Open work orders).
-  - **Detail View Extension Tabs** (e.g., Tenant Payment History tab, Unit Work Orders tab).
+- Layout navigation templates (`web/templates/header.ts`, `web/templates/layout.ts`) render responsive navigation and operator badges.
+- Module-based extensibility for metric cards, detail extension tabs, and action dialogs.
 
 ### 7.4. Semantic HTML5 & Vanilla CSS Design System (`web/public/css/`)
 
 - Uses CSS Custom Properties for typography, colors, borders, shadows, and light/dark theme variables.
-- Fully responsive layout using CSS Grid and Flexbox without utility frameworks.
+- Fully responsive layout using CSS Grid and Flexbox without utility frameworks or external preprocessors.
 - Native HTML `<dialog>` for modal interactions and accessible semantic tables for ledger data.

@@ -2,18 +2,60 @@ import { IncomingMessage, ServerResponse } from 'node:http';
 import { URL } from 'node:url';
 import { errorResponse } from './response.js';
 
+/**
+ * Extended Node.js IncomingMessage carrying parsed route parameters,
+ * query strings, body payloads, and ambient operator/tenant context.
+ */
 export interface ApiRequest extends IncomingMessage {
+  /**
+   * Route parameter key-value pairs (e.g., `:id`).
+   */
   params: Record<string, string>;
+
+  /**
+   * URL query parameter key-value pairs.
+   */
   query: Record<string, string>;
+
+  /**
+   * Parsed JSON request payload, or null if no body.
+   */
   body: any;
+
+  /**
+   * Normalized URL path without query strings.
+   */
   path: string;
+
+  /**
+   * Active operator isolation identifier.
+   */
   operatorId?: string;
+
+  /**
+   * Legacy alias for operatorId retained for backward compatibility.
+   */
   tenantId?: string;
+
+  /**
+   * Authenticated user ID, if authenticated.
+   */
   userId?: string;
+
+  /**
+   * Correlation ID for distributed request tracing.
+   */
   correlationId?: string;
 }
 
+/**
+ * Request handler function processing an API request.
+ */
 export type Handler = (req: ApiRequest, res: ServerResponse) => Promise<void> | void;
+
+/**
+ * Middleware function intercepting and chaining request processing.
+ */
 export type Middleware = (req: ApiRequest, res: ServerResponse, next: () => Promise<void>) => Promise<void> | void;
 
 interface RouteEntry {
@@ -27,10 +69,19 @@ interface RouteEntry {
 
 const MAX_BODY_SIZE_BYTES = 1024 * 1024; // 1 MB
 
+/**
+ * Zero-dependency HTTP router providing route pattern matching, parameter extraction,
+ * streaming JSON body parsing, and middleware pipeline execution.
+ */
 export class Router {
   private routes: RouteEntry[] = [];
   private middlewares: Middleware[] = [];
 
+  /**
+   * Registers a global middleware function executed on every request.
+   *
+   * @param middleware - The middleware function to execute.
+   */
   public use(middleware: Middleware): void {
     this.middlewares.push(middleware);
   }
@@ -59,38 +110,92 @@ export class Router {
     });
   }
 
+  /**
+   * Registers route handlers for HTTP GET requests.
+   *
+   * @param pattern - URL pattern string (supports :param placeholders).
+   * @param handlers - Sequence of handlers to execute.
+   */
   public get(pattern: string, ...handlers: Handler[]): void {
     this.register('GET', pattern, handlers);
   }
 
+  /**
+   * Registers a GET route marked safe for batch execution via /api/v1/batch.
+   *
+   * @param pattern - URL pattern string.
+   * @param handlers - Sequence of handlers to execute.
+   */
   public getBatchSafe(pattern: string, ...handlers: Handler[]): void {
     this.register('GET', pattern, handlers, true);
   }
 
+  /**
+   * Registers a GET route explicitly marked unsafe for batch execution.
+   *
+   * @param pattern - URL pattern string.
+   * @param handlers - Sequence of handlers to execute.
+   */
   public getUnsafe(pattern: string, ...handlers: Handler[]): void {
     this.register('GET', pattern, handlers, false);
   }
 
+  /**
+   * Registers route handlers for HTTP POST requests.
+   *
+   * @param pattern - URL pattern string.
+   * @param handlers - Sequence of handlers to execute.
+   */
   public post(pattern: string, ...handlers: Handler[]): void {
     this.register('POST', pattern, handlers);
   }
 
+  /**
+   * Registers route handlers for HTTP PUT requests.
+   *
+   * @param pattern - URL pattern string.
+   * @param handlers - Sequence of handlers to execute.
+   */
   public put(pattern: string, ...handlers: Handler[]): void {
     this.register('PUT', pattern, handlers);
   }
 
+  /**
+   * Registers route handlers for HTTP PATCH requests.
+   *
+   * @param pattern - URL pattern string.
+   * @param handlers - Sequence of handlers to execute.
+   */
   public patch(pattern: string, ...handlers: Handler[]): void {
     this.register('PATCH', pattern, handlers);
   }
 
+  /**
+   * Registers route handlers for HTTP DELETE requests.
+   *
+   * @param pattern - URL pattern string.
+   * @param handlers - Sequence of handlers to execute.
+   */
   public delete(pattern: string, ...handlers: Handler[]): void {
     this.register('DELETE', pattern, handlers);
   }
 
+  /**
+   * Registers route handlers for HTTP OPTIONS requests.
+   *
+   * @param pattern - URL pattern string.
+   * @param handlers - Sequence of handlers to execute.
+   */
   public options(pattern: string, ...handlers: Handler[]): void {
     this.register('OPTIONS', pattern, handlers);
   }
 
+  /**
+   * Checks whether a GET pathname matches a registered batch-safe route.
+   *
+   * @param pathname - URL pathname to check.
+   * @returns True if route exists and is batch-safe; false otherwise.
+   */
   public isBatchSafeGetPath(pathname: string): boolean {
     const route = this.routes.find((entry) => entry.method === 'GET' && entry.regex.test(pathname));
     return route?.batchSafe ?? false;
@@ -140,6 +245,13 @@ export class Router {
     });
   }
 
+  /**
+   * Main HTTP dispatch entry point. Parses request parameters, query strings, body,
+   * matches registered route patterns, and executes the middleware and handler chain.
+   *
+   * @param req - Raw Node.js IncomingMessage.
+   * @param res - Node.js ServerResponse.
+   */
   public async handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
     const host = req.headers.host || '127.0.0.1';
     const parsedUrl = new URL(req.url || '/', `http://${host}`);

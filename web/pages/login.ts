@@ -3,15 +3,47 @@ import { csrfField, validateCsrf } from '../lib/csrf.js';
 import { FlashMessage } from '../lib/session.js';
 import { PageContext, PageResult } from '../lib/page-context.js';
 
+/**
+ * Template rendering options for the user login page.
+ */
 export interface LoginPageOptions {
+  /**
+   * Cryptographic CSRF token string.
+   */
   csrfToken: string;
+
+  /**
+   * Pending flash messages to display.
+   */
   flashMessages?: FlashMessage[];
+
+  /**
+   * Error message to display, if authentication failed.
+   */
   error?: string | null;
+
+  /**
+   * Pre-filled email address.
+   */
   email?: string;
+
+  /**
+   * Pre-filled operator isolation ID.
+   */
   operatorId?: string;
+
+  /**
+   * Legacy alias for operatorId.
+   */
   tenantId?: string;
 }
 
+/**
+ * Renders the standalone sign-in page document.
+ *
+ * @param options - Template parameters and form defaults.
+ * @returns Complete HTML document string.
+ */
 export function renderLoginPage(options: LoginPageOptions): string {
   const flashes = (options.flashMessages || []).map(
     (f) =>
@@ -71,6 +103,12 @@ export function renderLoginPage(options: LoginPageOptions): string {
   return doc.toString();
 }
 
+/**
+ * Dispatches GET rendering or POST credentials verification for user authentication.
+ *
+ * @param ctx - Page execution context containing session, API client, and request body.
+ * @returns PageResult with redirect or rendered login page.
+ */
 export async function handle(ctx: PageContext): Promise<PageResult> {
   if (ctx.session.user) {
     return { redirect: '/dashboard', content: '' };

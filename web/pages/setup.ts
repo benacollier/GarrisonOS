@@ -2,11 +2,33 @@ import { html, raw, SafeHtml } from '../lib/html.js';
 import { csrfField, validateCsrf } from '../lib/csrf.js';
 import { PageContext, PageResult } from '../lib/page-context.js';
 
+/**
+ * Rendering options for the first-launch setup wizard page.
+ */
 export interface SetupPageOptions {
+  /**
+   * Cryptographic CSRF token.
+   */
   csrfToken: string;
+
+  /**
+   * Error message to display, if setup failed.
+   */
   error?: string | null;
+
+  /**
+   * Active tab: 'fresh' for initial provisioning, 'restore' for snapshot upload.
+   */
   activeTab?: 'fresh' | 'restore';
+
+  /**
+   * Whether the backup and restore module is enabled in core.
+   */
   backupModuleEnabled?: boolean;
+
+  /**
+   * Pre-filled form values for redisplay on validation error.
+   */
   formValues?: {
     organization_name?: string;
     first_name?: string;
@@ -16,6 +38,12 @@ export interface SetupPageOptions {
   };
 }
 
+/**
+ * Renders the HTML document for the initial first-launch setup wizard.
+ *
+ * @param options - Setup page template parameters and form states.
+ * @returns Complete HTML document string.
+ */
 export function renderSetupPage(options: SetupPageOptions): string {
   const activeTab = options.activeTab || 'fresh';
   const backupModuleEnabled = options.backupModuleEnabled ?? false;
@@ -150,6 +178,12 @@ export function renderSetupPage(options: SetupPageOptions): string {
   return doc.toString();
 }
 
+/**
+ * Processes initial setup initialization (fresh provisioning or snapshot restore).
+ *
+ * @param ctx - Page execution context containing session, API client, and request body.
+ * @returns PageResult redirecting on success or rendering the setup wizard on GET/error.
+ */
 export async function handle(ctx: PageContext): Promise<PageResult> {
   let isConfigured = false;
   let backupModuleEnabled = false;

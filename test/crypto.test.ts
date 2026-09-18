@@ -223,5 +223,22 @@ describe('Token Revocation with Database Backing', () => {
 
     db.prepare('UPDATE users SET deleted_at = NULL WHERE id = ?').run('user-rev-test');
   });
+
+  it('rejects createToken if neither opid nor tid claim is provided', () => {
+    assert.throws(
+      () => {
+        createToken(
+          {
+            sub: 'user-no-op',
+            role: 'owner',
+            exp: Math.floor(Date.now() / 1000) + 3600
+          },
+          secret
+        );
+      },
+      /createToken requires a non-empty operator claim/
+    );
+  });
 });
+
 
