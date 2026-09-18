@@ -5,6 +5,13 @@ import { errorResponse } from './response.js';
 import { generateUUIDv7, verifyToken, verifyTokenWithDatabase } from '../core/crypto.js';
 import { RequestContext } from '../core/context.js';
 import { getDatabase } from '../database/client.js';
+import {
+  PermissionString,
+  hasPermission,
+  loadOperatorRoleOverrides,
+  canAccessPortfolio,
+  canAccessModule
+} from '../core/rbac.js';
 
 const NODE_ENV = process.env['NODE_ENV'] || 'development';
 const APP_SECRET = process.env['APP_SECRET'] || (
@@ -23,16 +30,29 @@ const CORS_ALLOWED_ORIGINS = new Set(
     .filter((origin) => origin.length > 0)
 );
 
-// Configurable sliding-window rate limiter settings
+/**
+ * Sliding-window rate limiter threshold and window duration configuration.
+ */
 export interface RateLimitConfig {
+  /** Maximum allowed requests per window for standard operational routes. */
   operatorMax: number;
+  /** Window duration in milliseconds for standard operational routes. */
   operatorWindowMs: number;
+  /** Maximum allowed requests per window for authentication routes. */
   authMax: number;
+  /** Window duration in milliseconds for authentication routes. */
   authWindowMs: number;
+  /** Maximum allowed requests per window for unauthenticated public routes. */
   publicMax: number;
+  /** Window duration in milliseconds for unauthenticated public routes. */
   publicWindowMs: number;
 }
 
+/**
+ * Retrieves environment-configured or default sliding-window rate limit parameters.
+ *
+ * @returns RateLimitConfig object.
+ */
 export function getRateLimitConfig(): RateLimitConfig {
   return {
     operatorMax: Number(process.env['RATE_LIMIT_OPERATOR_MAX']) || 120,
@@ -84,10 +104,60 @@ export function startRateLimitEviction(intervalMs = 60 * 1000): void {
 }
 
 /**
+ * Historical record of a rate limit throttling event.
+ */
+export interface RateLimitEvent {
+  /** Bucket key identifier. */
+  key: string;
+  /** Epoch timestamp in milliseconds when throttle occurred. */
+  timestamp: number;
+  /** HTTP request path that triggered throttling. */
+  path?: string;
+  /** Client IP address. */
+  ip?: string;
+}
+
+/**
+ * Aggregate telemetry snapshot for platform rate limiting.
+ */
+export interface RateLimitStats {
+  /** Number of active buckets currently tracked in memory. */
+  activeBuckets: number;
+  /** Total count of blocked requests since process initialization. */
+  totalBlocks: number;
+  /** Circular buffer of recent rate limit throttle events. */
+  recentEvents: RateLimitEvent[];
+}
+
+let totalRateLimitBlocks = 0;
+const recentRateLimitEvents: RateLimitEvent[] = [];
+const MAX_RATE_LIMIT_EVENT_HISTORY = 50;
+
+/**
+ * Retrieves aggregate rate limiting telemetry and recent 429 throttle events.
+ */
+export function getRateLimitStats(): RateLimitStats {
+  return {
+    activeBuckets: rateLimitMap.size,
+    totalBlocks: totalRateLimitBlocks,
+    recentEvents: [...recentRateLimitEvents]
+  };
+}
+
+/**
+ * Clears recorded rate limit statistics and event log.
+ */
+export function resetRateLimitStats(): void {
+  totalRateLimitBlocks = 0;
+  recentRateLimitEvents.length = 0;
+}
+
+/**
  * Clears all entries in the rate limit map (useful for test resets).
  */
 export function resetRateLimitMap(): void {
   rateLimitMap.clear();
+  resetRateLimitStats();
 }
 
 // Start eviction timer on module load
@@ -222,6 +292,16 @@ export const rateLimitMiddleware: Middleware = async (req, res, next) => {
   if (record) {
     if (now < record.resetAt) {
       if (record.attempts >= maxAttempts) {
+        totalRateLimitBlocks += 1;
+        recentRateLimitEvents.unshift({
+          key,
+          timestamp: now,
+          path: req.path,
+          ip
+        });
+        if (recentRateLimitEvents.length > MAX_RATE_LIMIT_EVENT_HISTORY) {
+          recentRateLimitEvents.pop();
+        }
         res.setHeader('Retry-After', String(Math.max(1, Math.ceil((record.resetAt - now) / 1000))));
         return errorResponse(
           res,
@@ -495,3 +575,254 @@ export const operatorContextMiddleware: Middleware = async (req, res, next) => {
     }
   );
 };
+
+/**
+ * Route authorization middleware that enforces a fine-grained RBAC permission.
+ * Fails closed with HTTP 403 FORBIDDEN if the user lacks the required permission.
+ * Can be used as both global middleware and individual route guard.
+ *
+ * @param permission - The required permission string (e.g. 'properties:create').
+ * @returns Configured route guard handler.
+ */
+export function requirePermission(permission: PermissionString): (req: ApiRequest, res: ServerResponse, next?: () => Promise<void>) => Promise<void> {
+  return async (req: ApiRequest, res: ServerResponse, next?: () => Promise<void>) => {
+    const operatorId = RequestContext.tryGet()?.operatorId || req.operatorId;
+    const userId = RequestContext.tryGet()?.userId || req.userId;
+
+    if (!operatorId || !userId) {
+      errorResponse(res, 'FORBIDDEN', 'Authentication is required to perform this action', 403);
+      return;
+    }
+
+    // System operator or internal service bypass
+    if (userId === 'system') {
+      if (next) await next();
+      return;
+    }
+
+    const db = getDatabase();
+    const user = db.prepare(
+      'SELECT role FROM users WHERE id = ? AND operator_id = ? AND deleted_at IS NULL'
+    ).get(userId, operatorId) as { role: string } | undefined;
+
+    if (!user || !user.role) {
+      errorResponse(res, 'FORBIDDEN', 'User not authorized or inactive', 403);
+      return;
+    }
+
+    const overrides = loadOperatorRoleOverrides(operatorId, db);
+    if (!hasPermission(user.role, permission, overrides)) {
+      errorResponse(
+        res,
+        'FORBIDDEN',
+        `User lacks required permission: ${permission}`,
+        403,
+        [{ required_permission: permission, role: user.role }]
+      );
+      return;
+    }
+
+    const moduleName = permission.split(':')[0];
+    if (moduleName && moduleName !== '*' && !canAccessModule(userId, moduleName, operatorId, db)) {
+      errorResponse(
+        res,
+        'FORBIDDEN',
+        `User lacks access to module: ${moduleName}`,
+        403,
+        [{ required_module: moduleName, role: user.role }]
+      );
+      return;
+    }
+
+    if (next) {
+      await next();
+    }
+  };
+}
+
+/**
+ * Route authorization middleware enforcing portfolio scoping for subusers.
+ *
+ * @param extractPortfolioId - Function extracting target portfolioId from request.
+ * @returns Configured route guard handler.
+ */
+export function requirePortfolioAccess(
+  extractPortfolioId: (req: ApiRequest) => string | undefined
+): (req: ApiRequest, res: ServerResponse, next?: () => Promise<void>) => Promise<void> {
+  return async (req: ApiRequest, res: ServerResponse, next?: () => Promise<void>) => {
+    const operatorId = RequestContext.tryGet()?.operatorId || req.operatorId;
+    const userId = RequestContext.tryGet()?.userId || req.userId;
+    const portfolioId = extractPortfolioId(req);
+
+    if (!operatorId || !userId || !portfolioId) {
+      if (next) await next();
+      return;
+    }
+
+    if (userId === 'system') {
+      if (next) await next();
+      return;
+    }
+
+    const db = getDatabase();
+    if (!canAccessPortfolio(userId, portfolioId, operatorId, db)) {
+      errorResponse(
+        res,
+        'FORBIDDEN',
+        'User lacks permission to access resources in this portfolio',
+        403,
+        [{ portfolio_id: portfolioId }]
+      );
+      return;
+    }
+
+    if (next) {
+      await next();
+    }
+  };
+}
+
+/**
+ * Route authorization middleware requiring ALL specified permissions.
+ *
+ * @param permissions - Array of required permission strings.
+ * @returns Configured route guard handler.
+ */
+export function requireAllPermissions(permissions: PermissionString[]): (req: ApiRequest, res: ServerResponse, next?: () => Promise<void>) => Promise<void> {
+  return async (req: ApiRequest, res: ServerResponse, next?: () => Promise<void>) => {
+    const operatorId = RequestContext.tryGet()?.operatorId || req.operatorId;
+    const userId = RequestContext.tryGet()?.userId || req.userId;
+
+    if (!operatorId || !userId) {
+      errorResponse(res, 'FORBIDDEN', 'Authentication is required to perform this action', 403);
+      return;
+    }
+
+    if (userId === 'system') {
+      if (next) await next();
+      return;
+    }
+
+    const db = getDatabase();
+    const user = db.prepare(
+      'SELECT role FROM users WHERE id = ? AND operator_id = ? AND deleted_at IS NULL'
+    ).get(userId, operatorId) as { role: string } | undefined;
+
+    if (!user || !user.role) {
+      errorResponse(res, 'FORBIDDEN', 'User not authorized or inactive', 403);
+      return;
+    }
+
+    const overrides = loadOperatorRoleOverrides(operatorId, db);
+    for (const permission of permissions) {
+      if (!hasPermission(user.role, permission, overrides)) {
+        errorResponse(
+          res,
+          'FORBIDDEN',
+          `User lacks required permission: ${permission}`,
+          403,
+          [{ required_permission: permission, role: user.role }]
+        );
+        return;
+      }
+    }
+
+    if (next) {
+      await next();
+    }
+  };
+}
+
+/**
+ * Route authorization middleware requiring AT LEAST ONE of the specified permissions.
+ *
+ * @param permissions - Array of candidate permission strings.
+ * @returns Configured route guard handler.
+ */
+export function requireAnyPermission(permissions: PermissionString[]): (req: ApiRequest, res: ServerResponse, next?: () => Promise<void>) => Promise<void> {
+  return async (req: ApiRequest, res: ServerResponse, next?: () => Promise<void>) => {
+    const operatorId = RequestContext.tryGet()?.operatorId || req.operatorId;
+    const userId = RequestContext.tryGet()?.userId || req.userId;
+
+    if (!operatorId || !userId) {
+      errorResponse(res, 'FORBIDDEN', 'Authentication is required to perform this action', 403);
+      return;
+    }
+
+    if (userId === 'system') {
+      if (next) await next();
+      return;
+    }
+
+    const db = getDatabase();
+    const user = db.prepare(
+      'SELECT role FROM users WHERE id = ? AND operator_id = ? AND deleted_at IS NULL'
+    ).get(userId, operatorId) as { role: string } | undefined;
+
+    if (!user || !user.role) {
+      errorResponse(res, 'FORBIDDEN', 'User not authorized or inactive', 403);
+      return;
+    }
+
+    const overrides = loadOperatorRoleOverrides(operatorId, db);
+    let allowed = false;
+    for (const permission of permissions) {
+      if (hasPermission(user.role, permission, overrides)) {
+        allowed = true;
+        break;
+      }
+    }
+
+    if (!allowed) {
+      errorResponse(
+        res,
+        'FORBIDDEN',
+        `User lacks any of the required permissions: ${permissions.join(', ')}`,
+        403,
+        [{ required_permissions: permissions, role: user.role }]
+      );
+      return;
+    }
+
+    if (next) {
+      await next();
+    }
+  };
+}
+
+/**
+ * Backward-compatible role requirement middleware.
+ *
+ * @param role - Specific role name required for the endpoint.
+ * @returns Configured route guard handler.
+ */
+export function requireRole(role: string): (req: ApiRequest, res: ServerResponse, next?: () => Promise<void>) => Promise<void> {
+  return async (req: ApiRequest, res: ServerResponse, next?: () => Promise<void>) => {
+    const operatorId = RequestContext.tryGet()?.operatorId || req.operatorId;
+    const userId = RequestContext.tryGet()?.userId || req.userId;
+
+    if (!operatorId || !userId) {
+      errorResponse(res, 'FORBIDDEN', 'Authentication is required to perform this action', 403);
+      return;
+    }
+
+    if (userId === 'system') {
+      if (next) await next();
+      return;
+    }
+
+    const db = getDatabase();
+    const user = db.prepare(
+      'SELECT role FROM users WHERE id = ? AND operator_id = ? AND deleted_at IS NULL'
+    ).get(userId, operatorId) as { role: string } | undefined;
+
+    if (!user || user.role !== role) {
+      errorResponse(res, 'FORBIDDEN', `Role '${role}' is required for this endpoint`, 403);
+      return;
+    }
+
+    if (next) {
+      await next();
+    }
+  };
+}

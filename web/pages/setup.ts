@@ -35,6 +35,7 @@ export interface SetupPageOptions {
     last_name?: string;
     email?: string;
     seed_demo_data?: boolean;
+    setup_mode?: 'single' | 'multi';
   };
 }
 
@@ -48,6 +49,7 @@ export function renderSetupPage(options: SetupPageOptions): string {
   const activeTab = options.activeTab || 'fresh';
   const backupModuleEnabled = options.backupModuleEnabled ?? false;
   const formValues = options.formValues || {};
+  const setupMode = formValues.setup_mode || 'single';
 
   const errorAlert = options.error
     ? html`<div class="alert alert-danger" style="margin-bottom: 1.5rem;">${options.error}</div>`
@@ -98,6 +100,28 @@ export function renderSetupPage(options: SetupPageOptions): string {
           <input type="hidden" name="form_action" value="fresh">
 
           <div style="margin-bottom: 1.25rem;">
+              <h3 style="font-size: 1.1rem; font-weight: 700; margin-bottom: 0.25rem;">Deployment Architecture</h3>
+              <p style="font-size: 0.85rem; color: var(--text-muted);">Choose whether this instance operates for a single company or hosts multiple operators.</p>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 1.25rem;">
+              <label style="border: 1px solid var(--border-color); border-radius: 6px; padding: 0.75rem; cursor: pointer; display: flex; flex-direction: column; gap: 0.25rem; background: var(--surface-secondary, rgba(255,255,255,0.03));">
+                  <div style="display: flex; align-items: center; gap: 0.5rem;">
+                      <input type="radio" name="setup_mode" value="single" ${setupMode === 'single' ? raw('checked') : raw('')}>
+                      <strong style="font-size: 0.9rem;">Single-Operator</strong>
+                  </div>
+                  <span style="font-size: 0.75rem; color: var(--text-muted); margin-left: 1.4rem;">Dedicated instance for one property management company.</span>
+              </label>
+              <label style="border: 1px solid var(--border-color); border-radius: 6px; padding: 0.75rem; cursor: pointer; display: flex; flex-direction: column; gap: 0.25rem; background: var(--surface-secondary, rgba(255,255,255,0.03));">
+                  <div style="display: flex; align-items: center; gap: 0.5rem;">
+                      <input type="radio" name="setup_mode" value="multi" ${setupMode === 'multi' ? raw('checked') : raw('')}>
+                      <strong style="font-size: 0.9rem;">Multi-Operator</strong>
+                  </div>
+                  <span style="font-size: 0.75rem; color: var(--text-muted); margin-left: 1.4rem;">Platform hosting multiple independent property management firms.</span>
+              </label>
+          </div>
+
+          <div style="margin-bottom: 1.25rem; border-top: 1px solid var(--border-color); padding-top: 1.25rem;">
               <h3 style="font-size: 1.1rem; font-weight: 700; margin-bottom: 0.25rem;">Organization Profile</h3>
               <p style="font-size: 0.85rem; color: var(--text-muted);">The primary entity or property management company name.</p>
           </div>
@@ -244,12 +268,14 @@ export async function handle(ctx: PageContext): Promise<PageResult> {
       const password = typeof ctx.body['password'] === 'string' ? ctx.body['password'] : '';
       const passwordConfirm = typeof ctx.body['password_confirm'] === 'string' ? ctx.body['password_confirm'] : '';
       const seedDemoData = !!ctx.body['seed_demo_data'];
+      const setupMode: 'single' | 'multi' = ctx.body['setup_mode'] === 'multi' ? 'multi' : 'single';
 
       formValues.organization_name = orgName;
       formValues.first_name = firstName;
       formValues.last_name = lastName;
       formValues.email = email;
       formValues.seed_demo_data = seedDemoData;
+      formValues.setup_mode = setupMode;
 
       if (!orgName || !firstName || !lastName || !email || !password) {
         error = 'All fields are required.';
@@ -266,6 +292,7 @@ export async function handle(ctx: PageContext): Promise<PageResult> {
             email: email,
             password: password,
             seed_demo_data: seedDemoData,
+            setup_mode: setupMode,
           });
 
           const token = res.data?.token;

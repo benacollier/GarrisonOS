@@ -41,6 +41,63 @@ if (!fs.existsSync(resolvedSnapshot)) {
   process.exit(1);
 }
 
+/**
+ * Unpacks entries from an uncompressed POSIX ustar tar archive buffer.
+ *
+ * @param {Buffer} tarBuffer
+ * @returns {{ name: string, data: Buffer }[]}
+ */
+function unpackTar(tarBuffer) {
+  const entries = [];
+  let offset = 0;
+  while (offset + 512 <= tarBuffer.length) {
+    const header = tarBuffer.subarray(offset, offset + 512);
+    let isEmpty = true;
+    for (let i = 0; i < 512; i++) {
+      if (header[i] !== 0) {
+        isEmpty = false;
+        break;
+      }
+    }
+    if (isEmpty) break;
+
+    // Extract file name (bytes 0-99)
+    let nameEnd = 0;
+    while (nameEnd < 100 && header[nameEnd] !== 0) nameEnd++;
+    const baseName = header.toString('utf8', 0, nameEnd).trim();
+
+    // Extract prefix if present (bytes 345-499)
+    let prefixEnd = 345;
+    while (prefixEnd < 500 && header[prefixEnd] !== 0) prefixEnd++;
+    const prefix = prefixEnd > 345 ? header.toString('utf8', 345, prefixEnd).trim() : '';
+    const name = prefix.length > 0 ? `${prefix}/${baseName}` : baseName;
+
+    const sizeStr = header.toString('ascii', 124, 135).replace(/\0/g, '').trim();
+    const size = parseInt(sizeStr, 8);
+    if (Number.isNaN(size) || size < 0) {
+      throw new Error(`Corrupted tar archive: invalid size for entry '${name || 'unknown'}'`);
+    }
+
+    const typeFlag = header[156];
+    offset += 512;
+
+    if (typeFlag === 0x30 || typeFlag === 0x00) {
+      if (offset + size > tarBuffer.length) {
+        throw new Error(`Corrupted tar archive: truncated file entry for ${name}`);
+      }
+      entries.push({
+        name,
+        data: Buffer.from(tarBuffer.subarray(offset, offset + size))
+      });
+    }
+
+    const remainder = size % 512;
+    const padding = remainder > 0 ? 512 - remainder : 0;
+    offset += size + padding;
+  }
+  return entries;
+}
+
 async function runDisasterRecovery() {
   process.stdout.write(`====================================================\n`);
   process.stdout.write(`  GarrisonOS Database Disaster Recovery Restore\n`);
@@ -53,29 +110,55 @@ async function runDisasterRecovery() {
   const shmPath = `${resolvedDbPath}-shm`;
   const tempDbPath = path.resolve(path.dirname(resolvedDbPath), `restore-tmp-${Date.now()}.sqlite`);
 
+  const configuredStorage = process.env['STORAGE_PATH'] || './storage/uploads';
+  const resolvedStorage = path.resolve(configuredStorage);
+  const stagingAttachmentsDir = path.resolve(path.dirname(resolvedStorage), `.restore-media-staging-${Date.now()}`);
+  let stagedAttachmentCount = 0;
+
   try {
-    // 1. Decompress if needed and verify SQLite format 3 magic header
+    // 1. Decompress if needed and inspect snapshot format
     process.stdout.write(`[1/4] Inspecting and extracting snapshot...\n`);
-    const isGzip = resolvedSnapshot.endsWith('.gz');
-
+    let rawBuffer = fs.readFileSync(resolvedSnapshot);
+    const isGzip = resolvedSnapshot.endsWith('.gz') || (rawBuffer.length > 2 && rawBuffer[0] === 0x1f && rawBuffer[1] === 0x8b);
     if (isGzip) {
-      const source = fs.createReadStream(resolvedSnapshot);
-      const gunzip = zlib.createGunzip();
-      const dest = fs.createWriteStream(tempDbPath);
-      await pipeline(source, gunzip, dest);
+      rawBuffer = zlib.gunzipSync(rawBuffer);
+    }
+
+    const expectedSqliteHeader = Buffer.from('SQLite format 3\0');
+    if (rawBuffer.length >= 16 && rawBuffer.subarray(0, 16).equals(expectedSqliteHeader)) {
+      fs.writeFileSync(tempDbPath, rawBuffer);
+      process.stdout.write(`      ✔ Valid SQLite database detected.\n`);
     } else {
-      fs.copyFileSync(resolvedSnapshot, tempDbPath);
-    }
+      const entries = unpackTar(rawBuffer);
+      const dbEntry = entries.find(e => e.name === 'database.sqlite' || e.name.endsWith('.sqlite'));
+      if (!dbEntry) {
+        throw new Error('Verification failed: Archive does not contain a database snapshot file.');
+      }
+      if (dbEntry.data.length < 16 || !dbEntry.data.subarray(0, 16).equals(expectedSqliteHeader)) {
+        throw new Error('Verification failed: File is not a valid SQLite database format.');
+      }
+      fs.writeFileSync(tempDbPath, dbEntry.data);
+      process.stdout.write(`      ✔ Valid SQLite database detected inside tar archive.\n`);
 
-    const fd = fs.openSync(tempDbPath, 'r');
-    const headerBuf = Buffer.alloc(16);
-    fs.readSync(fd, headerBuf, 0, 16, 0);
-    fs.closeSync(fd);
+      // Stage media attachments safely
+      fs.mkdirSync(stagingAttachmentsDir, { recursive: true });
+      const normalizedStaging = path.normalize(stagingAttachmentsDir) + path.sep;
 
-    if (headerBuf.toString('utf8', 0, 15) !== 'SQLite format 3') {
-      throw new Error('Verification failed: File is not a valid SQLite database format.');
+      for (const entry of entries) {
+        if (entry.name.startsWith('attachments/')) {
+          const relPath = entry.name.substring('attachments/'.length);
+          const target = path.resolve(stagingAttachmentsDir, relPath);
+          if (target.startsWith(normalizedStaging)) {
+            fs.mkdirSync(path.dirname(target), { recursive: true });
+            fs.writeFileSync(target, entry.data);
+            stagedAttachmentCount++;
+          }
+        }
+      }
+      if (stagedAttachmentCount > 0) {
+        process.stdout.write(`      ✔ Staged ${stagedAttachmentCount} media attachment file(s) for atomic restore.\n`);
+      }
     }
-    process.stdout.write(`      ✔ Valid SQLite database detected.\n`);
 
     // 2. Remove stale WAL and SHM files
     process.stdout.write(`[2/4] Cleaning up stale WAL and shared-memory caches...\n`);
@@ -110,11 +193,36 @@ async function runDisasterRecovery() {
       process.stdout.write(`      ✔ Migrations applied: ${applied.length}\n`);
     }
 
+    // 6. Commit staged attachments to live storage directory
+    if (stagedAttachmentCount > 0 && fs.existsSync(stagingAttachmentsDir)) {
+      fs.mkdirSync(resolvedStorage, { recursive: true });
+      const copyRecursive = (src, dest) => {
+        const items = fs.readdirSync(src, { withFileTypes: true });
+        for (const item of items) {
+          const s = path.join(src, item.name);
+          const d = path.join(dest, item.name);
+          if (item.isDirectory()) {
+            fs.mkdirSync(d, { recursive: true });
+            copyRecursive(s, d);
+          } else if (item.isFile()) {
+            fs.mkdirSync(path.dirname(d), { recursive: true });
+            fs.copyFileSync(s, d);
+          }
+        }
+      };
+      copyRecursive(stagingAttachmentsDir, resolvedStorage);
+      fs.rmSync(stagingAttachmentsDir, { recursive: true, force: true });
+      process.stdout.write(`      ✔ Promoted ${stagedAttachmentCount} media attachment(s) to live storage.\n`);
+    }
+
     process.stdout.write(`\n✨ Disaster recovery restore completed successfully!\n`);
     process.exit(0);
   } catch (err) {
     if (fs.existsSync(tempDbPath)) {
       try { fs.unlinkSync(tempDbPath); } catch {}
+    }
+    if (fs.existsSync(stagingAttachmentsDir)) {
+      try { fs.rmSync(stagingAttachmentsDir, { recursive: true, force: true }); } catch {}
     }
     process.stderr.write(`\n❌ Disaster recovery failed: ${err.message}\n`);
     process.exit(1);

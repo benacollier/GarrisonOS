@@ -9,7 +9,9 @@ import {
   correlationMiddleware,
   rateLimitMiddleware,
   operatorContextMiddleware,
-  RESERVED_SUBDOMAINS
+  RESERVED_SUBDOMAINS,
+  requirePermission,
+  requireRole
 } from './middleware.js';
 import { successResponse, errorResponse } from './response.js';
 import { getDatabase, closeDatabase, withTransaction } from '../database/client.js';
@@ -18,6 +20,15 @@ import { loadModules, getLoadedModules } from '../core/module-loader.js';
 import { verifyPassword, hashPassword, createToken, generateUUIDv7 } from '../core/crypto.js';
 import { RequestContext } from '../core/context.js';
 import { getApplicationVersion } from '../core/version.js';
+import {
+  getUserPortfolioAccess,
+  setUserPortfolioAccess,
+  getUserModuleAccess,
+  setUserModuleAccess,
+  canAssignRole,
+  hasPermission,
+  loadOperatorRoleOverrides
+} from '../core/rbac.js';
 
 const NODE_ENV = process.env['NODE_ENV'] || 'development';
 const APP_SECRET = process.env['APP_SECRET'] || (
@@ -31,8 +42,11 @@ const HOST = process.env['HOST'] || '127.0.0.1';
 type BackupSchedulerReadiness = 'not-mounted' | 'disabled' | 'running' | 'failed';
 
 interface BackupSchedulerHandle {
+  /** Starts the background scheduled backup timer. */
   start(): void;
+  /** Gracefully stops active backup scheduler timers. */
   stop(): Promise<void>;
+  /** Returns the current scheduler daemon status. */
   getStatus(): { enabled: boolean; running: boolean };
 }
 
@@ -326,7 +340,8 @@ export function createRouter(serverPort: number = PORT): Router {
       last_name,
       email,
       password,
-      seed_demo_data
+      seed_demo_data,
+      setup_mode
     } = req.body || {};
 
     const cleanOrg = typeof organization_name === 'string' ? organization_name.trim() : '';
@@ -334,6 +349,8 @@ export function createRouter(serverPort: number = PORT): Router {
     const cleanLast = typeof last_name === 'string' ? last_name.trim() : '';
     const cleanEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';
     const cleanPassword = typeof password === 'string' ? password : '';
+    const isMultiOperator = setup_mode === 'multi';
+    const userRole = isMultiOperator ? 'system_owner' : 'owner';
 
     if (!cleanOrg) {
       return errorResponse(res, 'VALIDATION_ERROR', 'Organization name is required', 400);
@@ -361,11 +378,11 @@ export function createRouter(serverPort: number = PORT): Router {
           VALUES (?, ?, ?, 'USD', ?, ?)
         `).run(operatorId, cleanOrg, 'primary', now, now);
 
-        // 2. Create owner user
+        // 2. Create owner user (is_system_user = 1)
         tx.prepare(`
-          INSERT INTO users (id, operator_id, email, password_hash, first_name, last_name, role, token_version, created_at, updated_at)
-          VALUES (?, ?, ?, ?, ?, ?, 'owner', 1, ?, ?)
-        `).run(userId, operatorId, cleanEmail, passwordHash, cleanFirst, cleanLast, now, now);
+          INSERT INTO users (id, operator_id, email, password_hash, first_name, last_name, role, token_version, is_system_user, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, 1, 1, ?, ?)
+        `).run(userId, operatorId, cleanEmail, passwordHash, cleanFirst, cleanLast, userRole, now, now);
 
         // 3. Audit log
         tx.prepare(`
@@ -376,7 +393,7 @@ export function createRouter(serverPort: number = PORT): Router {
           operatorId,
           userId,
           operatorId,
-          JSON.stringify({ organization_name: cleanOrg, email: cleanEmail }),
+          JSON.stringify({ organization_name: cleanOrg, email: cleanEmail, setup_mode: isMultiOperator ? 'multi' : 'single' }),
           (req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress || '127.0.0.1',
           now
         );
@@ -416,26 +433,34 @@ export function createRouter(serverPort: number = PORT): Router {
             VALUES (?, ?, 'vendor', 'Marcus', 'Vance', 'Apex Plumbing Services', 'marcus@apexplumb.local', '(555) 301-4401', 'Plumbing', ?, ?)
           `).run(vendorId, operatorId, now, now);
 
-          // Sample property & unit
+          // Sample property, building & unit
           const propId = generateUUIDv7();
           tx.prepare(`
             INSERT INTO properties (id, operator_id, portfolio_id, name, property_type, address_line1, city, state, postal_code, created_at, updated_at)
             VALUES (?, ?, ?, '104 Oakwood Drive', 'single_family', '104 Oakwood Dr', 'Asheville', 'NC', '28801', ?, ?)
           `).run(propId, operatorId, portId, now, now);
 
+          const buildingId = generateUUIDv7();
+          tx.prepare(`
+            INSERT INTO buildings (id, operator_id, property_id, name, building_number, created_at, updated_at)
+            VALUES (?, ?, ?, 'Main Building', '1', ?, ?)
+          `).run(buildingId, operatorId, propId, now, now);
+
           const unitId = generateUUIDv7();
           tx.prepare(`
-            INSERT INTO units (id, operator_id, property_id, unit_number, status, bedrooms, bathrooms, square_feet, market_rent_cents, target_deposit_cents, created_at, updated_at)
-            VALUES (?, ?, ?, 'Main', 'vacant', 3, 2, 1450, 185000, 185000, ?, ?)
-          `).run(unitId, operatorId, propId, now, now);
+            INSERT INTO units (id, operator_id, property_id, building_id, unit_number, status, bedrooms, bathrooms, square_feet, market_rent_cents, target_deposit_cents, created_at, updated_at)
+            VALUES (?, ?, ?, ?, 'Main', 'vacant', 3, 2, 1450, 185000, 185000, ?, ?)
+          `).run(unitId, operatorId, propId, buildingId, now, now);
         }
       }, db);
+
+      process.env['OPERATOR_MODE'] = isMultiOperator ? 'multi' : 'single';
 
       const token = createToken(
         {
           sub: userId,
           opid: operatorId,
-          role: 'owner',
+          role: userRole,
           exp: Math.floor(Date.now() / 1000) + 86400,
           tv: 1
         },
@@ -444,13 +469,16 @@ export function createRouter(serverPort: number = PORT): Router {
 
       successResponse(res, {
         token,
+        setup_mode: isMultiOperator ? 'multi' : 'single',
+        operator_id: operatorId,
         user: {
           id: userId,
           operator_id: operatorId,
           email: cleanEmail,
           first_name: cleanFirst,
           last_name: cleanLast,
-          role: 'owner'
+          role: userRole,
+          is_system_user: 1
         }
       }, 201);
     } catch (err: any) {
@@ -724,6 +752,535 @@ export function createRouter(serverPort: number = PORT): Router {
     } catch (err: any) {
       errorResponse(res, 'RESTORE_FAILED', `Failed to restore database from backup: ${err.message}`, 500);
     }
+  });
+
+  // ==========================================
+  // Operator Team & Subuser Management
+  // ==========================================
+
+  // List users under active operator
+  router.get('/api/v1/users', async (req, res) => {
+    const operatorId = RequestContext.tryGet()?.operatorId || req.operatorId;
+    const callerId = RequestContext.tryGet()?.userId || req.userId;
+    if (!operatorId || !callerId) {
+      return errorResponse(res, 'FORBIDDEN', 'Authentication required', 403);
+    }
+
+    const db = getDatabase();
+    const caller = db.prepare(
+      'SELECT role, is_system_user FROM users WHERE id = ? AND deleted_at IS NULL'
+    ).get(callerId) as { role: string; is_system_user?: number } | undefined;
+
+    if (!caller) {
+      return errorResponse(res, 'FORBIDDEN', 'User inactive or not authorized', 403);
+    }
+
+    const overrides = loadOperatorRoleOverrides(operatorId, db);
+    const hasAdminAccess = caller.is_system_user === 1 ||
+      ['system_owner', 'system_manager', 'owner', 'manager'].includes(caller.role) ||
+      hasPermission(caller.role, 'system:admin', overrides);
+
+    if (!hasAdminAccess) {
+      return errorResponse(res, 'FORBIDDEN', 'Administrative privileges required to list team members', 403);
+    }
+
+    const users = db.prepare(`
+      SELECT id, operator_id, email, first_name, last_name, role, is_system_user, created_at, updated_at
+      FROM users
+      WHERE operator_id = ? AND deleted_at IS NULL
+      ORDER BY created_at ASC
+    `).all(operatorId) as any[];
+
+    const formatted = users.map((u) => ({
+      id: u.id,
+      operator_id: u.operator_id,
+      email: u.email,
+      first_name: u.first_name,
+      last_name: u.last_name,
+      role: u.role,
+      is_system_user: u.is_system_user === 1 ? 1 : 0,
+      allowed_portfolios: getUserPortfolioAccess(u.id, operatorId, db),
+      allowed_modules: getUserModuleAccess(u.id, operatorId, db),
+      created_at: u.created_at,
+      updated_at: u.updated_at
+    }));
+
+    successResponse(res, { users: formatted });
+  });
+
+  // Provision new subuser under active operator
+  router.post('/api/v1/users', async (req, res) => {
+    const operatorId = RequestContext.tryGet()?.operatorId || req.operatorId;
+    const callerId = RequestContext.tryGet()?.userId || req.userId;
+    if (!operatorId || !callerId) {
+      return errorResponse(res, 'FORBIDDEN', 'Authentication required', 403);
+    }
+
+    const db = getDatabase();
+    const caller = db.prepare(
+      'SELECT role, is_system_user FROM users WHERE id = ? AND deleted_at IS NULL'
+    ).get(callerId) as { role: string; is_system_user?: number } | undefined;
+
+    const isSystemAdmin = caller?.is_system_user === 1 || caller?.role === 'system_owner' || caller?.role === 'system_manager';
+    const isOperatorAdmin = caller?.role === 'owner' || caller?.role === 'manager';
+
+    if (!isSystemAdmin && !isOperatorAdmin) {
+      return errorResponse(res, 'FORBIDDEN', 'Only operator owners or managers can provision subusers', 403);
+    }
+
+    const { email, password, first_name, last_name, role, portfolio_ids, allowed_portfolios, module_ids, allowed_modules } = req.body || {};
+    const cleanEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';
+    const cleanPassword = typeof password === 'string' ? password : '';
+    const cleanFirst = typeof first_name === 'string' ? first_name.trim() : '';
+    const cleanLast = typeof last_name === 'string' ? last_name.trim() : '';
+    const cleanRole = typeof role === 'string' ? role.trim().toLowerCase() : 'leasing_agent';
+    const effectivePortfolios = Array.isArray(portfolio_ids) ? portfolio_ids : (Array.isArray(allowed_portfolios) ? allowed_portfolios : []);
+    const effectiveModules = Array.isArray(module_ids) ? module_ids : (Array.isArray(allowed_modules) ? allowed_modules : []);
+
+    if (!cleanEmail || !cleanEmail.includes('@') || !cleanEmail.includes('.')) {
+      return errorResponse(res, 'VALIDATION_ERROR', 'A valid email address is required', 400);
+    }
+    if (cleanPassword.length < 8) {
+      return errorResponse(res, 'VALIDATION_ERROR', 'Password must be at least 8 characters long', 400);
+    }
+    if (!cleanFirst || !cleanLast) {
+      return errorResponse(res, 'VALIDATION_ERROR', 'First name and last name are required', 400);
+    }
+
+    const allowedRoles = ['owner', 'manager', 'leasing_agent', 'assistant', 'maintenance', 'auditor', 'viewer', 'read_only'];
+    if (!allowedRoles.includes(cleanRole)) {
+      return errorResponse(res, 'VALIDATION_ERROR', `Invalid role. Allowed roles: ${allowedRoles.join(', ')}`, 400);
+    }
+
+    if (!caller || !canAssignRole(caller.role, cleanRole)) {
+      return errorResponse(res, 'FORBIDDEN', `Cannot assign role '${cleanRole}' exceeding caller privilege ceiling`, 403);
+    }
+
+    const existing = db.prepare(
+      'SELECT id FROM users WHERE operator_id = ? AND email = ? AND deleted_at IS NULL'
+    ).get(operatorId, cleanEmail);
+
+    if (existing) {
+      return errorResponse(res, 'CONFLICT', 'A user with this email address already exists in your organization', 409);
+    }
+
+    const now = Date.now();
+    const newUserId = generateUUIDv7();
+    const passwordHash = await hashPassword(cleanPassword);
+
+    withTransaction((tx) => {
+      tx.prepare(`
+        INSERT INTO users (id, operator_id, email, password_hash, first_name, last_name, role, token_version, is_system_user, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, 1, 0, ?, ?)
+      `).run(newUserId, operatorId, cleanEmail, passwordHash, cleanFirst, cleanLast, cleanRole, now, now);
+
+      if (effectivePortfolios.length > 0) {
+        setUserPortfolioAccess(newUserId, operatorId, effectivePortfolios, tx);
+      }
+      if (effectiveModules.length > 0) {
+        setUserModuleAccess(newUserId, operatorId, effectiveModules, tx);
+      }
+    }, db);
+
+    const createdUser = {
+      id: newUserId,
+      operator_id: operatorId,
+      email: cleanEmail,
+      first_name: cleanFirst,
+      last_name: cleanLast,
+      role: cleanRole,
+      is_system_user: 0,
+      allowed_portfolios: getUserPortfolioAccess(newUserId, operatorId, db),
+      allowed_modules: getUserModuleAccess(newUserId, operatorId, db),
+      created_at: now,
+      updated_at: now
+    };
+
+    successResponse(res, { user: createdUser }, 201);
+  });
+
+  // Get subuser details
+  router.get('/api/v1/users/:id', (req, res) => {
+    const operatorId = RequestContext.tryGet()?.operatorId || req.operatorId;
+    const callerId = RequestContext.tryGet()?.userId || req.userId;
+    if (!operatorId || !callerId) {
+      return errorResponse(res, 'FORBIDDEN', 'Authentication required', 403);
+    }
+
+    const db = getDatabase();
+    const caller = db.prepare(
+      'SELECT role, is_system_user FROM users WHERE id = ? AND deleted_at IS NULL'
+    ).get(callerId) as { role: string; is_system_user?: number } | undefined;
+
+    if (!caller) {
+      return errorResponse(res, 'FORBIDDEN', 'User inactive or not authorized', 403);
+    }
+
+    const overrides = loadOperatorRoleOverrides(operatorId, db);
+    const hasAdminAccess = caller.is_system_user === 1 ||
+      ['system_owner', 'system_manager', 'owner', 'manager'].includes(caller.role) ||
+      hasPermission(caller.role, 'system:admin', overrides);
+
+    if (!hasAdminAccess && callerId !== req.params.id) {
+      return errorResponse(res, 'FORBIDDEN', 'Access denied to user profile', 403);
+    }
+
+    const user = db.prepare(`
+      SELECT id, operator_id, email, first_name, last_name, role, is_system_user, created_at, updated_at
+      FROM users
+      WHERE id = ? AND operator_id = ? AND deleted_at IS NULL
+    `).get(req.params.id!, operatorId) as any;
+
+    if (!user) {
+      return errorResponse(res, 'NOT_FOUND', 'User not found', 404);
+    }
+
+    successResponse(res, {
+      user: {
+        id: user.id,
+        operator_id: user.operator_id,
+        email: user.email,
+        first_name: user.first_name,
+        last_name: user.last_name,
+        role: user.role,
+        is_system_user: user.is_system_user === 1 ? 1 : 0,
+        allowed_portfolios: getUserPortfolioAccess(user.id, operatorId, db),
+        allowed_modules: getUserModuleAccess(user.id, operatorId, db),
+        created_at: user.created_at,
+        updated_at: user.updated_at
+      }
+    });
+  });
+
+  // Update subuser
+  router.put('/api/v1/users/:id', async (req, res) => {
+    const operatorId = RequestContext.tryGet()?.operatorId || req.operatorId;
+    const callerId = RequestContext.tryGet()?.userId || req.userId;
+    if (!operatorId || !callerId) {
+      return errorResponse(res, 'FORBIDDEN', 'Authentication required', 403);
+    }
+
+    const db = getDatabase();
+    const caller = db.prepare(
+      'SELECT role, is_system_user FROM users WHERE id = ? AND deleted_at IS NULL'
+    ).get(callerId) as { role: string; is_system_user?: number } | undefined;
+
+    const isSystemAdmin = caller?.is_system_user === 1 || caller?.role === 'system_owner' || caller?.role === 'system_manager';
+    const isOperatorAdmin = caller?.role === 'owner' || caller?.role === 'manager';
+
+    if (!isSystemAdmin && !isOperatorAdmin) {
+      return errorResponse(res, 'FORBIDDEN', 'Only operator owners or managers can modify team members', 403);
+    }
+
+    const targetUser = db.prepare(
+      'SELECT id, role FROM users WHERE id = ? AND operator_id = ? AND deleted_at IS NULL'
+    ).get(req.params.id!, operatorId) as { id: string; role: string } | undefined;
+
+    if (!targetUser) {
+      return errorResponse(res, 'NOT_FOUND', 'User not found', 404);
+    }
+
+    // Callers below owner rank cannot modify users of equal or higher rank
+    if (caller && caller.role !== 'owner' && caller.role !== 'system_owner' && caller.is_system_user !== 1) {
+      if (!canAssignRole(caller.role, targetUser.role)) {
+        return errorResponse(res, 'FORBIDDEN', `Cannot modify user with role '${targetUser.role}' exceeding caller privilege ceiling`, 403);
+      }
+    }
+
+    const { first_name, last_name, role, password, portfolio_ids, allowed_portfolios, module_ids, allowed_modules } = req.body || {};
+    let cleanRole: string | undefined;
+    if (role !== undefined) {
+      if (typeof role !== 'string') {
+        return errorResponse(res, 'VALIDATION_ERROR', 'Role must be a string identifier', 400);
+      }
+      cleanRole = role.toLowerCase().trim();
+      const allowedRoles = ['owner', 'manager', 'leasing_agent', 'assistant', 'maintenance', 'auditor', 'viewer', 'read_only'];
+      if (!allowedRoles.includes(cleanRole)) {
+        return errorResponse(res, 'VALIDATION_ERROR', `Invalid role. Allowed roles: ${allowedRoles.join(', ')}`, 400);
+      }
+      if (caller && !canAssignRole(caller.role, cleanRole)) {
+        return errorResponse(res, 'FORBIDDEN', `Cannot assign role '${cleanRole}' exceeding caller privilege ceiling`, 403);
+      }
+    }
+
+    const now = Date.now();
+    const effectivePortfolios = Array.isArray(portfolio_ids) ? portfolio_ids : (Array.isArray(allowed_portfolios) ? allowed_portfolios : undefined);
+    const effectiveModules = Array.isArray(module_ids) ? module_ids : (Array.isArray(allowed_modules) ? allowed_modules : undefined);
+
+    withTransaction((tx) => {
+      if (first_name || last_name) {
+        tx.prepare('UPDATE users SET first_name = COALESCE(?, first_name), last_name = COALESCE(?, last_name), updated_at = ? WHERE id = ?')
+          .run(first_name || null, last_name || null, now, targetUser.id);
+      }
+      if (cleanRole) {
+        tx.prepare('UPDATE users SET role = ?, updated_at = ? WHERE id = ?')
+          .run(cleanRole, now, targetUser.id);
+      }
+      if (effectivePortfolios !== undefined) {
+        setUserPortfolioAccess(targetUser.id, operatorId, effectivePortfolios, tx);
+      }
+      if (effectiveModules !== undefined) {
+        setUserModuleAccess(targetUser.id, operatorId, effectiveModules, tx);
+      }
+    }, db);
+
+    if (password && typeof password === 'string' && password.length >= 8) {
+      const hash = await hashPassword(password);
+      db.prepare('UPDATE users SET password_hash = ?, token_version = token_version + 1, updated_at = ? WHERE id = ?')
+        .run(hash, now, targetUser.id);
+    }
+
+    const updated = db.prepare(`
+      SELECT id, operator_id, email, first_name, last_name, role, is_system_user, created_at, updated_at
+      FROM users WHERE id = ?
+    `).get(targetUser.id) as any;
+
+    successResponse(res, {
+      user: {
+        id: updated.id,
+        operator_id: updated.operator_id,
+        email: updated.email,
+        first_name: updated.first_name,
+        last_name: updated.last_name,
+        role: updated.role,
+        is_system_user: updated.is_system_user === 1 ? 1 : 0,
+        allowed_portfolios: getUserPortfolioAccess(updated.id, operatorId, db),
+        allowed_modules: getUserModuleAccess(updated.id, operatorId, db),
+        created_at: updated.created_at,
+        updated_at: updated.updated_at
+      }
+    });
+  });
+
+  // Delete subuser
+  router.delete('/api/v1/users/:id', (req, res) => {
+    const operatorId = RequestContext.tryGet()?.operatorId || req.operatorId;
+    const callerId = RequestContext.tryGet()?.userId || req.userId;
+    if (!operatorId || !callerId) {
+      return errorResponse(res, 'FORBIDDEN', 'Authentication required', 403);
+    }
+
+    if (req.params.id === callerId) {
+      return errorResponse(res, 'VALIDATION_ERROR', 'You cannot delete your own account', 400);
+    }
+
+    const db = getDatabase();
+    const caller = db.prepare(
+      'SELECT role, is_system_user FROM users WHERE id = ? AND deleted_at IS NULL'
+    ).get(callerId) as { role: string; is_system_user?: number } | undefined;
+
+    const isSystemAdmin = caller?.is_system_user === 1 || caller?.role === 'system_owner';
+    const isOwner = caller?.role === 'owner';
+
+    if (!isSystemAdmin && !isOwner) {
+      return errorResponse(res, 'FORBIDDEN', 'Only operator owners or system owners can remove team members', 403);
+    }
+
+    const targetUser = db.prepare(
+      'SELECT id, role FROM users WHERE id = ? AND operator_id = ? AND deleted_at IS NULL'
+    ).get(req.params.id!, operatorId) as { id: string; role: string } | undefined;
+
+    if (!targetUser) {
+      return errorResponse(res, 'NOT_FOUND', 'User not found', 404);
+    }
+
+    // Check if target is sole owner
+    if (targetUser.role === 'owner') {
+      const ownerCountRow = db.prepare(
+        "SELECT COUNT(*) as count FROM users WHERE operator_id = ? AND role = 'owner' AND deleted_at IS NULL"
+      ).get(operatorId) as { count: number };
+      if (Number(ownerCountRow?.count || 0) <= 1) {
+        return errorResponse(res, 'CONFLICT', 'Cannot delete the only owner of this organization', 409);
+      }
+    }
+
+    const now = Date.now();
+    db.prepare('UPDATE users SET deleted_at = ?, updated_at = ? WHERE id = ?').run(now, now, targetUser.id);
+    successResponse(res, { deleted: true });
+  });
+
+  // ==========================================
+  // Platform Instance Owner & System Managers
+  // ==========================================
+
+  // List system managers ("minions of the owner")
+  router.get('/api/v1/system/managers', (req, res) => {
+    const callerId = RequestContext.tryGet()?.userId || req.userId;
+    const db = getDatabase();
+    const caller = callerId ? db.prepare('SELECT role, is_system_user FROM users WHERE id = ?').get(callerId) as any : null;
+    const isOwner = caller?.is_system_user === 1 && (caller?.role === 'system_owner' || caller?.role === 'owner');
+
+    if (!isOwner && callerId !== 'system') {
+      return errorResponse(res, 'FORBIDDEN', 'Platform instance owner credentials required', 403);
+    }
+
+    const managers = db.prepare(`
+      SELECT id, email, first_name, last_name, role, is_system_user, created_at, updated_at
+      FROM users
+      WHERE is_system_user = 1 AND deleted_at IS NULL
+      ORDER BY created_at ASC
+    `).all() as any[];
+
+    successResponse(res, { managers });
+  });
+
+  // Provision a system manager minion
+  router.post('/api/v1/system/managers', async (req, res) => {
+    const callerId = RequestContext.tryGet()?.userId || req.userId;
+    const db = getDatabase();
+    const caller = callerId ? db.prepare('SELECT role, is_system_user FROM users WHERE id = ?').get(callerId) as any : null;
+    const isOwner = caller?.is_system_user === 1 && (caller?.role === 'system_owner' || caller?.role === 'owner');
+
+    if (!isOwner && callerId !== 'system') {
+      return errorResponse(res, 'FORBIDDEN', 'Only the platform instance owner can appoint system managers', 403);
+    }
+
+    const { email, password, first_name, last_name } = req.body || {};
+    const cleanEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';
+    const cleanPassword = typeof password === 'string' ? password : '';
+    const cleanFirst = typeof first_name === 'string' ? first_name.trim() : 'System';
+    const cleanLast = typeof last_name === 'string' ? last_name.trim() : 'Manager';
+
+    if (!cleanEmail || !cleanEmail.includes('@') || !cleanEmail.includes('.')) {
+      return errorResponse(res, 'VALIDATION_ERROR', 'A valid email address is required', 400);
+    }
+    if (cleanPassword.length < 8) {
+      return errorResponse(res, 'VALIDATION_ERROR', 'Password must be at least 8 characters long', 400);
+    }
+
+    const existing = db.prepare('SELECT id FROM users WHERE email = ? AND deleted_at IS NULL').get(cleanEmail);
+    if (existing) {
+      return errorResponse(res, 'CONFLICT', 'A user with this email address already exists', 409);
+    }
+
+    const primaryOperator = db.prepare('SELECT id FROM operators ORDER BY created_at ASC LIMIT 1').get() as { id: string } | undefined;
+    const opId = primaryOperator?.id || 'system';
+
+    const now = Date.now();
+    const newId = generateUUIDv7();
+    const passwordHash = await hashPassword(cleanPassword);
+
+    db.prepare(`
+      INSERT INTO users (id, operator_id, email, password_hash, first_name, last_name, role, token_version, is_system_user, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, 'system_manager', 1, 1, ?, ?)
+    `).run(newId, opId, cleanEmail, passwordHash, cleanFirst, cleanLast, now, now);
+
+    successResponse(res, {
+      manager: {
+        id: newId,
+        email: cleanEmail,
+        first_name: cleanFirst,
+        last_name: cleanLast,
+        role: 'system_manager',
+        is_system_user: 1,
+        created_at: now
+      }
+    }, 201);
+  });
+
+  // Delete system manager minion
+  router.delete('/api/v1/system/managers/:id', (req, res) => {
+    const callerId = RequestContext.tryGet()?.userId || req.userId;
+    const db = getDatabase();
+    const caller = callerId ? db.prepare('SELECT role, is_system_user FROM users WHERE id = ?').get(callerId) as any : null;
+    const isOwner = caller?.is_system_user === 1 && (caller?.role === 'system_owner' || caller?.role === 'owner');
+
+    if (!isOwner && callerId !== 'system') {
+      return errorResponse(res, 'FORBIDDEN', 'Only the platform instance owner can remove system managers', 403);
+    }
+
+    if (req.params.id === callerId) {
+      return errorResponse(res, 'VALIDATION_ERROR', 'You cannot remove yourself as instance owner', 400);
+    }
+
+    const now = Date.now();
+    const info = db.prepare('UPDATE users SET deleted_at = ?, updated_at = ? WHERE id = ? AND is_system_user = 1 AND deleted_at IS NULL')
+      .run(now, now, req.params.id!);
+
+    if (info.changes === 0) {
+      return errorResponse(res, 'NOT_FOUND', 'System manager not found', 404);
+    }
+
+    successResponse(res, { deleted: true });
+  });
+
+  // List all operators (for platform owners and managers)
+  router.get('/api/v1/system/operators', (req, res) => {
+    const callerId = RequestContext.tryGet()?.userId || req.userId;
+    const db = getDatabase();
+    const caller = callerId ? db.prepare('SELECT role, is_system_user FROM users WHERE id = ?').get(callerId) as any : null;
+    const isPlatformUser = caller?.is_system_user === 1 || caller?.role === 'system_owner' || caller?.role === 'system_manager';
+
+    if (!isPlatformUser && callerId !== 'system') {
+      return errorResponse(res, 'FORBIDDEN', 'Platform administrator credentials required', 403);
+    }
+
+    const operators = db.prepare(`
+      SELECT o.id, o.name, o.subdomain, o.currency, o.storage_quota_bytes, o.created_at, o.updated_at,
+             (SELECT COUNT(*) FROM units u WHERE u.operator_id = o.id AND u.deleted_at IS NULL) as unit_count,
+             (SELECT COUNT(*) FROM users usr WHERE usr.operator_id = o.id AND usr.deleted_at IS NULL) as user_count
+      FROM operators o
+      WHERE o.deleted_at IS NULL
+      ORDER BY o.created_at ASC
+    `).all() as any[];
+
+    successResponse(res, { operators });
+  });
+
+  // Update operator (name, quota, subdomain)
+  router.put('/api/v1/system/operators/:id', (req, res) => {
+    const callerId = RequestContext.tryGet()?.userId || req.userId;
+    const db = getDatabase();
+    const caller = callerId ? db.prepare('SELECT role, is_system_user FROM users WHERE id = ?').get(callerId) as any : null;
+    const isPlatformUser = caller?.is_system_user === 1 || caller?.role === 'system_owner' || caller?.role === 'system_manager';
+
+    if (!isPlatformUser && callerId !== 'system') {
+      return errorResponse(res, 'FORBIDDEN', 'Platform administrator credentials required', 403);
+    }
+
+    const targetOp = db.prepare('SELECT * FROM operators WHERE id = ? AND deleted_at IS NULL').get(req.params.id!) as any;
+    if (!targetOp) {
+      return errorResponse(res, 'NOT_FOUND', 'Operator not found', 404);
+    }
+
+    const { name, storage_quota_bytes, storage_quota } = req.body || {};
+    const now = Date.now();
+    const newName = typeof name === 'string' && name.trim() ? name.trim() : targetOp.name;
+    const rawQuota = storage_quota_bytes !== undefined ? storage_quota_bytes : storage_quota;
+    const newQuota = rawQuota !== undefined && Number.isInteger(Number(rawQuota)) && Number(rawQuota) > 0
+      ? Number(rawQuota)
+      : targetOp.storage_quota_bytes;
+
+    db.prepare('UPDATE operators SET name = ?, storage_quota_bytes = ?, updated_at = ? WHERE id = ?')
+      .run(newName, newQuota, now, targetOp.id);
+
+    const updated = db.prepare('SELECT * FROM operators WHERE id = ?').get(targetOp.id);
+    successResponse(res, { operator: updated });
+  });
+
+  // Soft delete operator (strictly owner)
+  router.delete('/api/v1/system/operators/:id', (req, res) => {
+    const callerId = RequestContext.tryGet()?.userId || req.userId;
+    const db = getDatabase();
+    const caller = callerId ? db.prepare('SELECT role, is_system_user FROM users WHERE id = ?').get(callerId) as any : null;
+    const isOwner = caller?.is_system_user === 1 && (caller?.role === 'system_owner' || caller?.role === 'owner');
+
+    if (!isOwner && callerId !== 'system') {
+      return errorResponse(res, 'FORBIDDEN', 'Only the platform instance owner can delete operators', 403);
+    }
+
+    const targetOp = db.prepare('SELECT * FROM operators WHERE id = ? AND deleted_at IS NULL').get(req.params.id!) as any;
+    if (!targetOp) {
+      return errorResponse(res, 'NOT_FOUND', 'Operator not found', 404);
+    }
+
+    const now = Date.now();
+    withTransaction((tx) => {
+      tx.prepare('UPDATE operators SET deleted_at = ?, updated_at = ? WHERE id = ?').run(now, now, targetOp.id);
+      tx.prepare('UPDATE users SET deleted_at = ?, updated_at = ? WHERE operator_id = ?').run(now, now, targetOp.id);
+    }, db);
+
+    successResponse(res, { deleted: true });
   });
 
   return router;

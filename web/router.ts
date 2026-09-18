@@ -20,6 +20,7 @@ import { HookRegistry } from './lib/hooks.js';
 import * as DashboardPage from './pages/dashboard.js';
 import * as LoginPage from './pages/login.js';
 import * as SetupPage from './pages/setup.js';
+import * as AdminPage from './pages/admin.js';
 
 // Import module page handlers
 import * as PropertiesIndex from '../modules/properties/frontend/pages/index.js';
@@ -51,6 +52,7 @@ const ROUTE_TABLE: Record<string, PageHandler> = {
   '/dashboard': DashboardPage.handle,
   '/login': LoginPage.handle,
   '/setup': SetupPage.handle,
+  '/admin': AdminPage.handle,
 
   '/properties': PropertiesIndex.handle,
   '/properties/show': PropertiesShow.handle,
@@ -78,9 +80,15 @@ const ROUTE_TABLE: Record<string, PageHandler> = {
   '/backups': BackupIndex.handle,
 };
 
+/**
+ * Web front-controller router that directs incoming HTTP presentation requests
+ * to appropriate SSR page handlers, verifies setup status and sessions, and handles redirects.
+ */
 export class WebRouter {
   /**
    * Handle incoming request and dispatch to target page handler.
+   *
+   * @param ctx - Page context encapsulating HTTP request, response, session, and API client.
    */
   public static async dispatch(ctx: PageContext): Promise<void> {
     const rawPath = ctx.url.pathname.replace(/\/+$/, '') || '/';

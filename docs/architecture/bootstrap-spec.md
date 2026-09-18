@@ -91,14 +91,15 @@ garrison-os/
 ├── core/                      # Engine Foundation & Runtime
 │   ├── context.ts             # AsyncLocalStorage operator & user context
 │   ├── crypto.ts              # Native RFC 9562 UUIDv7 generator, scrypt hashing, auth tokens
-│   ├── events.ts              # Native EventEmitter event bus
+│   ├── events.ts              # Native EventEmitter event bus with dead-letter failure tracking
+│   ├── rbac.ts                # Fine-grained configurable Role-Based Access Control matrix
 │   ├── storage.ts             # Native node:fs file storage abstraction & local driver
 │   ├── module-loader.ts       # Dynamic scanner & registry for /modules
 │   └── index.ts
 │
 ├── api/                       # Zero-Dependency HTTP Layer
 │   ├── router.ts              # Static-first HTTP router (methods, specificity, params, parsing)
-│   ├── middleware.ts          # Operator resolution, auth verification, CORS, rate limiting
+│   ├── middleware.ts          # Operator resolution, auth verification, CORS, rate limiting, RBAC guards
 │   ├── response.ts            # Standardized JSON response envelopes & status codes
 │   ├── server.ts              # Native node:http server harness & health checks
 │   └── index.ts
@@ -108,7 +109,12 @@ garrison-os/
 │   ├── migrator.ts            # Native SQL migration runner with _migrations tracker
 │   ├── seed.ts                # Deterministic date-relative 20-unit sample portfolio seeder
 │   └── migrations/            # Core system migrations
-│       └── 0001_core_schema.sql
+│       ├── 0001_core_schema.sql
+│       ├── 0002_add_token_version.sql
+│       ├── 0003_add_operator_storage_quota.sql
+│       ├── 0004_create_attachments.sql
+│       ├── 0005_create_role_permissions.sql
+│       └── 0006_platform_roles_and_subusers.sql
 │
 ├── modules/                   # Drop-in Functional Modules
 │   ├── properties/            # Portfolios, Properties, and Units
@@ -116,7 +122,8 @@ garrison-os/
 │   ├── leases/                # Lease agreements, terms & lease_contacts junction
 │   ├── accounting/            # Cash-basis ledger, billing cycles, Schedule E & balances
 │   ├── maintenance/           # Work order tracking, vendor dispatch, cost conversion
-│   └── backup/                # Hot vacuum, automated retention, and disaster recovery
+│   ├── backup/                # Hot vacuum, POSIX tar media backup, and disaster recovery
+│   └── attachments/           # Universal media/doc storage with EXIF & PDF sanitization
 │
 ├── web/                       # Presentation Layer (Native TypeScript SSR / Semantic HTML5)
 │   ├── index.ts               # Front controller, CSRF validator & dynamic route dispatcher
@@ -217,7 +224,8 @@ CREATE TABLE IF NOT EXISTS users (
     password_hash TEXT NOT NULL,
     first_name TEXT NOT NULL,
     last_name TEXT NOT NULL,
-    role TEXT NOT NULL CHECK (role IN ('owner', 'manager', 'assistant', 'read_only')),
+    role TEXT NOT NULL CHECK (role IN ('system_owner', 'system_manager', 'owner', 'manager', 'leasing_agent', 'assistant', 'maintenance', 'auditor', 'viewer', 'read_only')),
+    is_system_user INTEGER NOT NULL DEFAULT 0 CHECK (is_system_user IN (0, 1)),
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL,
     deleted_at INTEGER,

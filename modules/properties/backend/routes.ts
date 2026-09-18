@@ -2,6 +2,11 @@ import { Router } from '../../../api/router.js';
 import { successResponse, errorResponse } from '../../../api/response.js';
 import { PropertiesRepository } from './repository.js';
 
+/**
+ * Register properties, portfolios, buildings, and units API routes with the router.
+ *
+ * @param router - Application router instance to register route handlers on.
+ */
 export function registerRoutes(router: Router): void {
   // --- Portfolios ---
   router.get('/api/v1/properties/portfolios', (_req, res) => {
@@ -62,8 +67,12 @@ export function registerRoutes(router: Router): void {
     if (!property_id || !unit_number || market_rent_cents === undefined) {
       return errorResponse(res, 'VALIDATION_ERROR', 'property_id, unit_number, and market_rent_cents are required', 400);
     }
-    const unit = PropertiesRepository.createUnit(req.body);
-    successResponse(res, { unit }, 201);
+    try {
+      const unit = PropertiesRepository.createUnit(req.body);
+      successResponse(res, { unit }, 201);
+    } catch (err: any) {
+      return errorResponse(res, 'VALIDATION_ERROR', err.message || 'Failed to create unit', 400);
+    }
   });
 
   router.get('/api/v1/properties/units/:id', (req, res) => {
@@ -75,11 +84,15 @@ export function registerRoutes(router: Router): void {
   });
 
   router.put('/api/v1/properties/units/:id', (req, res) => {
-    const unit = PropertiesRepository.updateUnit(req.params.id!, req.body || {});
-    if (!unit) {
-      return errorResponse(res, 'NOT_FOUND', 'Unit not found', 404);
+    try {
+      const unit = PropertiesRepository.updateUnit(req.params.id!, req.body || {});
+      if (!unit) {
+        return errorResponse(res, 'NOT_FOUND', 'Unit not found', 404);
+      }
+      successResponse(res, { unit });
+    } catch (err: any) {
+      return errorResponse(res, 'VALIDATION_ERROR', err.message || 'Failed to update unit', 400);
     }
-    successResponse(res, { unit });
   });
 
   router.delete('/api/v1/properties/units/:id', (req, res) => {
@@ -117,8 +130,9 @@ export function registerRoutes(router: Router): void {
     if (!property) {
       return errorResponse(res, 'NOT_FOUND', 'Property not found', 404);
     }
+    const buildings = PropertiesRepository.listBuildings(property.id);
     const units = PropertiesRepository.listUnits({ property_id: property.id });
-    successResponse(res, { property, units });
+    successResponse(res, { property, buildings, units });
   });
 
   router.put('/api/v1/properties/:id', (req, res) => {
@@ -133,6 +147,75 @@ export function registerRoutes(router: Router): void {
     const deleted = PropertiesRepository.deleteProperty(req.params.id!);
     if (!deleted) {
       return errorResponse(res, 'NOT_FOUND', 'Property not found', 404);
+    }
+    successResponse(res, { deleted: true });
+  });
+
+  // --- Buildings ---
+  router.get('/api/v1/properties/:id/buildings', (req, res) => {
+    const property = PropertiesRepository.getPropertyById(req.params.id!);
+    if (!property) {
+      return errorResponse(res, 'NOT_FOUND', 'Property not found', 404);
+    }
+    const buildings = PropertiesRepository.listBuildings(property.id);
+    successResponse(res, { buildings });
+  });
+
+  router.post('/api/v1/properties/:id/buildings', (req, res) => {
+    const property = PropertiesRepository.getPropertyById(req.params.id!);
+    if (!property) {
+      return errorResponse(res, 'NOT_FOUND', 'Property not found', 404);
+    }
+    const { name, building_number, floors, notes } = req.body || {};
+    if (!name) {
+      return errorResponse(res, 'VALIDATION_ERROR', 'Building name is required', 400);
+    }
+    let parsedFloors: number | null = null;
+    if (floors !== undefined && floors !== null) {
+      const num = Number(floors);
+      if (!Number.isInteger(num) || num <= 0) {
+        return errorResponse(res, 'VALIDATION_ERROR', 'floors must be a positive integer', 400);
+      }
+      parsedFloors = num;
+    }
+    const building = PropertiesRepository.createBuilding({
+      property_id: property.id,
+      name,
+      building_number,
+      floors: parsedFloors,
+      notes
+    });
+    successResponse(res, { building }, 201);
+  });
+
+  router.get('/api/v1/buildings/:id', (req, res) => {
+    const building = PropertiesRepository.getBuildingById(req.params.id!);
+    if (!building) {
+      return errorResponse(res, 'NOT_FOUND', 'Building not found', 404);
+    }
+    const units = PropertiesRepository.listUnits({ building_id: building.id });
+    successResponse(res, { building, units });
+  });
+
+  router.put('/api/v1/buildings/:id', (req, res) => {
+    const { floors } = req.body || {};
+    if (floors !== undefined && floors !== null) {
+      const num = Number(floors);
+      if (!Number.isInteger(num) || num <= 0) {
+        return errorResponse(res, 'VALIDATION_ERROR', 'floors must be a positive integer', 400);
+      }
+    }
+    const building = PropertiesRepository.updateBuilding(req.params.id!, req.body || {});
+    if (!building) {
+      return errorResponse(res, 'NOT_FOUND', 'Building not found', 404);
+    }
+    successResponse(res, { building });
+  });
+
+  router.delete('/api/v1/buildings/:id', (req, res) => {
+    const deleted = PropertiesRepository.deleteBuilding(req.params.id!);
+    if (!deleted) {
+      return errorResponse(res, 'NOT_FOUND', 'Building not found', 404);
     }
     successResponse(res, { deleted: true });
   });

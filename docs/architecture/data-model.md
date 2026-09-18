@@ -79,3 +79,25 @@ To support seamless integration with external accounting software such as QuickB
 * **Account Types**: `Bank`, `AccountsReceivable`, `OtherCurrentAsset`, `AccountsPayable`, `OtherCurrentLiability`, `Equity`, `Income`, `Expense`, `CostOfGoodsSold`.
 * **Category Mapping**: Connects operational transaction categories (`rent`, `late_fee`, `repairs`, etc.) and system roles (`operating_bank`, `trust_bank`, `accounts_receivable`, `security_deposits_held`) to GL accounts.
 * **Balanced Double-Entry Representation**: Journal entries computed on-the-fly dynamically balance debits and credits in integer cents ($\sum \text{Debits} = \sum \text{Credits}$) and tag transactions with QuickBooks classes and customer/vendor associations.
+
+---
+
+## 6. Four-Tier Real Estate Asset Hierarchy
+
+GarrisonOS organizes all real estate inventory through a strict four-tier hierarchy:
+
+$$\text{Portfolios} \longrightarrow \text{Properties} \longrightarrow \text{Buildings} \longrightarrow \text{Units}$$
+
+1. **Portfolios (`portfolios`)**: Legal ownership entities, client funds, or holding trusts (e.g., `Blue Ridge Residential LLC`). Every asset belongs to an isolated portfolio.
+2. **Properties (`properties`)**: Physical real estate parcels or sites (e.g., `Broadview 4-Plex`, `Highland Ridge Apartments`).
+3. **Buildings (`buildings`)**: Structural structures or wings located within a property parcel (e.g., `Building A`, `North Tower`). Enables multi-structure campuses and floor-level organization.
+4. **Units (`units`)**: Individual rentable premises (e.g., `Unit 101`, `Penthouse B`). Units maintain a foreign key to their parcel (`property_id`) and an optional structural link to their physical structure (`building_id`).
+
+---
+
+## 7. Dual-Scoping Access Control Model
+
+Operator subusers are restricted across two orthogonal dimensions:
+
+1. **Functional Module Whitelist (`user_module_access`)**: Whitelists the business capabilities a subuser may invoke (`properties`, `tenants`, `leases`, `work_orders`, `accounting`).
+2. **Portfolio Boundary Whitelist (`user_portfolio_access`)**: Restricts subuser operational visibility strictly to assigned investment portfolios. Any attempt to inspect or mutate properties, buildings, units, or leases belonging to an unassigned portfolio is blocked with HTTP 403 `FORBIDDEN`.
