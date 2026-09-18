@@ -35,11 +35,20 @@ describe('Contacts Module - Directory & Vendor Registry', () => {
         last_name: 'Perez',
         company_name: 'Perez Rapid Plumbing',
         vendor_specialty: 'plumbing',
+        tax_classification: 'llc',
         email: 'robert@perezplumbing.local',
         phone: '555-0188'
       });
       assert.ok(vendorContact.id);
       assert.equal(vendorContact.vendor_specialty, 'plumbing');
+      assert.equal(vendorContact.tax_classification, 'llc');
+      assert.equal(vendorContact.w9_received, 0);
+
+      // Verify W-9 receipt update
+      const updatedVendor = ContactsRepository.updateContact(vendorContact.id, {
+        w9_received: 1
+      });
+      assert.equal(updatedVendor?.w9_received, 1);
 
       // 3. Filter contacts by contact_type
       const vendors = ContactsRepository.listContacts({ contact_type: 'vendor' });

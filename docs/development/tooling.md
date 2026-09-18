@@ -7,10 +7,16 @@ This guide documents the development tooling, test reporter, and repository comp
 ## 1. Test Reporter & Diagnostic Harness
 
 * **Script**: `scripts/test.js`
+* **Execution Options**:
+  * `node scripts/test.js` (or `npm test`): Executes full test regression across all 28 test suites.
+  * `node scripts/test.js core`: Executes only core engine, API, and database test suites.
+  * `node scripts/test.js e2e`: Executes the comprehensive end-to-end user lifecycle test suite (`test/e2e/lifecycle.test.ts`).
+  * `node scripts/test.js web`: Executes web presentation layer tests.
+  * `node scripts/test.js <module_name>`: Executes only tests for the specified module (e.g. `contacts`, `accounting`, `properties`, `leases`, `maintenance`, `backup`).
 * **Default Behavior**: Buffers `node:test` execution and outputs a single succinct line on success:
 
   ```text
-  ✔ All test suites passed (21 suites in 1.29s, 0 failures).
+  ✔ All test suites passed (28 suites in 1.30s, 0 failures).
   ```
 
   *(Maintains a clean terminal output while preserving context).*

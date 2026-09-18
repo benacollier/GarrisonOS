@@ -42,7 +42,16 @@ Represents distinct rentable living or commercial units within a property.
 
 ---
 
-## 2. API Endpoints
+## 2. Unit Turnover & Make-Ready Workflow
+
+GarrisonOS provides integrated unit turnover management:
+
+* **State Transitions**: Units transition through distinct lifecycle stages: `vacant` $\leftrightarrow$ `turnover` $\leftrightarrow$ `maintenance_hold`.
+* **Make-Ready Automation**: When transitioning a unit to `turnover`, the operator is prompted to automatically generate a make-ready work order (`category = 'make_ready'`) in the Maintenance module, tracking turnover tasks, inspection items, and turnaround costs.
+
+---
+
+## 3. API Endpoints
 
 * `GET /api/v1/properties/portfolios`: List portfolios with property counts
 * `POST /api/v1/properties/portfolios`: Create portfolio

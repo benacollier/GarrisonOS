@@ -52,7 +52,14 @@ Residential tenancies frequently involve multiple roommates, co-signers, and non
 
 ---
 
-## 4. API Endpoints
+## 4. Lease Renewal & Move-Out Termination Workflows
+
+* **Lease Renewal Modal**: Operators can execute a formal lease renewal (`renew_lease` action) specifying a new end date and revised monthly rent. The action updates status to `active` or records renewal details while maintaining full audit trail.
+* **Move-Out & Termination Modal**: Tenancy conclusion (`terminate_lease` action) captures formal notice dates and scheduled move-out dates. It flags the unit for turnover inspection and prepares the statutory security deposit disposition workflow to reconcile deposit refunds or deductions against the tenant ledger.
+
+---
+
+## 5. API Endpoints
 
 * `GET /api/v1/leases`: List leases with status, unit, and contact filters
 * `POST /api/v1/leases`: Create a new lease with signatories
