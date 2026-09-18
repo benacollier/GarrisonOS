@@ -30,7 +30,7 @@ CREATE TABLE IF NOT EXISTS operators (
 ```
 
 ### 1.2 Users & Authentication (`users`)
-Operator staff, property managers, and administrative users.
+Operator staff, property managers, subusers, and administrative users.
 ```sql
 CREATE TABLE IF NOT EXISTS users (
     id TEXT PRIMARY KEY,
@@ -39,8 +39,9 @@ CREATE TABLE IF NOT EXISTS users (
     password_hash TEXT NOT NULL,
     first_name TEXT NOT NULL,
     last_name TEXT NOT NULL,
-    role_id TEXT REFERENCES roles(id),
+    role TEXT NOT NULL DEFAULT 'viewer' CHECK (role IN ('system_owner', 'system_manager', 'owner', 'manager', 'leasing_agent', 'assistant', 'maintenance', 'auditor', 'viewer', 'read_only')),
     token_version INTEGER NOT NULL DEFAULT 1,
+    is_system_user INTEGER NOT NULL DEFAULT 0 CHECK (is_system_user IN (0, 1)),
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL,
     deleted_at INTEGER
@@ -48,7 +49,35 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE UNIQUE INDEX IF NOT EXISTS idx_users_operator_email ON users(operator_id, email) WHERE deleted_at IS NULL;
 ```
 
-### 1.3 Configurable Role-Based Access Control (`roles`, `role_permissions`)
+### 1.3 Scoped Subuser Whitelists (`user_portfolio_access`, `user_module_access`)
+Junction tables enforcing dual-scoping security restrictions on operator subusers.
+```sql
+CREATE TABLE IF NOT EXISTS user_portfolio_access (
+    id TEXT PRIMARY KEY,
+    operator_id TEXT NOT NULL REFERENCES operators(id),
+    user_id TEXT NOT NULL REFERENCES users(id),
+    portfolio_id TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    FOREIGN KEY (operator_id) REFERENCES operators(id),
+    FOREIGN KEY (user_id) REFERENCES users(id)
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_user_portfolio_access_unique ON user_portfolio_access(operator_id, user_id, portfolio_id);
+CREATE INDEX IF NOT EXISTS idx_user_portfolio_access_lookup ON user_portfolio_access(operator_id, user_id);
+
+CREATE TABLE IF NOT EXISTS user_module_access (
+    id TEXT PRIMARY KEY,
+    operator_id TEXT NOT NULL REFERENCES operators(id),
+    user_id TEXT NOT NULL REFERENCES users(id),
+    module_id TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    FOREIGN KEY (operator_id) REFERENCES operators(id),
+    FOREIGN KEY (user_id) REFERENCES users(id)
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_user_module_access_unique ON user_module_access(operator_id, user_id, module_id);
+CREATE INDEX IF NOT EXISTS idx_user_module_access_lookup ON user_module_access(operator_id, user_id);
+```
+
+### 1.4 Configurable Role-Based Access Control (`roles`, `role_permissions`)
 Granular permission matrix supporting custom operator roles.
 ```sql
 CREATE TABLE IF NOT EXISTS roles (
@@ -74,7 +103,7 @@ CREATE TABLE IF NOT EXISTS role_permissions (
 CREATE UNIQUE INDEX IF NOT EXISTS idx_role_permissions_unique ON role_permissions(operator_id, role_id, resource, action);
 ```
 
-### 1.4 Universal Document Attachments & Media (`attachments`)
+### 1.5 Universal Document Attachments & Media (`attachments`)
 Universal document storage metadata across all operational entities.
 ```sql
 CREATE TABLE IF NOT EXISTS attachments (
@@ -94,7 +123,7 @@ CREATE TABLE IF NOT EXISTS attachments (
 CREATE INDEX IF NOT EXISTS idx_attachments_operator_entity ON attachments(operator_id, entity_type, entity_id) WHERE deleted_at IS NULL;
 ```
 
-### 1.5 Immutable Audit Logs (`audit_logs`)
+### 1.6 Immutable Audit Logs (`audit_logs`)
 Tamper-evident audit trail capturing all state-modifying actions.
 ```sql
 CREATE TABLE IF NOT EXISTS audit_logs (
@@ -133,7 +162,7 @@ CREATE INDEX IF NOT EXISTS idx_portfolios_operator ON portfolios(operator_id) WH
 ```
 
 ### 2.2 Properties (`properties`)
-Physical real estate assets (buildings, multi-family complexes, or single-family residences).
+Physical real estate parcels or sites (e.g. multi-family complexes, apartment communities, or single-family homes).
 ```sql
 CREATE TABLE IF NOT EXISTS properties (
     id TEXT PRIMARY KEY,
@@ -156,13 +185,32 @@ CREATE TABLE IF NOT EXISTS properties (
 CREATE INDEX IF NOT EXISTS idx_properties_operator_portfolio ON properties(operator_id, portfolio_id) WHERE deleted_at IS NULL;
 ```
 
-### 2.3 Units (`units`)
-Rentable physical inventory partitions within a property.
+### 2.3 Buildings (`buildings`)
+Structural edifices or distinct wings located within a property parcel.
+```sql
+CREATE TABLE IF NOT EXISTS buildings (
+    id TEXT PRIMARY KEY,
+    operator_id TEXT NOT NULL REFERENCES operators(id),
+    property_id TEXT NOT NULL REFERENCES properties(id),
+    name TEXT NOT NULL,
+    building_number TEXT,
+    floors INTEGER DEFAULT 1,
+    notes TEXT,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
+    deleted_at INTEGER
+);
+CREATE INDEX IF NOT EXISTS idx_buildings_operator_property ON buildings(operator_id, property_id) WHERE deleted_at IS NULL;
+```
+
+### 2.4 Units (`units`)
+Rentable physical premises within a property or building.
 ```sql
 CREATE TABLE IF NOT EXISTS units (
     id TEXT PRIMARY KEY,
     operator_id TEXT NOT NULL REFERENCES operators(id),
     property_id TEXT NOT NULL REFERENCES properties(id),
+    building_id TEXT REFERENCES buildings(id),
     unit_number TEXT NOT NULL,
     bedrooms REAL NOT NULL DEFAULT 1.0,
     bathrooms REAL NOT NULL DEFAULT 1.0,
@@ -175,6 +223,7 @@ CREATE TABLE IF NOT EXISTS units (
     deleted_at INTEGER
 );
 CREATE INDEX IF NOT EXISTS idx_units_operator_property ON units(operator_id, property_id) WHERE deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_units_operator_building ON units(operator_id, building_id) WHERE deleted_at IS NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS idx_units_property_number ON units(property_id, unit_number) WHERE deleted_at IS NULL;
 ```
 

@@ -37,10 +37,13 @@ export async function seedDatabase(dbInstance?: DatabaseSync): Promise<void> {
     tx.prepare('DELETE FROM lease_contacts WHERE operator_id = ?').run(OPERATOR_ID);
     tx.prepare('DELETE FROM leases WHERE operator_id = ?').run(OPERATOR_ID);
     tx.prepare('DELETE FROM units WHERE operator_id = ?').run(OPERATOR_ID);
+    tx.prepare('DELETE FROM buildings WHERE operator_id = ?').run(OPERATOR_ID);
     tx.prepare('DELETE FROM properties WHERE operator_id = ?').run(OPERATOR_ID);
     tx.prepare('DELETE FROM portfolios WHERE operator_id = ?').run(OPERATOR_ID);
     tx.prepare('DELETE FROM contacts WHERE operator_id = ?').run(OPERATOR_ID);
     tx.prepare('DELETE FROM audit_logs WHERE operator_id = ?').run(OPERATOR_ID);
+    tx.prepare('DELETE FROM user_portfolio_access WHERE user_id IN (SELECT id FROM users WHERE operator_id = ?)').run(OPERATOR_ID);
+    tx.prepare('DELETE FROM user_module_access WHERE user_id IN (SELECT id FROM users WHERE operator_id = ?)').run(OPERATOR_ID);
     tx.prepare('DELETE FROM users WHERE operator_id = ?').run(OPERATOR_ID);
     tx.prepare('DELETE FROM operators WHERE id = ?').run(OPERATOR_ID);
 
@@ -53,8 +56,8 @@ export async function seedDatabase(dbInstance?: DatabaseSync): Promise<void> {
     // 3. Create Operator User (Password: Password123!)
     const userId = generateUUIDv7();
     tx.prepare(`
-      INSERT INTO users (id, operator_id, email, password_hash, first_name, last_name, role, token_version, created_at, updated_at)
-      VALUES (?, ?, 'operator@garrisonos.local', ?, 'Alexander', 'Garrison', 'owner', 1, ?, ?)
+      INSERT INTO users (id, operator_id, email, password_hash, first_name, last_name, role, token_version, is_system_user, created_at, updated_at)
+      VALUES (?, ?, 'operator@garrisonos.local', ?, 'Alexander', 'Garrison', 'owner', 1, 0, ?, ?)
     `).run(userId, OPERATOR_ID, passwordHash, now, now);
 
     // 4. Create Portfolios
@@ -65,6 +68,27 @@ export async function seedDatabase(dbInstance?: DatabaseSync): Promise<void> {
       VALUES (?, ?, 'Blue Ridge Residential LLC', 'XX-XXX4819', 'Single family residential holdings', ?, ?),
              (?, ?, 'Piedmont Multifamily Holdings', 'XX-XXX9201', 'Duplex and small multifamily portfolio', ?, ?)
     `).run(portfolio1Id, OPERATOR_ID, now, now, portfolio2Id, OPERATOR_ID, now, now);
+
+    // 4b. Create Sample Subuser (Leasing Agent with Portfolio & Module Scoping)
+    const subuserId = generateUUIDv7();
+    tx.prepare(`
+      INSERT INTO users (id, operator_id, email, password_hash, first_name, last_name, role, token_version, is_system_user, created_at, updated_at)
+      VALUES (?, ?, 'leasing@garrisonos.local', ?, 'Sarah', 'Jenkins', 'leasing_agent', 1, 0, ?, ?)
+    `).run(subuserId, OPERATOR_ID, passwordHash, now, now);
+
+    // Grant access to Piedmont Multifamily portfolio only
+    tx.prepare(`
+      INSERT INTO user_portfolio_access (id, operator_id, user_id, portfolio_id, created_at)
+      VALUES (?, ?, ?, ?, ?)
+    `).run(generateUUIDv7(), OPERATOR_ID, subuserId, portfolio2Id, now);
+
+    // Grant module access to properties, tenants, work_orders
+    for (const mod of ['properties', 'tenants', 'work_orders']) {
+      tx.prepare(`
+        INSERT INTO user_module_access (id, operator_id, user_id, module_id, created_at)
+        VALUES (?, ?, ?, ?, ?)
+      `).run(generateUUIDv7(), OPERATOR_ID, subuserId, mod, now);
+    }
 
     // 5. Create 7 Vendors & Trades with W-9 & Tax Classification
     const vendorPlumbingId = generateUUIDv7();
@@ -171,12 +195,18 @@ export async function seedDatabase(dbInstance?: DatabaseSync): Promise<void> {
       }
     }
 
-    // 1 4-Plex (4 units: 101/102 occupied, 201 turnover, 202 vacant)
+    // 1 4-Plex (4 units: 101/102 occupied, 201 turnover, 202 vacant) with Building entity
     const fourPlexPropId = generateUUIDv7();
     tx.prepare(`
       INSERT INTO properties (id, operator_id, portfolio_id, name, property_type, address_line1, city, state, postal_code, created_at, updated_at)
       VALUES (?, ?, ?, 'Broadview 4-Plex', 'multi_family', '512 Broadview Terrace', 'Asheville', 'NC', '28806', ?, ?)
     `).run(fourPlexPropId, OPERATOR_ID, portfolio2Id, now, now);
+
+    const buildingId = generateUUIDv7();
+    tx.prepare(`
+      INSERT INTO buildings (id, operator_id, property_id, name, building_number, floors, notes, created_at, updated_at)
+      VALUES (?, ?, ?, 'Building A', 'Bldg-A', 2, 'Two-story residential quadplex building', ?, ?)
+    `).run(buildingId, OPERATOR_ID, fourPlexPropId, now, now);
 
     const fourPlexUnits = [
       { num: '101', rent: 125000, status: 'occupied' as const },
@@ -190,9 +220,9 @@ export async function seedDatabase(dbInstance?: DatabaseSync): Promise<void> {
     for (const fpu of fourPlexUnits) {
       const unitId = generateUUIDv7();
       tx.prepare(`
-        INSERT INTO units (id, operator_id, property_id, unit_number, status, bedrooms, bathrooms, square_feet, market_rent_cents, target_deposit_cents, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, 2, 1, 800, ?, ?, ?, ?)
-      `).run(unitId, OPERATOR_ID, fourPlexPropId, fpu.num, fpu.status, fpu.rent, fpu.rent, now, now);
+        INSERT INTO units (id, operator_id, property_id, building_id, unit_number, status, bedrooms, bathrooms, square_feet, market_rent_cents, target_deposit_cents, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, 2, 1, 800, ?, ?, ?, ?)
+      `).run(unitId, OPERATOR_ID, fourPlexPropId, buildingId, fpu.num, fpu.status, fpu.rent, fpu.rent, now, now);
 
       if (fpu.status === 'occupied') {
         createdUnits.push({ unitId, propertyId: fourPlexPropId, rentCents: fpu.rent, unitNumber: fpu.num, propertyName: 'Broadview 4-Plex' });

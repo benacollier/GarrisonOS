@@ -117,8 +117,9 @@ export function registerRoutes(router: Router): void {
     if (!property) {
       return errorResponse(res, 'NOT_FOUND', 'Property not found', 404);
     }
+    const buildings = PropertiesRepository.listBuildings(property.id);
     const units = PropertiesRepository.listUnits({ property_id: property.id });
-    successResponse(res, { property, units });
+    successResponse(res, { property, buildings, units });
   });
 
   router.put('/api/v1/properties/:id', (req, res) => {
@@ -133,6 +134,60 @@ export function registerRoutes(router: Router): void {
     const deleted = PropertiesRepository.deleteProperty(req.params.id!);
     if (!deleted) {
       return errorResponse(res, 'NOT_FOUND', 'Property not found', 404);
+    }
+    successResponse(res, { deleted: true });
+  });
+
+  // --- Buildings ---
+  router.get('/api/v1/properties/:id/buildings', (req, res) => {
+    const property = PropertiesRepository.getPropertyById(req.params.id!);
+    if (!property) {
+      return errorResponse(res, 'NOT_FOUND', 'Property not found', 404);
+    }
+    const buildings = PropertiesRepository.listBuildings(property.id);
+    successResponse(res, { buildings });
+  });
+
+  router.post('/api/v1/properties/:id/buildings', (req, res) => {
+    const property = PropertiesRepository.getPropertyById(req.params.id!);
+    if (!property) {
+      return errorResponse(res, 'NOT_FOUND', 'Property not found', 404);
+    }
+    const { name, building_number, floors, notes } = req.body || {};
+    if (!name) {
+      return errorResponse(res, 'VALIDATION_ERROR', 'Building name is required', 400);
+    }
+    const building = PropertiesRepository.createBuilding({
+      property_id: property.id,
+      name,
+      building_number,
+      floors: floors !== undefined ? Number(floors) : null,
+      notes
+    });
+    successResponse(res, { building }, 201);
+  });
+
+  router.get('/api/v1/buildings/:id', (req, res) => {
+    const building = PropertiesRepository.getBuildingById(req.params.id!);
+    if (!building) {
+      return errorResponse(res, 'NOT_FOUND', 'Building not found', 404);
+    }
+    const units = PropertiesRepository.listUnits({ building_id: building.id });
+    successResponse(res, { building, units });
+  });
+
+  router.put('/api/v1/buildings/:id', (req, res) => {
+    const building = PropertiesRepository.updateBuilding(req.params.id!, req.body || {});
+    if (!building) {
+      return errorResponse(res, 'NOT_FOUND', 'Building not found', 404);
+    }
+    successResponse(res, { building });
+  });
+
+  router.delete('/api/v1/buildings/:id', (req, res) => {
+    const deleted = PropertiesRepository.deleteBuilding(req.params.id!);
+    if (!deleted) {
+      return errorResponse(res, 'NOT_FOUND', 'Building not found', 404);
     }
     successResponse(res, { deleted: true });
   });

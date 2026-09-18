@@ -70,10 +70,32 @@ export type EventMap = {
 };
 
 /**
+ * Dead-letter failure record capturing failed event subscriber executions.
+ */
+export interface DeadLetterFailure {
+  /** Unique error record identifier. */
+  id: string;
+  /** Event topic name. */
+  event: string;
+  /** Error message. */
+  error: string;
+  /** Captured stack trace. */
+  stack?: string;
+  /** Operator context identifier if resolved. */
+  operatorId?: string;
+  /** Correlation identifier for request tracing. */
+  correlationId?: string;
+  /** UTC timestamp of the failure. */
+  timestamp: number;
+}
+
+/**
  * In-process asynchronous event bus for cross-module domain messaging.
  */
 export class EventBus {
   private emitter: EventEmitter;
+  private deadLetters: DeadLetterFailure[] = [];
+  private static readonly MAX_DEAD_LETTERS = 50;
 
   /**
    * Initialize a new EventBus with an increased listener capacity.
@@ -150,7 +172,23 @@ export class EventBus {
     const safeWrapper = async (payload: unknown) => {
       try {
         await handler(payload);
-      } catch (error) {
+      } catch (error: any) {
+        const ctx = RequestContext.tryGet();
+        const failure: DeadLetterFailure = {
+          id: generateUUIDv7(),
+          event,
+          error: error?.message || String(error),
+          stack: error?.stack,
+          operatorId: ctx?.operatorId,
+          correlationId: ctx?.correlationId,
+          timestamp: Date.now()
+        };
+
+        this.deadLetters.unshift(failure);
+        if (this.deadLetters.length > EventBus.MAX_DEAD_LETTERS) {
+          this.deadLetters.pop();
+        }
+
         process.stderr.write(`[EventBus] Error in subscriber for ${event}: ${String(error)}\n`);
       }
     };
@@ -159,6 +197,22 @@ export class EventBus {
     return () => {
       this.emitter.off(event, safeWrapper);
     };
+  }
+
+  /**
+   * Retrieves recent dead-letter subscriber failures for system audit and telemetry.
+   *
+   * @returns Array of dead-letter failure records.
+   */
+  public getDeadLetterFailures(): DeadLetterFailure[] {
+    return [...this.deadLetters];
+  }
+
+  /**
+   * Clears the in-memory dead-letter failure log.
+   */
+  public clearDeadLetterFailures(): void {
+    this.deadLetters = [];
   }
 
   /**

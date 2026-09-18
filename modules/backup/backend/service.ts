@@ -9,6 +9,7 @@ import { runMigrations } from '../../../database/migrator.js';
 import { RequestContext } from '../../../core/context.js';
 import { getApplicationVersion } from '../../../core/version.js';
 import { BackupRecord, BackupRepository } from './repository.js';
+import { createTarGzFile, TarEntry, unpackTar } from './tar.js';
 
 /**
  * Options configuring an operator-level data restoration.
@@ -101,15 +102,16 @@ export class BackupService {
   }
 
   /**
-   * Creates a full SQLite database snapshot using VACUUM INTO, compressed with gzip,
-   * with SHA-256 checksum and metadata registration.
+   * Creates a full system backup snapshot using SQLite VACUUM INTO alongside all
+   * uploaded physical media attachments from STORAGE_PATH, packaged into a POSIX .tar.gz archive
+   * with SHA-256 integrity verification.
    *
    * @returns Completed BackupRecord.
    */
   public static async createFullDatabaseBackup(): Promise<BackupRecord> {
     const operatorId = RequestContext.getOperatorId();
     const timestamp = Date.now();
-    const filename = `garrison-db-${timestamp}.sqlite.gz`;
+    const filename = `garrison-db-${timestamp}.tar.gz`;
     const relativePath = filename;
     const backupDir = this.getBackupDir();
     const targetCompressedPath = path.join(backupDir, filename);
@@ -119,7 +121,12 @@ export class BackupService {
       backup_type: 'full_system',
       filename,
       relative_path: relativePath,
-      metadata_json: JSON.stringify({ operator_id: operatorId, tenant_id: operatorId, mode: 'full_sqlite_snapshot' })
+      metadata_json: JSON.stringify({
+        operator_id: operatorId,
+        tenant_id: operatorId,
+        mode: 'full_system_snapshot',
+        includes_media: true
+      })
     });
 
     try {
@@ -131,17 +138,49 @@ export class BackupService {
       const vacuumStmt = db.prepare('VACUUM INTO ?');
       vacuumStmt.run(tempSnapshotPath);
 
-      // Compress snapshot with gzip
-      const sourceStream = fs.createReadStream(tempSnapshotPath);
-      const gzipStream = zlib.createGzip({ level: 9 });
-      const destStream = fs.createWriteStream(targetCompressedPath);
-
-      await pipeline(sourceStream, gzipStream, destStream);
-
-      // Clean up uncompressed snapshot
+      const dbBuffer = fs.readFileSync(tempSnapshotPath);
       if (fs.existsSync(tempSnapshotPath)) {
         fs.unlinkSync(tempSnapshotPath);
       }
+
+      const entries: TarEntry[] = [
+        {
+          name: 'database.sqlite',
+          data: dbBuffer,
+          mode: 0o644,
+          mtimeMs: timestamp
+        }
+      ];
+
+      // Collect media attachment files from STORAGE_PATH/attachments if exists
+      const baseStorage = process.env['STORAGE_PATH'] || './storage';
+      const attachmentsDir = path.resolve(baseStorage, 'attachments');
+      let attachmentCount = 0;
+
+      if (fs.existsSync(attachmentsDir)) {
+        const collectFilesRecursively = (dir: string, baseDir: string) => {
+          const items = fs.readdirSync(dir, { withFileTypes: true });
+          for (const item of items) {
+            const fullPath = path.join(dir, item.name);
+            if (item.isDirectory()) {
+              collectFilesRecursively(fullPath, baseDir);
+            } else if (item.isFile()) {
+              const relPath = path.relative(baseDir, fullPath).replace(/\\/g, '/');
+              const data = fs.readFileSync(fullPath);
+              entries.push({
+                name: `attachments/${relPath}`,
+                data,
+                mode: 0o644,
+                mtimeMs: fs.statSync(fullPath).mtimeMs
+              });
+              attachmentCount++;
+            }
+          }
+        };
+        collectFilesRecursively(attachmentsDir, attachmentsDir);
+      }
+
+      await createTarGzFile(targetCompressedPath, entries);
 
       // Calculate file size and checksum
       const stats = fs.statSync(targetCompressedPath);
@@ -150,7 +189,14 @@ export class BackupService {
       const updated = BackupRepository.updateStatus(record.id, {
         status: 'completed',
         file_size_bytes: stats.size,
-        checksum_sha256: checksum
+        checksum_sha256: checksum,
+        metadata_json: JSON.stringify({
+          operator_id: operatorId,
+          tenant_id: operatorId,
+          mode: 'full_system_snapshot',
+          includes_media: true,
+          attachments_count: attachmentCount
+        })
       });
 
       return updated!;
@@ -546,8 +592,11 @@ export class BackupService {
   }
 
   /**
-   * Disaster Recovery: Restores the full SQLite database from a .sqlite.gz snapshot.
-   * Safely removes active WAL/SHM handles, swaps files, and re-applies any pending migrations.
+   * Disaster Recovery: Restores the full SQLite database and physical media attachments
+   * from a snapshot archive.
+   * Supports both modern .tar.gz archives containing database.sqlite and media files,
+   * as well as legacy .sqlite.gz or uncompressed .sqlite snapshots.
+   * Safely removes active WAL/SHM handles, swaps files, restores media files, and re-applies any pending migrations.
    *
    * @param sourcePath - Path to the snapshot archive file.
    */
@@ -561,22 +610,48 @@ export class BackupService {
     const walPath = `${resolvedDbPath}-wal`;
     const shmPath = `${resolvedDbPath}-shm`;
 
-    // 1. Decompress snapshot to a temporary verification file
     const tempDbPath = path.resolve(path.dirname(resolvedDbPath), `restore-tmp-${Date.now()}.sqlite`);
     try {
-      const sourceStream = fs.createReadStream(sourcePath);
-      const isGzip = sourcePath.endsWith('.gz');
-
+      let rawBuffer = fs.readFileSync(sourcePath);
+      const isGzip = sourcePath.endsWith('.gz') || (rawBuffer.length > 2 && rawBuffer[0] === 0x1f && rawBuffer[1] === 0x8b);
       if (isGzip) {
-        const gunzipStream = zlib.createGunzip();
-        const destStream = fs.createWriteStream(tempDbPath);
-        await pipeline(sourceStream, gunzipStream, destStream);
-      } else {
-        const destStream = fs.createWriteStream(tempDbPath);
-        await pipeline(sourceStream, destStream);
+        rawBuffer = zlib.gunzipSync(rawBuffer);
       }
 
-      // Verify SQLite header magic bytes (first 16 bytes: "SQLite format 3\0")
+      // 1. Check if buffer is direct SQLite database snapshot
+      if (rawBuffer.length >= 16 && rawBuffer.subarray(0, 15).toString('utf8') === 'SQLite format 3') {
+        fs.writeFileSync(tempDbPath, rawBuffer);
+      } else {
+        // Parse as POSIX TAR archive containing database.sqlite and optional attachments
+        const entries = unpackTar(rawBuffer);
+        const dbEntry = entries.find(e => e.name === 'database.sqlite' || e.name.endsWith('.sqlite'));
+        if (!dbEntry) {
+          throw new Error('Invalid backup archive: missing database snapshot entry');
+        }
+
+        if (dbEntry.data.length < 16 || dbEntry.data.subarray(0, 15).toString('utf8') !== 'SQLite format 3') {
+          throw new Error('Invalid SQLite database header in restored snapshot');
+        }
+
+        fs.writeFileSync(tempDbPath, dbEntry.data);
+
+        // Restore media attachments to STORAGE_PATH if present
+        const baseStorage = process.env['STORAGE_PATH'] || './storage';
+        const resolvedBaseStorage = path.resolve(baseStorage);
+        const normalizedBase = path.normalize(resolvedBaseStorage) + path.sep;
+
+        for (const entry of entries) {
+          if (entry.name.startsWith('attachments/')) {
+            const targetPath = path.resolve(resolvedBaseStorage, entry.name);
+            if (targetPath.startsWith(normalizedBase)) {
+              fs.mkdirSync(path.dirname(targetPath), { recursive: true });
+              fs.writeFileSync(targetPath, entry.data);
+            }
+          }
+        }
+      }
+
+      // 2. Verify SQLite header magic bytes (first 16 bytes: "SQLite format 3\0")
       const fd = fs.openSync(tempDbPath, 'r');
       const headerBuf = Buffer.alloc(16);
       fs.readSync(fd, headerBuf, 0, 16, 0);
@@ -586,10 +661,10 @@ export class BackupService {
         throw new Error('Invalid SQLite database header in restored snapshot');
       }
 
-      // 2. Close active database connections
+      // 3. Close active database connections
       closeDatabase();
 
-      // 3. Remove stale WAL and SHM files
+      // 4. Remove stale WAL and SHM files
       if (fs.existsSync(walPath)) {
         try { fs.unlinkSync(walPath); } catch {}
       }
@@ -597,13 +672,13 @@ export class BackupService {
         try { fs.unlinkSync(shmPath); } catch {}
       }
 
-      // 4. Overwrite main database file
+      // 5. Overwrite main database file
       fs.copyFileSync(tempDbPath, resolvedDbPath);
 
       // Clean up temp file
       try { fs.unlinkSync(tempDbPath); } catch {}
 
-      // 5. Re-open database and run migrations to catch up any newer schema changes
+      // 6. Re-open database and run migrations to catch up any newer schema changes
       const db = getDatabase();
       runMigrations(db);
     } catch (err: any) {

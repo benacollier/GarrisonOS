@@ -47,7 +47,53 @@ Standard Error Codes:
 
 ---
 
-## 2. Accounts Payable (AP) & Vendor Invoicing Subsystem
+## 2. Platform Governance & Operator Subuser APIs
+
+### 2.1 Platform Operators Governance
+* `GET /api/v1/system/operators`: List all operators on the instance (Platform Owner & System Managers only).
+* `POST /api/v1/system/operators`: Provision a new operator and owner user with configurable storage quota (Platform Owner only).
+* `PUT /api/v1/system/operators/:id`: Update operator name, storage quota bytes (Platform Owner & System Managers).
+* `DELETE /api/v1/system/operators/:id`: Soft-delete operator and all its users (Platform Master Owner only).
+
+### 2.2 Platform System Managers ("Minions of the Owner")
+* `GET /api/v1/system/managers`: List platform system managers (Platform Owner only).
+* `POST /api/v1/system/managers`: Provision a new platform manager (`is_system_user = 1`, `role = system_manager`) assisting with platform administration.
+* `DELETE /api/v1/system/managers/:id`: Soft-delete platform manager (Platform Owner only; cannot delete self).
+
+### 2.3 Operator Team & Subuser Management
+* `GET /api/v1/users`: List subusers belonging to the caller's operator organization.
+* `POST /api/v1/users`: Provision a subuser with role (`leasing_agent`, `assistant`, `maintenance`, `auditor`, `viewer`), `allowed_modules: string[]`, and `allowed_portfolios: string[]`.
+* `GET /api/v1/users/:id`: Get subuser profile with module and portfolio whitelist.
+* `PUT /api/v1/users/:id`: Update subuser profile, role, password, `allowed_modules`, or `allowed_portfolios`.
+* `DELETE /api/v1/users/:id`: Soft-delete subuser (blocks deletion of sole remaining owner).
+
+---
+
+## 3. Four-Tier Asset Hierarchy: Properties & Buildings APIs
+
+### 3.1 Buildings Management
+* `GET /api/v1/properties/:id/buildings`: List all buildings located within a property parcel.
+* `POST /api/v1/properties/:id/buildings`: Create a new building under a property parcel:
+  ```json
+  {
+    "name": "North Tower",
+    "building_number": "Bldg-A",
+    "floors": 4,
+    "notes": "Four-story residential wing"
+  }
+  ```
+* `GET /api/v1/buildings/:id`: Retrieve building details with parent property reference.
+* `PUT /api/v1/buildings/:id`: Update building name, number, floor count, or notes.
+* `DELETE /api/v1/buildings/:id`: Soft-delete building record.
+
+### 3.2 Units with Structural Links
+* `POST /api/v1/properties/:id/units`: Accepts optional `building_id` linking the unit directly to a physical building within the parcel.
+* `GET /api/v1/properties/units/:id`: Returns unit details including linked `building_id`.
+* `PUT /api/v1/properties/units/:id`: Re-assign or update `building_id`.
+
+---
+
+## 4. Accounts Payable (AP) & Vendor Invoicing Subsystem
 
 ### 2.1 List Bills
 * **Endpoint**: `GET /api/v1/accounting/bills`

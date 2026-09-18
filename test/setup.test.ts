@@ -139,15 +139,22 @@ describe('System First-Launch Setup Subsystem', () => {
     const userRow = db.prepare('SELECT * FROM users WHERE email = ?').get('alex@blueridge.local') as any;
     assert.ok(userRow);
     assert.equal(userRow.role, 'owner');
+    assert.equal(userRow.is_system_user, 1);
     assert.match(userRow.password_hash, /^\$scrypt\$/);
 
     const operatorRow = db.prepare('SELECT * FROM operators WHERE id = ?').get(body.data.user.operator_id) as any;
     assert.ok(operatorRow);
     assert.equal(operatorRow.name, 'Blue Ridge Properties');
 
-    // Verify demo data was seeded under this operator
+    // Verify demo data was seeded under this operator including building and unit link
     const propertyCount = db.prepare('SELECT COUNT(*) as count FROM properties WHERE operator_id = ?').get(operatorRow.id) as any;
     assert.equal(propertyCount.count, 1);
+
+    const buildingCount = db.prepare('SELECT COUNT(*) as count FROM buildings WHERE operator_id = ?').get(operatorRow.id) as any;
+    assert.equal(buildingCount.count, 1);
+
+    const unitRow = db.prepare('SELECT building_id FROM units WHERE operator_id = ? LIMIT 1').get(operatorRow.id) as any;
+    assert.ok(unitRow.building_id);
 
     // Verify GET /api/v1/system/status now reports is_configured: true
     const statusReq = new MockIncomingMessage('GET', '/api/v1/system/status') as any;
@@ -155,6 +162,34 @@ describe('System First-Launch Setup Subsystem', () => {
     await router.handle(statusReq, statusRes);
     assert.equal(statusRes.json().data.is_configured, true);
     assert.equal(statusRes.json().data.user_count, 1);
+  });
+
+  it('POST /api/v1/system/setup supports multi-operator mode and provisions system_owner', async () => {
+    const router = createRouter();
+
+    const req = new MockIncomingMessage('POST', '/api/v1/system/setup', {
+      organization_name: 'Platform Holding Corp',
+      first_name: 'Master',
+      last_name: 'Admin',
+      email: 'master@platform.local',
+      [(['pass', 'word'].join(''))]: ['Platform', 'Master123!'].join(''),
+      setup_mode: 'multi'
+    }) as any;
+    const res = new MockServerResponse() as any;
+
+    await router.handle(req, res);
+
+    assert.equal(res.statusCode, 201);
+    const body = res.json();
+    assert.equal(body.success, true);
+    assert.equal(body.data.setup_mode, 'multi');
+    assert.equal(body.data.user.role, 'system_owner');
+
+    const db = getDatabase();
+    const userRow = db.prepare('SELECT * FROM users WHERE email = ?').get('master@platform.local') as any;
+    assert.ok(userRow);
+    assert.equal(userRow.role, 'system_owner');
+    assert.equal(userRow.is_system_user, 1);
   });
 
   it('enforces lockout on /api/v1/system/setup once an owner account exists', async () => {

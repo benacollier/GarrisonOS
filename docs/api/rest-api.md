@@ -65,8 +65,10 @@ All JSON responses conform to standardized envelopes:
 * `VALIDATION_ERROR` (`400`)
 * `UNAUTHORIZED` (`401`)
 * `FORBIDDEN` (`403`)
+* `PERMISSION_DENIED` (`403`)
 * `NOT_FOUND` (`404`)
 * `CONFLICT` (`409`)
+* `QUOTA_EXCEEDED` (`413`)
 * `RATE_LIMITED` (`429`)
 * `INTERNAL_ERROR` (`500`)
 
@@ -79,25 +81,53 @@ All JSON responses conform to standardized envelopes:
 | `GET` | `/health` | Public | Liveness check returning status and uptime |
 | `GET` | `/ready` | Public | Readiness check verifying SQLite database connectivity |
 | `POST` | `/api/v1/auth/login` | Public (Rate Limited) | Authenticate user credentials and return signed HMAC token with `opid` |
-| `POST` | `/api/v1/system/setup` | Public | Initial system bootstrap provisioning first operator and owner user |
+| `POST` | `/api/v1/system/setup` | Public | Initial system bootstrap supporting `setup_mode` (`single` or `multi`), provisioning owner account and optional demo building/units |
+| `GET` | `/api/v1/system/operators` | Platform Owner / Manager | List all tenant operators across the platform instance |
 | `POST` | `/api/v1/system/operators` | Admin / System Secret | Provision a new operator and owner user with configurable storage quota, seeding Chart of Accounts |
+| `PUT` | `/api/v1/system/operators/:id` | Platform Owner / Manager | Update operator name, storage quota, or configuration |
+| `DELETE` | `/api/v1/system/operators/:id` | Platform Owner | Soft delete operator and associated operator users |
+| `GET` | `/api/v1/system/managers` | Platform Owner | List platform administrator managers ("minions of the owner") |
+| `POST` | `/api/v1/system/managers` | Platform Owner | Provision a platform system manager with platform-wide administrative visibility |
+| `DELETE` | `/api/v1/system/managers/:id` | Platform Owner | Soft delete a platform system manager |
+| `POST` | `/api/v1/system/restore` | Public (Unconfigured) | Disaster recovery restoring SQLite database and physical media attachments from `.tar.gz` archive |
 | `POST` | `/api/v1/batch` | Authenticated | Execute up to 10 authenticated `GET` requests concurrently. Operator and user identity come only from the verified bearer token; each response is indexed as `response_N`. Non-JSON responses return `NON_JSON_RESPONSE` for that item without failing the complete batch. |
 | `GET` | `/api/v1/system/backup` | Admin | Trigger WAL checkpoint and create database snapshot |
 
 ---
 
-## 4. Module Endpoint Directory
+## 4. Module & Subsystem Endpoint Directory
 
-### Properties & Units
+### User & Subuser Management (Operator Level)
+
+* `GET /api/v1/users`: List team members and subusers for the authenticated operator
+* `POST /api/v1/users`: Provision a subuser (e.g. `leasing_agent`, `assistant`, `maintenance`) with configurable `allowed_modules` and `allowed_portfolios`
+* `GET /api/v1/users/:id`: Get subuser profile with module and portfolio permissions
+* `PUT /api/v1/users/:id`: Update subuser profile, role, password, `allowed_modules`, or `allowed_portfolios`
+* `DELETE /api/v1/users/:id`: Soft delete subuser (prevents deletion of the last owner)
+
+### Universal Attachments
+
+* `GET /api/v1/attachments`: List attachments with polymorphic entity filters (`entity_type`, `entity_id`) and pagination (`limit`, `offset`)
+* `POST /api/v1/attachments`: Upload attachment (multipart/form-data with `file`, `entity_type`, `entity_id`, optional `description`), performs automatic EXIF stripping, PDF sanitization, and quota verification
+* `GET /api/v1/attachments/:id`: Get attachment metadata
+* `GET /api/v1/attachments/:id/download`: Stream sanitized binary attachment file
+* `DELETE /api/v1/attachments/:id`: Soft delete attachment record and remove physical file from disk
+
+### Properties, Buildings & Units (4-Tier Asset Hierarchy)
 
 * `GET /api/v1/properties`: List properties
 * `POST /api/v1/properties`: Create property
-* `GET /api/v1/properties/:id`: Get property with units
+* `GET /api/v1/properties/:id`: Get property with units and associated buildings
 * `PUT /api/v1/properties/:id`: Update property
 * `DELETE /api/v1/properties/:id`: Soft delete property
-* `POST /api/v1/properties/:id/units`: Create unit under property
-* `GET /api/v1/properties/units/:unitId`: Get unit
-* `PUT /api/v1/properties/units/:unitId`: Update unit
+* `GET /api/v1/properties/:id/buildings`: List buildings in a property
+* `POST /api/v1/properties/:id/buildings`: Create building within a property (`name`, `building_number`, `floors`, `notes`)
+* `GET /api/v1/buildings/:id`: Get building details
+* `PUT /api/v1/buildings/:id`: Update building
+* `DELETE /api/v1/buildings/:id`: Soft delete building
+* `POST /api/v1/properties/:id/units`: Create unit under property (supports optional `building_id`)
+* `GET /api/v1/properties/units/:unitId`: Get unit details including `building_id`
+* `PUT /api/v1/properties/units/:unitId`: Update unit details including `building_id`
 
 ### Contacts
 
@@ -143,3 +173,13 @@ All JSON responses conform to standardized envelopes:
 * `GET /api/v1/maintenance/:id`: Work order details
 * `PUT /api/v1/maintenance/:id`: Update work order status and costs
 * `DELETE /api/v1/maintenance/:id`: Soft delete work order
+
+### Backup & Disaster Recovery
+
+* `GET /api/v1/backups`: List backup archives and snapshots with pagination
+* `POST /api/v1/backups`: Create backup snapshot (`full_system` bundling SQLite DB and physical attachments into `.tar.gz`, or `operator_data` JSON export)
+* `GET /api/v1/backups/:id`: Get backup metadata and verification status
+* `GET /api/v1/backups/:id/download`: Stream compressed backup archive
+* `POST /api/v1/backups/:id/verify`: Verify SHA-256 cryptographic digest of archive
+* `POST /api/v1/backups/:id/restore`: Restore operator data from archive
+* `DELETE /api/v1/backups/:id`: Soft delete backup record and remove archive from disk

@@ -32,11 +32,25 @@ export interface Property {
   deleted_at?: number | null;
 }
 
+export interface Building {
+  id: string;
+  operator_id: string;
+  property_id: string;
+  name: string;
+  building_number?: string | null;
+  floors?: number | null;
+  notes?: string | null;
+  created_at: number;
+  updated_at: number;
+  deleted_at?: number | null;
+}
+
 export interface Unit {
   id: string;
   operator_id: string;
   tenant_id?: string;
   property_id: string;
+  building_id?: string | null;
   unit_number: string;
   status: 'vacant' | 'occupied' | 'notice_given' | 'turnover' | 'maintenance_hold';
   bedrooms: number;
@@ -229,8 +243,103 @@ export class PropertiesRepository {
     return info.changes > 0;
   }
 
+  // --- Buildings ---
+  public static listBuildings(propertyId?: string): Building[] {
+    const operatorId = RequestContext.getOperatorId();
+    const db = getDatabase();
+    let sql = 'SELECT * FROM buildings WHERE operator_id = ? AND deleted_at IS NULL';
+    const params: any[] = [operatorId];
+
+    if (propertyId) {
+      sql += ' AND property_id = ?';
+      params.push(propertyId);
+    }
+    sql += ' ORDER BY name ASC';
+
+    return db.prepare(sql).all(...params) as unknown as Building[];
+  }
+
+  public static getBuildingById(id: string): Building | null {
+    const operatorId = RequestContext.getOperatorId();
+    const db = getDatabase();
+    const row = db.prepare(`
+      SELECT * FROM buildings
+      WHERE id = ? AND operator_id = ? AND deleted_at IS NULL
+    `).get(id, operatorId) as Building | undefined;
+    return row || null;
+  }
+
+  public static createBuilding(data: {
+    property_id: string;
+    name: string;
+    building_number?: string | null;
+    floors?: number | null;
+    notes?: string | null;
+  }): Building {
+    const operatorId = RequestContext.getOperatorId();
+    const db = getDatabase();
+    const id = generateUUIDv7();
+    const now = Date.now();
+
+    db.prepare(`
+      INSERT INTO buildings (
+        id, operator_id, property_id, name, building_number,
+        floors, notes, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      id,
+      operatorId,
+      data.property_id,
+      data.name,
+      data.building_number || null,
+      data.floors || null,
+      data.notes || null,
+      now,
+      now
+    );
+
+    return PropertiesRepository.getBuildingById(id)!;
+  }
+
+  public static updateBuilding(id: string, data: Partial<Omit<Building, 'id' | 'operator_id' | 'created_at' | 'updated_at' | 'deleted_at'>>): Building | null {
+    const existing = PropertiesRepository.getBuildingById(id);
+    if (!existing) return null;
+
+    const operatorId = RequestContext.getOperatorId();
+    const db = getDatabase();
+    const now = Date.now();
+    const updated = { ...existing, ...data, updated_at: now };
+
+    db.prepare(`
+      UPDATE buildings SET
+        name = ?, building_number = ?, floors = ?, notes = ?, updated_at = ?
+      WHERE id = ? AND operator_id = ? AND deleted_at IS NULL
+    `).run(
+      updated.name,
+      updated.building_number || null,
+      updated.floors || null,
+      updated.notes || null,
+      now,
+      id,
+      operatorId
+    );
+
+    return PropertiesRepository.getBuildingById(id);
+  }
+
+  public static deleteBuilding(id: string): boolean {
+    const operatorId = RequestContext.getOperatorId();
+    const db = getDatabase();
+    const now = Date.now();
+    const info = db.prepare(`
+      UPDATE buildings SET deleted_at = ?
+      WHERE id = ? AND operator_id = ? AND deleted_at IS NULL
+    `).run(now, id, operatorId);
+    return info.changes > 0;
+  }
+
   // --- Units ---
-  public static listUnits(filter?: { property_id?: string; status?: string }): Unit[] {
+  public static listUnits(filter?: { property_id?: string; building_id?: string; status?: string }): Unit[] {
     const operatorId = RequestContext.getOperatorId();
     const db = getDatabase();
     let sql = 'SELECT * FROM units WHERE operator_id = ? AND deleted_at IS NULL';
@@ -239,6 +348,10 @@ export class PropertiesRepository {
     if (filter?.property_id) {
       sql += ' AND property_id = ?';
       params.push(filter.property_id);
+    }
+    if (filter?.building_id) {
+      sql += ' AND building_id = ?';
+      params.push(filter.building_id);
     }
     if (filter?.status) {
       sql += ' AND status = ?';
@@ -261,6 +374,7 @@ export class PropertiesRepository {
 
   public static createUnit(data: {
     property_id: string;
+    building_id?: string | null;
     unit_number: string;
     status?: Unit['status'];
     bedrooms?: number;
@@ -276,14 +390,15 @@ export class PropertiesRepository {
 
     db.prepare(`
       INSERT INTO units (
-        id, operator_id, property_id, unit_number, status,
+        id, operator_id, property_id, building_id, unit_number, status,
         bedrooms, bathrooms, square_feet, market_rent_cents, target_deposit_cents,
         created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       id,
       operatorId,
       data.property_id,
+      data.building_id || null,
       data.unit_number,
       data.status || 'vacant',
       data.bedrooms ?? 1,
@@ -309,12 +424,13 @@ export class PropertiesRepository {
 
     db.prepare(`
       UPDATE units SET
-        property_id = ?, unit_number = ?, status = ?,
+        property_id = ?, building_id = ?, unit_number = ?, status = ?,
         bedrooms = ?, bathrooms = ?, square_feet = ?,
         market_rent_cents = ?, target_deposit_cents = ?, updated_at = ?
       WHERE id = ? AND operator_id = ? AND deleted_at IS NULL
     `).run(
       updated.property_id,
+      updated.building_id || null,
       updated.unit_number,
       updated.status,
       updated.bedrooms,

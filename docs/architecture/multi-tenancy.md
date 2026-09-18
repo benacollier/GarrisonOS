@@ -26,11 +26,70 @@ To prevent cognitive ambiguity across the software and property management domai
    CREATE INDEX IF NOT EXISTS idx_units_operator_property ON units(operator_id, property_id);
    CREATE INDEX IF NOT EXISTS idx_tx_operator_lease_date ON transactions(operator_id, lease_id, transaction_date);
    ```
-4. **Backward Compatibility**: A SQL view `tenants` is provided mapping to `operators`, and `RequestContext.getTenantId()` acts as an alias to `RequestContext.getOperatorId()`. HTTP request headers support both `X-Operator-ID` and legacy `X-Tenant-ID`.
+4. **Zero Parameter Leakage**: Parameter leakage checks run during CI/CD (`node scripts/check-hygiene.js`) to guarantee `:operator_id` is never present in route URLs.
 
 ---
 
-## 3. Request Lifecycle & Context Store
+## 3. 3-Tier Organizational & Access Control Hierarchy
+
+GarrisonOS enforces a three-tier governance architecture separating infrastructure administration, property management operations, and granular subuser duties:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                       PLATFORM PLANE                        │
+│   • Master Instance Owner (system_owner)                    │
+│   • System Managers ("Minions of the Owner" - system_manager)│
+└──────────────┬───────────────────────────────┬──────────────┘
+               │                               │
+               ▼                               ▼
+┌──────────────────────────────┐┌──────────────────────────────┐
+│       OPERATOR PLANE A       ││       OPERATOR PLANE B       │
+│  (Property Management Firm)  ││  (Property Management Firm)  │
+│  • Operator Owner (owner)    ││  • Operator Owner (owner)    │
+│  • Operator Manager (manager)││  • Operator Manager (manager)│
+└──────────────┬───────────────┘└──────────────┬───────────────┘
+               │                               │
+               ▼                               ▼
+┌──────────────────────────────┐┌──────────────────────────────┐
+│        SUBUSER PLANE         ││        SUBUSER PLANE         │
+│  • Leasing Agents            ││  • Leasing Agents            │
+│  • Office Assistants         ││  • Office Assistants         │
+│  • Maintenance Technicians   ││  • Maintenance Technicians   │
+│  [Module & Portfolio Scoped] ││  [Module & Portfolio Scoped] │
+└──────────────────────────────┘└──────────────────────────────┘
+```
+
+### 3.1 Platform Plane (`is_system_user = 1`)
+- **Master Instance Owner (`system_owner`)**: Complete system authority. Can provision, configure, and soft-delete operators and platform managers. Accesses system-wide performance telemetry, error queues, and global backups.
+- **Platform System Managers (`system_manager`)**: Designated platform administrators who assist the master owner with daily operations, monitoring, and cross-operator support without owner-destruction privileges.
+
+### 3.2 Operator Plane
+- **Operator Admins & Managers (`owner`, `manager`)**: Authority bounded strictly to their property management company dataset (`operator_id`). Manages client portfolios, properties, units, leases, accounting, and staff accounts.
+
+### 3.3 Subuser Plane (Dual-Scoped Team Members)
+- **Granular Roles**: `leasing_agent`, `assistant`, `maintenance`, `auditor`, `viewer`.
+- **Dual Scoping**:
+  - **Module Whitelist**: Only authorized business modules can be accessed.
+  - **Portfolio Whitelist**: Can only read or write assets within assigned client portfolios.
+
+---
+
+## 4. Deployment Architecture: Single-Operator vs Multi-Operator
+
+During first-launch setup (`/setup`), administrators select the instance deployment mode:
+
+1. **Single-Operator Mode (`OPERATOR_MODE=single`)**:
+   - Designed for private property management firms or self-managed landlords running a dedicated server or local appliance.
+   - Automatically binds administrative sessions to the primary operator.
+   - Streamlines navigation by eliminating unnecessary multi-company selection views.
+2. **Multi-Operator Mode (`OPERATOR_MODE=multi`)**:
+   - Designed for hosting multiple independent property management firms on a shared GarrisonOS instance.
+   - Requires Platform Owner/Manager credentials for operator lifecycle operations (`/api/v1/system/operators`).
+   - Supports path-based (`/o/:slug/...`) and subdomain-based (`:slug.garrisonos.local`) routing.
+
+---
+
+## 5. Request Lifecycle & Context Store
 
 Context is propagated through asynchronous call chains using Node.js `node:async_hooks.AsyncLocalStorage`.
 
@@ -44,7 +103,7 @@ sequenceDiagram
     participant Repo as modules/*/backend/repository.ts
     participant DB as database/client.ts (SQLite)
 
-    Client->>Middleware: HTTP Request with X-Operator-ID
+    Client->>Middleware: HTTP Request with Bearer Token & X-Operator-ID
     Middleware->>Middleware: Resolve Operator ID & Auth Token
     Middleware->>Context: RequestContext.run({ operatorId, userId, correlationId }, next)
     Context->>Route: Execute Route Handler
@@ -59,7 +118,7 @@ sequenceDiagram
 
 ---
 
-## 4. Code Conventions
+## 6. Code Conventions
 
 ### Request Context Access
 

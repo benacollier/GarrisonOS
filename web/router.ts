@@ -20,6 +20,7 @@ import { HookRegistry } from './lib/hooks.js';
 import * as DashboardPage from './pages/dashboard.js';
 import * as LoginPage from './pages/login.js';
 import * as SetupPage from './pages/setup.js';
+import * as AdminPage from './pages/admin.js';
 
 // Import module page handlers
 import * as PropertiesIndex from '../modules/properties/frontend/pages/index.js';
@@ -51,6 +52,7 @@ const ROUTE_TABLE: Record<string, PageHandler> = {
   '/dashboard': DashboardPage.handle,
   '/login': LoginPage.handle,
   '/setup': SetupPage.handle,
+  '/admin': AdminPage.handle,
 
   '/properties': PropertiesIndex.handle,
   '/properties/show': PropertiesShow.handle,

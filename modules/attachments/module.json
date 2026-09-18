@@ -1,0 +1,11 @@
+{
+  "id": "attachments",
+  "name": "Universal Attachments",
+  "description": "Zero-dependency document and media management with automated EXIF stripping and PDF sanitization",
+  "dependencies": [],
+  "permissions": [
+    "attachments:view",
+    "attachments:upload",
+    "attachments:delete"
+  ]
+}

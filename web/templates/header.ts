@@ -1,4 +1,4 @@
-import { html, SafeHtml } from '../lib/html.js';
+import { html, raw, SafeHtml } from '../lib/html.js';
 import { SessionUser } from '../lib/session.js';
 
 /**
@@ -17,6 +17,7 @@ export function renderHeader(user: SessionUser | null, operatorId: string): Safe
       <div class="user-profile">
         ${user
           ? html`
+              ${user.role === 'owner' ? html`<a href="/admin" class="btn btn-sm btn-secondary" style="margin-right: 0.5rem;">⚙️ Admin</a>` : raw('')}
               <span>${user.first_name} ${user.last_name} (${user.role})</span>
               <a href="/logout" class="btn btn-sm btn-secondary">Sign Out</a>
             `
