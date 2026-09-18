@@ -79,9 +79,11 @@ export async function handle(ctx: PageContext): Promise<PageResult> {
 
   const vendorOptions = vendors.map((v) => {
     const isSelected = workOrder.vendor_contact_id === v.id;
+    const specialtyText = v.vendor_specialty ? ` [${v.vendor_specialty}]` : '';
+    const w9Text = v.w9_received ? ' [W-9 ✓]' : ' [W-9 Pending]';
     return html`
       <option value="${v.id}" ${isSelected ? raw('selected') : raw('')}>
-        ${v.last_name}, ${v.first_name}${v.company_name ? ` (${v.company_name})` : ''}
+        ${v.last_name}, ${v.first_name}${v.company_name ? ` (${v.company_name})` : ''}${specialtyText}${w9Text}
       </option>
     `;
   });
@@ -117,7 +119,10 @@ export async function handle(ctx: PageContext): Promise<PageResult> {
       </div>
       <div class="btn-group">
         ${workOrder.status !== 'completed'
-          ? html`<button class="btn btn-primary" onclick="document.getElementById('completeOrderModal').showModal()">✓ Complete & Record Cost</button>`
+          ? html`
+            <button class="btn btn-secondary" onclick="document.getElementById('dispatchModal').showModal()">⚡ Dispatch Vendor</button>
+            <button class="btn btn-primary" onclick="document.getElementById('completeOrderModal').showModal()">✓ Complete & Record Cost</button>
+          `
           : html`<span class="badge badge-success" style="padding: 0.5rem 1rem; font-size: 1rem;">Completed</span>`}
       </div>
     </div>
@@ -201,6 +206,33 @@ export async function handle(ctx: PageContext): Promise<PageResult> {
         </form>
       </div>
     </div>
+
+    <!-- Modal: Dispatch Vendor -->
+    <dialog id="dispatchModal" class="modal">
+      <form method="POST" action="/maintenance/show?id=${encodeURIComponent(id)}" class="modal-box">
+        ${csrfField(csrfToken)}
+        <input type="hidden" name="action" value="update_status">
+        <input type="hidden" name="status" value="assigned">
+        <div class="modal-header">
+          <h3>Dispatch Vendor for Work Order</h3>
+          <button type="button" class="btn-close" onclick="document.getElementById('dispatchModal').close()">✕</button>
+        </div>
+        <div class="modal-body">
+          <p>Assign a qualified trade contractor and transition this ticket to <strong>Assigned to Vendor</strong>.</p>
+          <div class="form-group" style="margin-top: 1rem;">
+            <label class="form-label" for="dispatch_vendor_id">Select Qualified Vendor / Contractor *</label>
+            <select class="form-select" id="dispatch_vendor_id" name="vendor_contact_id" required>
+              <option value="">-- Choose Trade Vendor --</option>
+              ${vendorOptions}
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="document.getElementById('dispatchModal').close()">Cancel</button>
+          <button type="submit" class="btn btn-primary">Dispatch Work Order</button>
+        </div>
+      </form>
+    </dialog>
 
     <!-- Modal: Complete Work Order -->
     <dialog id="completeOrderModal" class="modal">

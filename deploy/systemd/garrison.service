@@ -1,0 +1,49 @@
+[Unit]
+Description=GarrisonOS Property Management Engine
+Documentation=https://github.com/garrisonos/GarrisonOS
+After=network.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=garrison
+Group=garrison
+WorkingDirectory=/opt/garrison
+EnvironmentFile=-/etc/garrison/garrison.env
+Environment=NODE_ENV=production
+Environment=PORT=3000
+Environment=HOST=127.0.0.1
+
+ExecStart=/usr/bin/node scripts/serve.js
+Restart=always
+RestartSec=5s
+
+# Security Sandboxing & Hardening Directives
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+MemoryDenyWriteExecute=false
+CapabilityBoundingSet=
+AmbientCapabilities=
+
+# Persistent Data Storage Paths
+ReadWritePaths=/opt/garrison/storage /opt/garrison/data /opt/garrison/garrison.sqlite
+ProtectClock=true
+LockPersonality=true
+
+# Resource Limits
+LimitNOFILE=65535
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=garrison
+
+[Install]
+WantedBy=multi-user.target

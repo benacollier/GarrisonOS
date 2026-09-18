@@ -15,6 +15,8 @@ export interface Contact {
   secondary_phone?: string | null;
   tax_id_last4?: string | null;
   vendor_specialty?: string | null;
+  w9_received?: number;
+  tax_classification?: string | null;
   notes?: string | null;
   created_at: number;
   updated_at: number;
@@ -63,6 +65,8 @@ export class ContactsRepository {
     secondary_phone?: string;
     tax_id_last4?: string;
     vendor_specialty?: string;
+    w9_received?: number;
+    tax_classification?: string;
     notes?: string;
   }): Contact {
     const operatorId = RequestContext.getOperatorId();
@@ -74,8 +78,8 @@ export class ContactsRepository {
       INSERT INTO contacts (
         id, operator_id, contact_type, first_name, last_name,
         company_name, email, phone, secondary_phone,
-        tax_id_last4, vendor_specialty, notes, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        tax_id_last4, vendor_specialty, w9_received, tax_classification, notes, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       id,
       operatorId,
@@ -88,6 +92,8 @@ export class ContactsRepository {
       data.secondary_phone || null,
       data.tax_id_last4 || null,
       data.vendor_specialty || null,
+      data.w9_received ? 1 : 0,
+      data.tax_classification || null,
       data.notes || null,
       now,
       now
@@ -109,7 +115,7 @@ export class ContactsRepository {
       UPDATE contacts SET
         contact_type = ?, first_name = ?, last_name = ?,
         company_name = ?, email = ?, phone = ?, secondary_phone = ?,
-        tax_id_last4 = ?, vendor_specialty = ?, notes = ?, updated_at = ?
+        tax_id_last4 = ?, vendor_specialty = ?, w9_received = ?, tax_classification = ?, notes = ?, updated_at = ?
       WHERE id = ? AND operator_id = ? AND deleted_at IS NULL
     `).run(
       updated.contact_type,
@@ -121,6 +127,8 @@ export class ContactsRepository {
       updated.secondary_phone || null,
       updated.tax_id_last4 || null,
       updated.vendor_specialty || null,
+      updated.w9_received ? 1 : 0,
+      updated.tax_classification || null,
       updated.notes || null,
       now,
       id,

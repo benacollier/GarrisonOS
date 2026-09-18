@@ -22,6 +22,7 @@ storage/uploads/*
 !storage/uploads/.gitkeep
 storage/backups/*
 !storage/backups/.gitkeep
+storage/test-*
 
 # Logs and Debug Output
 *.log

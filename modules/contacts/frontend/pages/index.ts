@@ -27,6 +27,8 @@ export async function handle(ctx: PageContext): Promise<PageResult> {
         phone: ctx.body['phone'] || null,
         secondary_phone: ctx.body['secondary_phone'] || null,
         vendor_specialty: ctx.body['vendor_specialty'] || null,
+        w9_received: ctx.body['w9_received'] === '1' || ctx.body['w9_received'] === 'on' ? 1 : 0,
+        tax_classification: ctx.body['tax_classification'] || null,
         notes: ctx.body['notes'] || null
       });
       ctx.session.addFlash('success', 'Contact created successfully');
@@ -56,13 +58,23 @@ export async function handle(ctx: PageContext): Promise<PageResult> {
   const contactRows = contacts.length > 0
     ? contacts.map((c) => {
         const typeFormatted = c.contact_type ? c.contact_type.charAt(0).toUpperCase() + c.contact_type.slice(1) : '';
+        const isVendor = c.contact_type === 'vendor';
+        const w9Badge = isVendor
+          ? c.w9_received
+            ? html`<span class="badge badge-success" title="W-9 On File">W-9 Verified</span> `
+            : html`<span class="badge badge-warning" title="W-9 Not On File">W-9 Pending</span> `
+          : raw('');
+
         return html`
           <tr>
             <td>
               <strong><a href="/contacts/show?id=${encodeURIComponent(c.id)}">${c.last_name}, ${c.first_name}</a></strong>
               ${c.company_name ? html`<div class="text-muted text-sm">${c.company_name}</div>` : raw('')}
             </td>
-            <td><span class="badge">${typeFormatted}</span></td>
+            <td>
+              <span class="badge">${typeFormatted}</span>
+              ${w9Badge}
+            </td>
             <td>${c.email ? html`<a href="mailto:${c.email}">${c.email}</a>` : '—'}</td>
             <td>${c.phone || '—'}</td>
             <td>
@@ -169,9 +181,28 @@ export async function handle(ctx: PageContext): Promise<PageResult> {
               <input class="form-input" type="tel" id="phone" name="phone" placeholder="(555) 234-5678">
             </div>
           </div>
-          <div class="form-group">
-            <label class="form-label" for="vendor_specialty">Vendor Specialty (if applicable)</label>
-            <input class="form-input" type="text" id="vendor_specialty" name="vendor_specialty" placeholder="e.g. HVAC, Roofing, Electrician">
+          <div class="form-row">
+            <div class="form-group col-6">
+              <label class="form-label" for="vendor_specialty">Vendor Specialty (Trade)</label>
+              <input class="form-input" type="text" id="vendor_specialty" name="vendor_specialty" placeholder="e.g. Plumbing, HVAC, Electrical">
+            </div>
+            <div class="form-group col-6">
+              <label class="form-label" for="tax_classification">Tax Classification</label>
+              <select class="form-select" id="tax_classification" name="tax_classification">
+                <option value="">— Select Classification —</option>
+                <option value="individual">Individual / Sole Proprietor</option>
+                <option value="llc">LLC</option>
+                <option value="corporation">Corporation</option>
+                <option value="partnership">Partnership</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-group" style="padding: 0.5rem 0;">
+            <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+              <input type="checkbox" name="w9_received" value="1">
+              <span><strong>W-9 Form Verified & On File</strong> (Required for 1099-NEC reporting)</span>
+            </label>
           </div>
           <div class="form-group">
             <label class="form-label" for="notes">Notes</label>

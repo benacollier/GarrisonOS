@@ -1,0 +1,46 @@
+# ==============================================================================
+# GarrisonOS Production Caddy Configuration
+# Automated Let's Encrypt TLS & Hardened Security Headers
+# ==============================================================================
+
+{$DOMAIN:localhost} {
+    # Encode responses with modern compression algorithms
+    encode gzip zstd
+
+    # Hardened Security Response Headers
+    header {
+        # Enforce strict transport security (1 year)
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        # Prevent MIME type sniffing
+        X-Content-Type-Options "nosniff"
+        # Clickjacking mitigation
+        X-Frame-Options "DENY"
+        # Referrer policy
+        Referrer-Policy "strict-origin-when-cross-origin"
+        # Content Security Policy: strict, zero unvalidated inline executions
+        Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none';"
+        # Disable FLoC / privacy-invasive tracking headers
+        Permissions-Policy "accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()"
+        # Remove server header signature
+        -Server
+    }
+
+    # Proxy all traffic to the GarrisonOS Node.js engine
+    reverse_proxy {$GARRISON_UPSTREAM:127.0.0.1:3000} {
+        header_up Host {host}
+        header_up X-Real-IP {remote_host}
+        header_up X-Forwarded-For {remote_host}
+        header_up X-Forwarded-Proto {scheme}
+
+        # Health checks
+        health_uri /health
+        health_interval 15s
+        health_timeout 3s
+    }
+
+    # Structured logging
+    log {
+        output stdout
+        format console
+    }
+}

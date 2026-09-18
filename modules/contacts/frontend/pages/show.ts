@@ -108,6 +108,46 @@ export async function handle(ctx: PageContext): Promise<PageResult> {
           <p>${notesHtml}</p>
         </div>
       </div>
+
+      ${contact.contact_type === 'vendor'
+        ? html`
+          <div class="card" style="grid-column: span 2;">
+            <div class="card-header">
+              <h2 class="card-title">Vendor Compliance & Tax Information</h2>
+            </div>
+            <div class="detail-list">
+              <div class="detail-item">
+                <span class="detail-label">Trade Specialization</span>
+                <span class="detail-value">
+                  ${contact.vendor_specialty ? html`<span class="badge badge-info">${contact.vendor_specialty}</span>` : '—'}
+                </span>
+              </div>
+              <div class="detail-item">
+                <span class="detail-label">W-9 Form Status</span>
+                <span class="detail-value">
+                  ${contact.w9_received
+                    ? html`<span class="badge badge-success">✓ Verified On File</span>`
+                    : html`<span class="badge badge-warning">⚠ W-9 Pending (Action Required)</span>`}
+                </span>
+              </div>
+              <div class="detail-item">
+                <span class="detail-label">Tax Classification</span>
+                <span class="detail-value">${contact.tax_classification ? contact.tax_classification.toUpperCase() : 'Not Specified'}</span>
+              </div>
+              <div class="detail-item">
+                <span class="detail-label">Tax ID (Last 4)</span>
+                <span class="detail-value">${contact.tax_id_last4 ? `•••-••-${contact.tax_id_last4}` : '—'}</span>
+              </div>
+              <div class="detail-item">
+                <span class="detail-label">1099 Reporting</span>
+                <span class="detail-value">
+                  <a href="/accounting/1099-nec" class="btn btn-sm btn-secondary">View 1099-NEC Ledger Schedule →</a>
+                </span>
+              </div>
+            </div>
+          </div>
+        `
+        : raw('')}
     </div>
   `;
 

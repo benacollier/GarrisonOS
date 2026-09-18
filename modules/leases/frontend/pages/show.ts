@@ -40,9 +40,21 @@ export async function handle(ctx: PageContext): Promise<PageResult> {
         await ctx.api.post(`/api/v1/leases/${encodeURIComponent(id)}/activate`, {});
         ctx.session.addFlash('success', 'Lease activated successfully');
         return { redirect: `/leases/show?id=${encodeURIComponent(id)}`, content: '' };
+      } else if (action === 'renew_lease') {
+        const newEndDateStr = ctx.body['new_end_date'] || '';
+        const newEndDate = newEndDateStr ? new Date(newEndDateStr).getTime() : undefined;
+        const newRentCents = ctx.body['new_rent'] ? Math.round(parseFloat(ctx.body['new_rent']) * 100) : undefined;
+
+        await ctx.api.put(`/api/v1/leases/${encodeURIComponent(id)}`, {
+          ...(newEndDate ? { end_date: newEndDate } : {}),
+          ...(newRentCents !== undefined ? { rent_amount_cents: newRentCents } : {}),
+          status: 'active'
+        });
+        ctx.session.addFlash('success', 'Lease agreement renewed successfully');
+        return { redirect: `/leases/show?id=${encodeURIComponent(id)}`, content: '' };
       } else if (action === 'terminate_lease') {
         await ctx.api.post(`/api/v1/leases/${encodeURIComponent(id)}/terminate`, {});
-        ctx.session.addFlash('success', 'Lease terminated');
+        ctx.session.addFlash('success', 'Lease terminated. Unit placed in turnover. Proceed to Tenant Ledger for statutory deposit disposition.');
         return { redirect: `/leases/show?id=${encodeURIComponent(id)}`, content: '' };
       } else if (action === 'add_signatory') {
         await ctx.api.post(`/api/v1/leases/${encodeURIComponent(id)}/contacts`, {
@@ -130,11 +142,8 @@ export async function handle(ctx: PageContext): Promise<PageResult> {
           : raw('')}
         ${lease.status === 'active' || lease.status === 'month_to_month'
           ? html`
-            <form method="POST" action="/leases/show?id=${encodeURIComponent(id)}" style="display:inline;">
-              ${csrfField(csrfToken)}
-              <input type="hidden" name="action" value="terminate_lease">
-              <button type="submit" class="btn btn-danger" onclick="return confirm('Terminate this lease?')">Terminate Lease</button>
-            </form>
+            <button type="button" class="btn btn-secondary" onclick="document.getElementById('renewLeaseModal').showModal()">↻ Renew Lease</button>
+            <button type="button" class="btn btn-danger" onclick="document.getElementById('terminateLeaseModal').showModal()">Move-Out & Terminate</button>
           `
           : raw('')}
       </div>
@@ -228,6 +237,58 @@ export async function handle(ctx: PageContext): Promise<PageResult> {
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" onclick="document.getElementById('addSignatoryModal').close()">Cancel</button>
           <button type="submit" class="btn btn-primary">Add to Agreement</button>
+        </div>
+      </form>
+    </dialog>
+
+    <!-- Modal: Renew Lease -->
+    <dialog id="renewLeaseModal" class="modal">
+      <form method="POST" action="/leases/show?id=${encodeURIComponent(id)}" class="modal-box">
+        ${csrfField(csrfToken)}
+        <input type="hidden" name="action" value="renew_lease">
+        <div class="modal-header">
+          <h3>Renew Lease Agreement</h3>
+          <button type="button" class="btn-close" onclick="document.getElementById('renewLeaseModal').close()">✕</button>
+        </div>
+        <div class="modal-body">
+          <p>Extend the lease agreement term and optionally adjust the monthly contract rent.</p>
+          <div class="form-group" style="margin-top: 1rem;">
+            <label class="form-label" for="new_end_date">New Lease Expiration Date *</label>
+            <input class="form-input" type="date" id="new_end_date" name="new_end_date" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="new_rent">Revised Monthly Rent ($)</label>
+            <input class="form-input" type="number" id="new_rent" name="new_rent" step="0.01" value="${((lease.rent_amount_cents || 0) / 100).toFixed(2)}">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="document.getElementById('renewLeaseModal').close()">Cancel</button>
+          <button type="submit" class="btn btn-primary">Confirm Renewal</button>
+        </div>
+      </form>
+    </dialog>
+
+    <!-- Modal: Terminate Lease & Move-Out -->
+    <dialog id="terminateLeaseModal" class="modal">
+      <form method="POST" action="/leases/show?id=${encodeURIComponent(id)}" class="modal-box">
+        ${csrfField(csrfToken)}
+        <input type="hidden" name="action" value="terminate_lease">
+        <div class="modal-header">
+          <h3>Terminate Lease & Process Move-Out</h3>
+          <button type="button" class="btn-close" onclick="document.getElementById('terminateLeaseModal').close()">✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="alert alert-warning" style="margin-bottom: 1rem;">
+            <strong>Notice:</strong> Terminating this lease will automatically transition Unit ${lease.unit_number || ''} into <strong>Turnover</strong> status.
+          </div>
+          <p>
+            Deposit held in trust: <strong>$${formatCurrency(lease.deposit_held_cents || 0)}</strong>.
+            Following termination, you will be directed to the Tenant Ledger to execute the statutory deposit refund or itemized deductions within legal jurisdiction deadlines.
+          </p>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="document.getElementById('terminateLeaseModal').close()">Cancel</button>
+          <button type="submit" class="btn btn-danger">Confirm Termination & Move-Out</button>
         </div>
       </form>
     </dialog>

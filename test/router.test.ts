@@ -135,5 +135,54 @@ describe('Zero-Dependency HTTP Router Subsystem', () => {
     assert.equal(router.isBatchSafeGetPath('/api/v1/system/backup'), false);
     assert.equal(router.isBatchSafeGetPath('/nonexistent'), false);
   });
+
+  it('guarantees static segment precedence over parameterized wildcard segments regardless of registration order', async () => {
+    const router = new Router();
+    let handlerHit = '';
+
+    // Intentionally register parameterized route FIRST
+    router.get('/api/v1/properties/:id', (req, res) => {
+      handlerHit = `parameterized:${req.params['id']}`;
+      res.writeHead(200);
+      res.end('parameterized');
+    });
+
+    // Register static sub-paths AFTER parameterized route
+    router.get('/api/v1/properties/units', (_req, res) => {
+      handlerHit = 'static:units';
+      res.writeHead(200);
+      res.end('units');
+    });
+
+    router.get('/api/v1/properties/export', (_req, res) => {
+      handlerHit = 'static:export';
+      res.writeHead(200);
+      res.end('export');
+    });
+
+    // Test static route dispatch
+    const unitsReq = new MockIncomingMessage('GET', '/api/v1/properties/units') as any;
+    const unitsRes = new MockServerResponse() as any;
+    await router.handle(unitsReq, unitsRes);
+
+    assert.equal(unitsRes.statusCode, 200);
+    assert.equal(handlerHit, 'static:units');
+
+    // Test another static route dispatch
+    const exportReq = new MockIncomingMessage('GET', '/api/v1/properties/export') as any;
+    const exportRes = new MockServerResponse() as any;
+    await router.handle(exportReq, exportRes);
+
+    assert.equal(exportRes.statusCode, 200);
+    assert.equal(handlerHit, 'static:export');
+
+    // Test parameterized route dispatch for genuine IDs
+    const idReq = new MockIncomingMessage('GET', '/api/v1/properties/prop-456') as any;
+    const idRes = new MockServerResponse() as any;
+    await router.handle(idReq, idRes);
+
+    assert.equal(idRes.statusCode, 200);
+    assert.equal(handlerHit, 'parameterized:prop-456');
+  });
 });
 

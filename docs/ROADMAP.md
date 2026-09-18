@@ -100,15 +100,16 @@ To bridge high-level architectural phases with practical development velocity, G
 ---
 
 ### Sprint 2 (Weeks 3–4): Production Readiness, Operator Workflows & Release Candidate
-> **Status**: In Planning / Next Sprint | **Release Target**: v0.1.0-RC1
+> **Status**: Completed (2026-09-17) | **Release Target**: v0.1.0-RC1
 
-| Work Stream | Key Deliverables | Target Phase |
+| Work Stream | Key Deliverables | Status |
 | :--- | :--- | :---: |
-| **Turnkey Production Packaging** | Provide hardened Systemd service unit (`deploy/systemd/garrison.service`) and multi-stage, zero-dependency Dockerfile (`node:24-alpine`) with turnkey `docker-compose.yml` and reverse proxy configs (Caddy / Nginx). | Phase 7 |
-| **Interactive Operator Workflows** | Wire interactive modals and state machines in TypeScript SSR: vacant-unit turnover (`vacant` $\leftrightarrow$ `turnover` $\leftrightarrow$ `maintenance_hold`), lease renewals/terminations, and maintenance vendor dispatch. | Phases 2, 3, 5 |
-| **Vendor Tax & Specialization UI** | Expose vendor trade specialization badges (Plumbing, HVAC, etc.) and visual W-9 verification flags in contacts directory and detail views. | Phases 2, 5 |
-| **Router Trie / Static Precedence** | Refactor `api/router.ts` dispatch matching to guarantee literal static segments take precedence over parameterized wildcard segments, preventing route registration collisions. | Phase 1 |
-| **End-to-End (E2E) Test Suite** | Implement comprehensive multi-step user-journey test suite (`test/e2e/lifecycle.test.ts`) validating portfolio setup, leasing, trust deposits, rent runs, maintenance, move-out, and snapshot restores. | Phase 7 |
+| **Turnkey Production Packaging** | Provided hardened Systemd service unit (`deploy/systemd/garrison.service`) and multi-stage, zero-dependency Dockerfile (`node:24-alpine`) with turnkey `docker-compose.yml`, reverse proxy configs (Caddy / Nginx), and deployment guide. | ✅ Completed |
+| **Interactive Operator Workflows** | Wired interactive modals and state machines in TypeScript SSR: vacant-unit turnover (`vacant` $\leftrightarrow$ `turnover` $\leftrightarrow$ `maintenance_hold`), lease renewals/terminations, and maintenance vendor dispatch. | ✅ Completed |
+| **Vendor Tax & Specialization UI** | Exposed vendor trade specialization badges (Plumbing, HVAC, etc.) and visual W-9 verification flags in contacts directory and detail views with schema migration (`0002_add_vendor_w9.sql`). | ✅ Completed |
+| **Router Trie / Static Precedence** | Refactored `api/router.ts` dispatch matching to guarantee literal static segments take precedence over parameterized wildcard segments, preventing route registration collisions. | ✅ Completed |
+| **Token Security Hardening** | Enforced mandatory numeric `token_version` check in `verifyTokenWithDatabase()`, rejecting legacy unversioned tokens to guarantee 100% session revocability. | ✅ Completed |
+| **End-to-End (E2E) Test Suite** | Implemented comprehensive multi-step user-journey test suite (`test/e2e/lifecycle.test.ts`) validating portfolio setup, leasing, trust deposits, rent runs, maintenance dispatch, move-out turnover, and ledger parity. | ✅ Completed |
 
 ---
 

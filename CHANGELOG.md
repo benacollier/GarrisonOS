@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **Sprint 2: Production Readiness, Operator Workflows & Release Candidate (v0.1.0-RC1)**:
+  - **Turnkey Production Packaging**: Introduced production-grade Systemd service unit (`deploy/systemd/garrison.service`) with full security sandboxing, multi-stage zero-dependency Alpine Dockerfile (`Dockerfile`) executing under an unprivileged `garrison` system user, turnkey `docker-compose.yml`, production reverse proxy configurations for automatic Let's Encrypt TLS in Caddy (`deploy/caddy/Caddyfile`) and hardened Nginx (`deploy/nginx/nginx.conf`), and a comprehensive Self-Hosting Operator Runbook (`docs/deployment/production-guide.md`).
+  - **Interactive Operator Workflows**: Added native TypeScript SSR interactive workflows and modal dialogs for vacant-unit turnover (`vacant` $\leftrightarrow$ `turnover` $\leftrightarrow$ `maintenance_hold`) with auto-generated make-ready work orders in `modules/properties/frontend/pages/show.ts`, lease renewals and statutory move-out dispositions in `modules/leases/frontend/pages/show.ts`, and direct contractor dispatch in `modules/maintenance/frontend/pages/show.ts`.
+  - **Vendor Tax & Specialization UI**: Added schema migration (`modules/contacts/backend/migrations/0002_add_vendor_w9.sql`) adding `w9_received` verification flag and `tax_classification` to contacts, with visual trade specialization badges (Plumbing, HVAC, Electrical, etc.) and W-9 verification alerts in the contacts directory and detail views.
+  - **Static-First Router Precedence**: Refactored `api/router.ts` dispatch matching to enforce static segment precedence over parameterized wildcard segments (`:param`), completely eliminating registration order sensitivity and collision hazards (Technical Debt #125).
+  - **Stateless Token Security Hardening**: Enforced mandatory numeric `token_version` checking in `verifyTokenWithDatabase()` in `core/crypto.ts`, rejecting legacy unversioned tokens to guarantee 100% token revocability across all active sessions (Technical Debt #126).
+  - **End-to-End Lifecycle Test Suite**: Implemented comprehensive user-journey integration test suite (`test/e2e/lifecycle.test.ts`) validating operator provisioning, portfolio creation, tenant/vendor onboarding, lease execution, fiduciary security deposit trust receipt (`1020` vs `2100`), monthly rent billing and operating cash collection (`1010` vs `4010`), emergency maintenance dispatch, lease move-out turnover, and ledger balance zero-sum parity.
+
 - **Multi-Operator Architecture & Real-Estate Domain Tenant Clarification**:
   - Replaced ambiguous, conflicting usage of "tenant" for software infrastructure isolation with **Operator** (`operators` table, `operator_id` foreign keys, `RequestContext.getOperatorId()`, and `X-Operator-ID` HTTP headers).
   - Reserved **Organization** for commercial property portfolios and future commercial entity support.
