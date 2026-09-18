@@ -38,11 +38,22 @@ stateDiagram-v2
 * `structural`
 * `cosmetic`
 * `pest`
+* `make_ready` (Unit turnover inspections & turnover remediation)
 * `other`
 
 ---
 
-## 3. Cross-Module Expense Integration
+## 3. Vendor Dispatch Workflow
+
+The maintenance module integrates with the **Contacts** vendor registry:
+
+* **Trade-Filtered Dispatching**: When dispatching a work order, operators select exclusively from vendors verified for the relevant trade (e.g. plumbing, HVAC, electrical, make-ready, or general contracting).
+* **Compliance Safeguard**: Only vendors with verified W-9 status (`w9_received = 1`) are eligible for dispatch. The repository and API enforce this invariant, rejecting assignment of unverified contractors or mismatched trade specialties.
+* **Status Automation & Guardrails**: Dispatching transitions tickets to `assigned` / `in_progress`. Dispatching is restricted to dispatchable statuses (`open`, `assigned`, `on_hold`) and strictly prohibited on completed or cancelled work orders.
+
+---
+
+## 4. Cross-Module Expense Integration
 
 When a work order status transitions to `completed` and contains an `actual_cost_cents > 0`, the maintenance module publishes a `work_order.completed` event to the central `EventBus`.
 

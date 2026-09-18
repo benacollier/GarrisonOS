@@ -109,11 +109,31 @@ export class MaintenanceRepository {
     }
 
     if (vendorContactId) {
-      const vendor = db.prepare('SELECT id FROM contacts WHERE id = ? AND operator_id = ? AND deleted_at IS NULL').get(vendorContactId, operatorId);
+      const vendor = db.prepare('SELECT id, contact_type, vendor_specialty, w9_received FROM contacts WHERE id = ? AND operator_id = ? AND deleted_at IS NULL').get(vendorContactId, operatorId) as any;
       if (!vendor) {
         throw new Error(`Vendor contact ${vendorContactId} not found or does not belong to the active operator`);
       }
+      if (vendor.contact_type !== 'vendor') {
+        throw new Error(`Contact ${vendorContactId} is not a vendor (contact_type: ${vendor.contact_type})`);
+      }
     }
+  }
+
+  /**
+   * Determine if a vendor's trade specialty is compatible with a work order category.
+   *
+   * @param vendorSpecialty - Declared trade specialty of vendor.
+   * @param category - Category of work order.
+   * @returns True if compatible or generalized trade.
+   */
+  public static isTradeCompatible(vendorSpecialty?: string | null, category?: string | null): boolean {
+    if (!vendorSpecialty || !category) return false;
+    const spec = vendorSpecialty.toLowerCase().trim();
+    const cat = category.toLowerCase().trim();
+    if (spec === cat) return true;
+    if (spec === 'general contractor' || spec === 'general repair' || spec === 'handyman') return true;
+    if ((cat === 'cosmetic' || cat === 'other') && (spec === 'make_ready' || spec === 'turnkey' || spec === 'cleaning' || spec === 'painting' || spec === 'general contractor')) return true;
+    return spec.includes(cat) || cat.includes(spec);
   }
 
   /**
@@ -290,6 +310,11 @@ export class MaintenanceRepository {
     const now = Date.now();
     const updated = { ...existing, ...data, updated_at: now };
 
+    // Reject reopening or dispatching cancelled work orders
+    if (existing.status === 'cancelled' && updated.status !== 'cancelled') {
+      throw new Error(`Cannot update or dispatch cancelled work order ${id}`);
+    }
+
     // Validate operator ownership of any modified or existing relation IDs
     MaintenanceRepository.validateOwnership(
       operatorId,
@@ -298,6 +323,19 @@ export class MaintenanceRepository {
       updated.requested_by_contact_id,
       updated.vendor_contact_id
     );
+
+    // Enforce vendor eligibility during dispatch
+    if (updated.status === 'assigned' && updated.vendor_contact_id) {
+      const vendor = db.prepare('SELECT id, vendor_specialty, w9_received FROM contacts WHERE id = ? AND operator_id = ? AND deleted_at IS NULL').get(updated.vendor_contact_id, operatorId) as any;
+      if (vendor) {
+        if (!vendor.w9_received) {
+          throw new Error(`Vendor ${updated.vendor_contact_id} cannot be dispatched: W-9 form is pending verification`);
+        }
+        if (!MaintenanceRepository.isTradeCompatible(vendor.vendor_specialty, updated.category)) {
+          throw new Error(`Vendor specialty "${vendor.vendor_specialty || 'None'}" is not eligible for "${updated.category}" work orders`);
+        }
+      }
+    }
 
     db.prepare(`
       UPDATE work_orders SET

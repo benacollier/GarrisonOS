@@ -92,9 +92,13 @@ describe('Leases Module - Agreement Lifecycle & Signatories', () => {
       const refreshed = LeasesRepository.getLeaseById(lease.id);
       assert.equal(refreshed?.contacts?.length, 3);
 
-      // 6. Terminate lease
-      const terminated = LeasesRepository.updateLeaseStatus(lease.id, 'terminated');
+      // 6. Terminate lease with formal notice and move-out dates
+      const noticeDate = Date.now() - 30 * 86400000;
+      const moveOutDate = Date.now();
+      const terminated = LeasesRepository.updateLeaseStatus(lease.id, 'terminated', noticeDate, moveOutDate);
       assert.equal(terminated?.status, 'terminated');
+      assert.equal(terminated?.notice_date, noticeDate);
+      assert.equal(terminated?.move_out_date, moveOutDate);
     });
   });
 });

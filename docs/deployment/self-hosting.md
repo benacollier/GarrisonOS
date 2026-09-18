@@ -2,6 +2,9 @@
 
 This guide details running GarrisonOS in a production environment using Linux system services (systemd) and a reverse proxy (Caddy or Nginx).
 
+> [!TIP]
+> For turnkey packaging, ready-to-use configs, and Docker/Docker-Compose setups, see the comprehensive [Production Deployment & Operations Guide](production-guide.md) and repository configurations in [`deploy/`](../../deploy/).
+
 ---
 
 ## 1. System Architecture

@@ -2,10 +2,39 @@ import { PageContext, PageResult } from '../../../../web/lib/page-context.js';
 import { html, raw, SafeHtml } from '../../../../web/lib/html.js';
 import { csrfField, validateCsrf } from '../../../../web/lib/csrf.js';
 
+/**
+ * Format integer cents into USD currency string.
+ *
+ * @param cents - Value in integer cents.
+ * @returns Formatted currency string (e.g. '1,250.00').
+ */
 function formatCurrency(cents: number): string {
   return (cents / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+/**
+ * Test trade specialty compatibility against work order category.
+ *
+ * @param vendorSpecialty - Vendor trade specialty.
+ * @param category - Work order category.
+ * @returns True if compatible or general contractor.
+ */
+function matchesSpecialty(vendorSpecialty?: string | null, category?: string | null): boolean {
+  if (!vendorSpecialty || !category) return false;
+  const spec = vendorSpecialty.toLowerCase().trim();
+  const cat = category.toLowerCase().trim();
+  if (spec === cat) return true;
+  if (spec === 'general contractor' || spec === 'general repair' || spec === 'handyman') return true;
+  if ((cat === 'cosmetic' || cat === 'other') && (spec === 'make_ready' || spec === 'turnkey' || spec === 'cleaning' || spec === 'painting' || spec === 'general contractor')) return true;
+  return spec.includes(cat) || cat.includes(spec);
+}
+
+/**
+ * Web request handler for viewing and managing individual work order tickets.
+ *
+ * @param ctx - Page request context including session, query, and body.
+ * @returns Rendered HTML page or redirect response.
+ */
 export async function handle(ctx: PageContext): Promise<PageResult> {
   const id = ctx.query['id'] || '';
   if (!id) {
@@ -79,12 +108,30 @@ export async function handle(ctx: PageContext): Promise<PageResult> {
 
   const vendorOptions = vendors.map((v) => {
     const isSelected = workOrder.vendor_contact_id === v.id;
+    const specialtyText = v.vendor_specialty ? ` [${v.vendor_specialty}]` : '';
+    const w9Text = v.w9_received ? ' [W-9 ✓]' : ' [W-9 Pending]';
     return html`
       <option value="${v.id}" ${isSelected ? raw('selected') : raw('')}>
-        ${v.last_name}, ${v.first_name}${v.company_name ? ` (${v.company_name})` : ''}
+        ${v.last_name}, ${v.first_name}${v.company_name ? ` (${v.company_name})` : ''}${specialtyText}${w9Text}
       </option>
     `;
   });
+
+  const eligibleDispatchVendors = vendors.filter((v) => {
+    return v.w9_received === 1 && matchesSpecialty(v.vendor_specialty, workOrder.category);
+  });
+
+  const dispatchVendorOptions = eligibleDispatchVendors.length > 0
+    ? eligibleDispatchVendors.map((v) => {
+        const isSelected = workOrder.vendor_contact_id === v.id;
+        const specialtyText = v.vendor_specialty ? ` [${v.vendor_specialty}]` : '';
+        return html`
+          <option value="${v.id}" ${isSelected ? raw('selected') : raw('')}>
+            ${v.last_name}, ${v.first_name}${v.company_name ? ` (${v.company_name})` : ''}${specialtyText} [W-9 ✓]
+          </option>
+        `;
+      })
+    : [html`<option value="" disabled>No W-9 verified vendors matching category "${catFormatted}"</option>`];
 
   const statuses = [
     { value: 'open', label: 'Open' },
@@ -104,6 +151,9 @@ export async function handle(ctx: PageContext): Promise<PageResult> {
     ? raw(String(workOrder.description).split(/\r?\n/).map((line) => html`${line}`.toString()).join('<br>'))
     : html`<span class="text-muted">No details provided.</span>`;
 
+  const isDispatchable = ['open', 'assigned', 'on_hold'].includes(workOrder.status);
+  const isCompletable = workOrder.status !== 'completed' && workOrder.status !== 'cancelled';
+
   const content = html`
     <div class="page-header">
       <div>
@@ -116,9 +166,14 @@ export async function handle(ctx: PageContext): Promise<PageResult> {
         </p>
       </div>
       <div class="btn-group">
-        ${workOrder.status !== 'completed'
+        ${isDispatchable
+          ? html`<button class="btn btn-secondary" onclick="document.getElementById('dispatchModal').showModal()">⚡ Dispatch Vendor</button>`
+          : raw('')}
+        ${isCompletable
           ? html`<button class="btn btn-primary" onclick="document.getElementById('completeOrderModal').showModal()">✓ Complete & Record Cost</button>`
-          : html`<span class="badge badge-success" style="padding: 0.5rem 1rem; font-size: 1rem;">Completed</span>`}
+          : workOrder.status === 'completed'
+            ? html`<span class="badge badge-success" style="padding: 0.5rem 1rem; font-size: 1rem;">Completed</span>`
+            : html`<span class="badge badge-danger" style="padding: 0.5rem 1rem; font-size: 1rem;">Cancelled</span>`}
       </div>
     </div>
 
@@ -201,6 +256,33 @@ export async function handle(ctx: PageContext): Promise<PageResult> {
         </form>
       </div>
     </div>
+
+    <!-- Modal: Dispatch Vendor -->
+    <dialog id="dispatchModal" class="modal">
+      <form method="POST" action="/maintenance/show?id=${encodeURIComponent(id)}" class="modal-box">
+        ${csrfField(csrfToken)}
+        <input type="hidden" name="action" value="update_status">
+        <input type="hidden" name="status" value="assigned">
+        <div class="modal-header">
+          <h3>Dispatch Vendor for Work Order</h3>
+          <button type="button" class="btn-close" onclick="document.getElementById('dispatchModal').close()">✕</button>
+        </div>
+        <div class="modal-body">
+          <p>Assign a qualified trade contractor and transition this ticket to <strong>Assigned to Vendor</strong>.</p>
+          <div class="form-group" style="margin-top: 1rem;">
+            <label class="form-label" for="dispatch_vendor_id">Select Qualified Vendor / Contractor *</label>
+            <select class="form-select" id="dispatch_vendor_id" name="vendor_contact_id" required>
+              <option value="">-- Choose Trade Vendor --</option>
+              ${dispatchVendorOptions}
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="document.getElementById('dispatchModal').close()">Cancel</button>
+          <button type="submit" class="btn btn-primary">Dispatch Work Order</button>
+        </div>
+      </form>
+    </dialog>
 
     <!-- Modal: Complete Work Order -->
     <dialog id="completeOrderModal" class="modal">

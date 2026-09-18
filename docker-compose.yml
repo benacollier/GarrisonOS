@@ -1,0 +1,60 @@
+services:
+  garrison:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: garrisonos/garrison:v0.1.0-rc1
+    container_name: garrisonos-app
+    restart: unless-stopped
+    ports:
+      # Bind strictly to loopback interface for host-level reverse proxy (Caddy / Nginx)
+      - "127.0.0.1:8080:8080"
+      - "127.0.0.1:3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - HOST=0.0.0.0
+      - WEB_PORT=8080
+      - WEB_HOST=0.0.0.0
+      - APP_SECRET=${APP_SECRET:?APP_SECRET is required}
+      - SQLITE_PATH=/app/data/garrison.sqlite
+      - STORAGE_PATH=/app/storage
+      - BACKUP_INTERVAL_MINUTES=360
+      - BACKUP_RETENTION_COUNT=14
+    volumes:
+      - garrison_data:/app/data
+      - garrison_storage:/app/storage
+    healthcheck:
+      test: ["CMD", "node", "-e", "const http = require('node:http'); http.get('http://127.0.0.1:3000/health', (r) => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1));"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # Optional Turnkey Automated Reverse Proxy with Let's Encrypt TLS
+  caddy:
+    image: caddy:2-alpine
+    container_name: garrisonos-caddy
+    restart: unless-stopped
+    profiles: ["caddy"]
+    environment:
+      DOMAIN: ${DOMAIN:?DOMAIN must be set}
+      GARRISON_UPSTREAM: garrison:8080
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      garrison:
+        condition: service_healthy
+
+volumes:
+  garrison_data:
+    name: garrison_sqlite_data
+  garrison_storage:
+    name: garrison_upload_storage
+  caddy_data:
+  caddy_config:

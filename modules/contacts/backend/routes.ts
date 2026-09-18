@@ -16,8 +16,12 @@ export function registerRoutes(router: Router): void {
     if (!contact_type || !first_name || !last_name) {
       return errorResponse(res, 'VALIDATION_ERROR', 'contact_type, first_name, and last_name are required', 400);
     }
-    const contact = ContactsRepository.createContact(req.body);
-    successResponse(res, { contact }, 201);
+    try {
+      const contact = ContactsRepository.createContact(req.body);
+      successResponse(res, { contact }, 201);
+    } catch (err: any) {
+      return errorResponse(res, 'VALIDATION_ERROR', err.message, 400);
+    }
   });
 
   router.get('/api/v1/contacts/:id', (req, res) => {
@@ -29,11 +33,15 @@ export function registerRoutes(router: Router): void {
   });
 
   router.put('/api/v1/contacts/:id', (req, res) => {
-    const contact = ContactsRepository.updateContact(req.params.id!, req.body || {});
-    if (!contact) {
-      return errorResponse(res, 'NOT_FOUND', 'Contact not found', 404);
+    try {
+      const contact = ContactsRepository.updateContact(req.params.id!, req.body || {});
+      if (!contact) {
+        return errorResponse(res, 'NOT_FOUND', 'Contact not found', 404);
+      }
+      successResponse(res, { contact });
+    } catch (err: any) {
+      return errorResponse(res, 'VALIDATION_ERROR', err.message, 400);
     }
-    successResponse(res, { contact });
   });
 
   router.delete('/api/v1/contacts/:id', (req, res) => {

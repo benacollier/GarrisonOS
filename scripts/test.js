@@ -28,6 +28,8 @@ if (!target || target === 'all') {
   testFiles = getTestFiles(resolve('dist'));
 } else if (target === 'core') {
   testFiles = getTestFiles(resolve('dist/test'));
+} else if (target === 'e2e') {
+  testFiles = getTestFiles(resolve('dist/test/e2e'));
 } else if (target === 'web') {
   testFiles = getTestFiles(resolve('dist/web/test'));
 } else {
@@ -40,6 +42,10 @@ if (!target || target === 'all') {
 }
 
 if (testFiles.length === 0) {
+  if (target === 'e2e' || target === 'core' || target === 'web') {
+    process.stderr.write(`[TestRunner] Error: No test files found for target "${target}". Ensure the project is built via 'npm.cmd run build'.\n`);
+    process.exit(1);
+  }
   process.stdout.write(`[TestRunner] No test files found for target: ${target || 'all'}\n`);
   process.exit(0);
 }

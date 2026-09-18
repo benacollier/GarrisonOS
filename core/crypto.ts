@@ -234,6 +234,8 @@ export function verifyToken(token: string, secret: string): TokenPayload | null 
  * Verify token with database-backed token version validation.
  * Used for stateless token revocation - when a user's password or role changes,
  * their token_version is incremented, invalidating all existing tokens.
+ * Enforces strict token_version verification; legacy unversioned tokens lacking
+ * a numeric `tv` claim are rejected to guarantee 100% token revocability.
  */
 export function verifyTokenWithDatabase(
   token: string,
@@ -247,9 +249,9 @@ export function verifyTokenWithDatabase(
 
   const tokenVersion = payload.tv;
 
-  // Legacy tokens without tv claim - accept but they cannot be revoked
-  if (tokenVersion === undefined) {
-    return payload;
+  // Reject unversioned tokens to guarantee 100% revocability
+  if (tokenVersion === undefined || typeof tokenVersion !== 'number') {
+    return null;
   }
 
   // Fetch user's current token version from database

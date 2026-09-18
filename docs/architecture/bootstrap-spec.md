@@ -68,9 +68,16 @@ garrison-os/
 ├── .gitignore
 ├── AGENTS.md                  # Contributor & engineering guardrails
 ├── CONTRIBUTING.md            # Contribution guide & dual-licensing policy
+├── Dockerfile                 # Multi-stage zero-dependency Alpine production container
+├── docker-compose.yml         # Turnkey Docker Compose service orchestration
 ├── LICENSE                    # AGPLv3 with Section 7(b) UI attribution addendum
 ├── package.json               # Zero runtime dependencies (typescript, @types/node)
 ├── tsconfig.json              # Strict TypeScript compiler configuration
+│
+├── deploy/                    # Production Hosting & Proxy Templates
+│   ├── systemd/garrison.service # Hardened systemd service with sandbox security
+│   ├── caddy/Caddyfile        # Automated TLS reverse proxy configuration
+│   └── nginx/nginx.conf       # High-performance reverse proxy with rate limiting
 │
 ├── docs/                      # Comprehensive Documentation Hierarchy
 │   ├── README.md
@@ -90,7 +97,7 @@ garrison-os/
 │   └── index.ts
 │
 ├── api/                       # Zero-Dependency HTTP Layer
-│   ├── router.ts              # Native HTTP router (methods, regex/params, body parsing)
+│   ├── router.ts              # Static-first HTTP router (methods, specificity, params, parsing)
 │   ├── middleware.ts          # Operator resolution, auth verification, CORS, rate limiting
 │   ├── response.ts            # Standardized JSON response envelopes & status codes
 │   ├── server.ts              # Native node:http server harness & health checks
@@ -108,7 +115,8 @@ garrison-os/
 │   ├── contacts/              # Humans directory (tenants, owners, vendors, emergency)
 │   ├── leases/                # Lease agreements, terms & lease_contacts junction
 │   ├── accounting/            # Cash-basis ledger, billing cycles, Schedule E & balances
-│   └── maintenance/           # Work order tracking, vendor dispatch, cost conversion
+│   ├── maintenance/           # Work order tracking, vendor dispatch, cost conversion
+│   └── backup/                # Hot vacuum, automated retention, and disaster recovery
 │
 ├── web/                       # Presentation Layer (Native TypeScript SSR / Semantic HTML5)
 │   ├── index.ts               # Front controller, CSRF validator & dynamic route dispatcher
@@ -119,11 +127,13 @@ garrison-os/
 │
 └── test/                      # Native node:test & node:assert Suite
     ├── helpers.ts             # In-memory SQLite fixtures & mock HTTP harnesses
-    ├── crypto.test.ts         # UUIDv7 format, bit validation & scrypt hashing tests
+    ├── crypto.test.ts         # UUIDv7 format, bit validation, scrypt hashing & token tests
     ├── context.test.ts        # AsyncLocalStorage propagation & concurrency tests
     ├── isolation.test.ts      # Cross-operator data isolation & leak prevention tests
-    ├── router.test.ts         # Route matching, parameter extraction, body parsing tests
-    └── modules.test.ts        # Module auto-discovery & migration runner tests
+    ├── router.test.ts         # Static-first route matching, params, body parsing tests
+    ├── modules.test.ts        # Module auto-discovery & migration runner tests
+    └── e2e/                   # Multi-step end-to-end user lifecycle integration tests
+        └── lifecycle.test.ts  # Full operator journey from bootstrap to deposit refund
 ```
 
 ---

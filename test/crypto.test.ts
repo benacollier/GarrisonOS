@@ -188,7 +188,7 @@ describe('Token Revocation with Database Backing', () => {
     assert.equal(verified, null, 'Token with mismatched version should be rejected');
   });
 
-  it('accepts legacy tokens without version check', () => {
+  it('rejects legacy unversioned tokens without tv claim', () => {
     const token = createToken(
       {
         sub: 'user-rev-test',
@@ -200,7 +200,7 @@ describe('Token Revocation with Database Backing', () => {
     );
 
     const verified = verifyTokenWithDatabase(token, secret, db);
-    assert.ok(verified !== null, 'Legacy tokens without tv should still work');
+    assert.equal(verified, null, 'Unversioned tokens without tv must be rejected');
   });
 
   it('rejects tokens for deleted users', () => {

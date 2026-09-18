@@ -65,9 +65,35 @@ interface RouteEntry {
   regex: RegExp;
   handlers: Handler[];
   batchSafe: boolean;
+  registrationOrder: number;
 }
 
 const MAX_BODY_SIZE_BYTES = 1024 * 1024; // 1 MB
+
+/**
+ * Compares two route entries to ensure literal static segments take strict precedence
+ * over parameterized wildcard segments (:param), eliminating registration-order sensitivity.
+ */
+function compareRouteSpecificity(a: RouteEntry, b: RouteEntry): number {
+  const segA = a.pattern.split('/').filter(Boolean);
+  const segB = b.pattern.split('/').filter(Boolean);
+  const minLen = Math.min(segA.length, segB.length);
+
+  for (let i = 0; i < minLen; i++) {
+    const isParamA = segA[i]!.startsWith(':');
+    const isParamB = segB[i]!.startsWith(':');
+    if (!isParamA && isParamB) return -1; // static segment has higher precedence than param
+    if (isParamA && !isParamB) return 1;  // param has lower precedence than static
+  }
+
+  // When prefixes match, longer paths are more specific
+  if (segA.length !== segB.length) {
+    return segB.length - segA.length;
+  }
+
+  // Preserve initial registration order if specificity is identical
+  return a.registrationOrder - b.registrationOrder;
+}
 
 /**
  * Zero-dependency HTTP router providing route pattern matching, parameter extraction,
@@ -76,6 +102,7 @@ const MAX_BODY_SIZE_BYTES = 1024 * 1024; // 1 MB
 export class Router {
   private routes: RouteEntry[] = [];
   private middlewares: Middleware[] = [];
+  private registrationCounter = 0;
 
   /**
    * Registers a global middleware function executed on every request.
@@ -86,6 +113,14 @@ export class Router {
     this.middlewares.push(middleware);
   }
 
+  /**
+   * Registers a route pattern and associated handlers for the specified HTTP method.
+   *
+   * @param method - HTTP verb (e.g. GET, POST, PUT, DELETE).
+   * @param pattern - URL pattern string.
+   * @param handlers - Sequence of handlers to execute.
+   * @param batchSafe - Whether this route can be invoked within batch transactions.
+   */
   private register(method: string, pattern: string, handlers: Handler[], batchSafe = false): void {
     const paramNames: string[] = [];
     const normalizedPattern = pattern.startsWith('/') ? pattern : `/${pattern}`;
@@ -106,7 +141,23 @@ export class Router {
       paramNames,
       regex,
       handlers,
-      batchSafe
+      batchSafe,
+      registrationOrder: this.registrationCounter++
+    });
+
+    this.sortRoutes();
+  }
+
+  /**
+   * Sorts registered routes by HTTP method and route specificity,
+   * ensuring static routes take priority over parameterized routes.
+   */
+  private sortRoutes(): void {
+    this.routes.sort((a, b) => {
+      if (a.method !== b.method) {
+        return a.method.localeCompare(b.method);
+      }
+      return compareRouteSpecificity(a, b);
     });
   }
 
