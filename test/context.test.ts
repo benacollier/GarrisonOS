@@ -3,9 +3,18 @@ import * as assert from 'node:assert/strict';
 import { RequestContext } from '../core/context.js';
 import { eventBus, EventBus, BaseEventPayload } from '../core/events.js';
 
-describe('RequestContext & Multi-Tenant Store Subsystem', () => {
-  it('propagates tenant context synchronously', () => {
+describe('RequestContext & Multi-Operator Store Subsystem', () => {
+  it('propagates operator context synchronously', () => {
+    RequestContext.run({ operatorId: 'operator-100', correlationId: 'req-1' }, () => {
+      assert.equal(RequestContext.getOperatorId(), 'operator-100');
+      assert.equal(RequestContext.getTenantId(), 'operator-100');
+      assert.equal(RequestContext.getCorrelationId(), 'req-1');
+    });
+  });
+
+  it('supports legacy tenantId fallback synchronously', () => {
     RequestContext.run({ tenantId: 'tenant-100', correlationId: 'req-1' }, () => {
+      assert.equal(RequestContext.getOperatorId(), 'tenant-100');
       assert.equal(RequestContext.getTenantId(), 'tenant-100');
       assert.equal(RequestContext.getCorrelationId(), 'req-1');
     });

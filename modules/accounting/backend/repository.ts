@@ -50,11 +50,11 @@ export class AccountingRepository {
     end_date?: number;
     qb_unexported_only?: boolean;
   }): TransactionRecord[] {
-    const tenantId = RequestContext.getTenantId();
+    const operatorId = RequestContext.getOperatorId();
     const db = getDatabase();
 
-    let sql = 'SELECT * FROM transactions WHERE tenant_id = ? AND deleted_at IS NULL';
-    const params: any[] = [tenantId];
+    let sql = 'SELECT * FROM transactions WHERE operator_id = ? AND deleted_at IS NULL';
+    const params: any[] = [operatorId];
 
     if (filter?.lease_id) {
       sql += ' AND lease_id = ?';
@@ -93,12 +93,12 @@ export class AccountingRepository {
   }
 
   public static getTransactionById(id: string): TransactionRecord | null {
-    const tenantId = RequestContext.getTenantId();
+    const operatorId = RequestContext.getOperatorId();
     const db = getDatabase();
     const row = db.prepare(`
       SELECT * FROM transactions
-      WHERE id = ? AND tenant_id = ? AND deleted_at IS NULL
-    `).get(id, tenantId) as TransactionRecord | undefined;
+      WHERE id = ? AND operator_id = ? AND deleted_at IS NULL
+    `).get(id, operatorId) as TransactionRecord | undefined;
     return row || null;
   }
 
@@ -107,7 +107,7 @@ export class AccountingRepository {
    * balanced double-entry journal entry atomically.
    */
   public static createTransaction(data: CreateTransactionData, dbInstance?: any): TransactionRecord {
-    const tenantId = RequestContext.getTenantId();
+    const operatorId = RequestContext.getOperatorId();
     const db = dbInstance || getDatabase();
     ChartOfAccountsRepository.ensureDefaultAccounts(dbInstance);
     const id = generateUUIDv7();
@@ -324,14 +324,14 @@ export class AccountingRepository {
 
       conn.prepare(`
         INSERT INTO transactions (
-          id, tenant_id, transaction_type, category, amount_cents,
+          id, operator_id, transaction_type, category, amount_cents,
           transaction_date, description, payment_method, reference_number,
           property_id, unit_id, lease_id, payer_contact_id, payee_contact_id,
           journal_entry_id, created_at, updated_at
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(
         id,
-        tenantId,
+        operatorId,
         data.transaction_type,
         data.category,
         amount,
@@ -365,7 +365,7 @@ export class AccountingRepository {
    * Reverse a transaction and its double-entry journal entry.
    */
   public static deleteTransaction(id: string): boolean {
-    const tenantId = RequestContext.getTenantId();
+    const operatorId = RequestContext.getOperatorId();
     const db = getDatabase();
     const now = Date.now();
 
@@ -385,21 +385,21 @@ export class AccountingRepository {
 
       tx.prepare(`
         UPDATE transactions SET deleted_at = ?
-        WHERE id = ? AND tenant_id = ? AND deleted_at IS NULL
-      `).run(now, id, tenantId);
+        WHERE id = ? AND operator_id = ? AND deleted_at IS NULL
+      `).run(now, id, operatorId);
     }, db);
 
     return true;
   }
 
   public static getLeaseTransactions(leaseId: string, dbInstance?: DatabaseSync): TransactionRecord[] {
-    const tenantId = RequestContext.getTenantId();
+    const operatorId = RequestContext.getOperatorId();
     const db = dbInstance || getDatabase();
     return db.prepare(`
       SELECT * FROM transactions
-      WHERE lease_id = ? AND tenant_id = ? AND deleted_at IS NULL
+      WHERE lease_id = ? AND operator_id = ? AND deleted_at IS NULL
       ORDER BY transaction_date ASC, created_at ASC
-    `).all(leaseId, tenantId) as unknown as TransactionRecord[];
+    `).all(leaseId, operatorId) as unknown as TransactionRecord[];
   }
 
   public static getLeaseBalance(leaseId: string, dbInstance?: DatabaseSync): {
@@ -417,7 +417,7 @@ export class AccountingRepository {
   }
 
   public static getRentRoll(): RentRollItem[] {
-    const tenantId = RequestContext.getTenantId();
+    const operatorId = RequestContext.getOperatorId();
     const db = getDatabase();
 
     const rows = db.prepare(`
@@ -436,9 +436,9 @@ export class AccountingRepository {
       JOIN properties p ON u.property_id = p.id AND p.deleted_at IS NULL
       LEFT JOIN lease_contacts lc ON l.id = lc.lease_id AND lc.role = 'primary_tenant' AND lc.deleted_at IS NULL
       LEFT JOIN contacts c ON lc.contact_id = c.id AND c.deleted_at IS NULL
-      WHERE l.tenant_id = ? AND l.deleted_at IS NULL AND l.status IN ('active', 'renewed', 'month_to_month', 'expiring')
+      WHERE l.operator_id = ? AND l.deleted_at IS NULL AND l.status IN ('active', 'renewed', 'month_to_month', 'expiring')
       ORDER BY p.name ASC, u.unit_number ASC
-    `).all(tenantId) as unknown as Array<Omit<RentRollItem, 'balance_cents'>>;
+    `).all(operatorId) as unknown as Array<Omit<RentRollItem, 'balance_cents'>>;
 
     return rows.map((r) => {
       const balance = AccountingRepository.getLeaseBalance(r.lease_id).balanceCents;
@@ -451,11 +451,11 @@ export class AccountingRepository {
   }
 
   public static getScheduleEReport(filter?: { year?: number; property_id?: string }): ScheduleEReport {
-    const tenantId = RequestContext.getTenantId();
+    const operatorId = RequestContext.getOperatorId();
     const db = getDatabase();
 
-    let sql = 'SELECT * FROM transactions WHERE tenant_id = ? AND deleted_at IS NULL';
-    const params: any[] = [tenantId];
+    let sql = 'SELECT * FROM transactions WHERE operator_id = ? AND deleted_at IS NULL';
+    const params: any[] = [operatorId];
 
     if (filter?.property_id) {
       sql += ' AND property_id = ?';
@@ -484,16 +484,16 @@ export class AccountingRepository {
     finalRefundCents: number;
     createdTransactions: TransactionRecord[];
   } {
-    const tenantId = RequestContext.getTenantId();
+    const operatorId = RequestContext.getOperatorId();
     const db = getDatabase();
 
     return withTransaction((tx) => {
       const lease = tx.prepare(`
         SELECT l.*, u.property_id
         FROM leases l
-        LEFT JOIN units u ON l.unit_id = u.id AND u.tenant_id = l.tenant_id
-        WHERE l.id = ? AND l.tenant_id = ? AND l.deleted_at IS NULL
-      `).get(leaseId, tenantId) as any;
+        LEFT JOIN units u ON l.unit_id = u.id AND u.operator_id = l.operator_id
+        WHERE l.id = ? AND l.operator_id = ? AND l.deleted_at IS NULL
+      `).get(leaseId, operatorId) as any;
 
       if (!lease) {
         throw new Error('Lease not found');
@@ -543,8 +543,8 @@ export class AccountingRepository {
       // 3. Update lease deposit held to 0 and terminate lease if active
       tx.prepare(`
         UPDATE leases SET deposit_held_cents = 0, status = 'terminated', updated_at = ?
-        WHERE id = ? AND tenant_id = ?
-      `).run(now, leaseId, tenantId);
+        WHERE id = ? AND operator_id = ?
+      `).run(now, leaseId, operatorId);
 
       return {
         leaseId,
@@ -572,16 +572,16 @@ export class AccountingRepository {
     bankStatementBalanceCents?: number,
     tx?: any
   ): ThreeWayReconciliationResult {
-    const tenantId = RequestContext.getTenantId();
+    const operatorId = RequestContext.getOperatorId();
     const db = tx || getDatabase();
     const asOf = asOfDateMs || Date.now();
 
     // 1. Calculate GL Trust Cash from Account 1020
     const trustAccount = db.prepare(`
       SELECT id FROM chart_of_accounts
-      WHERE tenant_id = ? AND (account_number = '1020' OR category_mapping = 'trust_bank') AND deleted_at IS NULL
+      WHERE operator_id = ? AND (account_number = '1020' OR category_mapping = 'trust_bank') AND deleted_at IS NULL
       LIMIT 1
-    `).get(tenantId) as { id: string } | undefined;
+    `).get(operatorId) as { id: string } | undefined;
 
     let glTrustCashCents = 0;
     if (trustAccount) {
@@ -589,17 +589,17 @@ export class AccountingRepository {
         SELECT COALESCE(SUM(jl.debit_cents - jl.credit_cents), 0) AS balance_cents
         FROM journal_lines jl
         JOIN journal_entries je ON jl.journal_entry_id = je.id
-        WHERE jl.tenant_id = ? AND jl.account_id = ? AND je.date_ms <= ? AND je.deleted_at IS NULL
-      `).get(tenantId, trustAccount.id, asOf) as { balance_cents: number };
+        WHERE jl.operator_id = ? AND jl.account_id = ? AND je.date_ms <= ? AND je.deleted_at IS NULL
+      `).get(operatorId, trustAccount.id, asOf) as { balance_cents: number };
       glTrustCashCents = glRow ? Number(glRow.balance_cents) : 0;
     }
 
     // 2. Calculate Tenant Deposits Liability from Account 2100
     const liabilityAccount = db.prepare(`
       SELECT id FROM chart_of_accounts
-      WHERE tenant_id = ? AND (account_number = '2100' OR category_mapping = 'security_deposit') AND deleted_at IS NULL
+      WHERE operator_id = ? AND (account_number = '2100' OR category_mapping = 'security_deposit') AND deleted_at IS NULL
       LIMIT 1
-    `).get(tenantId) as { id: string } | undefined;
+    `).get(operatorId) as { id: string } | undefined;
 
     let tenantDepositsLiabilityCents = 0;
     if (liabilityAccount) {
@@ -607,8 +607,8 @@ export class AccountingRepository {
         SELECT COALESCE(SUM(jl.credit_cents - jl.debit_cents), 0) AS balance_cents
         FROM journal_lines jl
         JOIN journal_entries je ON jl.journal_entry_id = je.id
-        WHERE jl.tenant_id = ? AND jl.account_id = ? AND je.date_ms <= ? AND je.deleted_at IS NULL
-      `).get(tenantId, liabilityAccount.id, asOf) as { balance_cents: number };
+        WHERE jl.operator_id = ? AND jl.account_id = ? AND je.date_ms <= ? AND je.deleted_at IS NULL
+      `).get(operatorId, liabilityAccount.id, asOf) as { balance_cents: number };
       tenantDepositsLiabilityCents = liabRow ? Number(liabRow.balance_cents) : 0;
     }
 
@@ -619,8 +619,8 @@ export class AccountingRepository {
           COALESCE(SUM(CASE WHEN transaction_type = 'deposit_inflow' THEN amount_cents ELSE 0 END), 0) -
           COALESCE(SUM(CASE WHEN transaction_type IN ('deposit_return', 'deposit_deduction') THEN amount_cents ELSE 0 END), 0) AS net_trust
         FROM transactions
-        WHERE tenant_id = ? AND transaction_date <= ? AND deleted_at IS NULL
-      `).get(tenantId, asOf) as { net_trust: number };
+        WHERE operator_id = ? AND transaction_date <= ? AND deleted_at IS NULL
+      `).get(operatorId, asOf) as { net_trust: number };
       const netTrust = txRow ? Number(txRow.net_trust) : 0;
       glTrustCashCents = netTrust;
       tenantDepositsLiabilityCents = netTrust;
@@ -646,7 +646,7 @@ export class AccountingRepository {
             COALESCE(SUM(CASE WHEN t.transaction_type IN ('deposit_return', 'deposit_deduction') THEN t.amount_cents ELSE 0 END), 0)
           FROM transactions t
           WHERE t.lease_id = l.id
-            AND t.tenant_id = l.tenant_id
+            AND t.operator_id = l.operator_id
             AND t.transaction_date <= ?
             AND t.deleted_at IS NULL
         ) AS tx_deposit_held_cents,
@@ -654,19 +654,19 @@ export class AccountingRepository {
           SELECT COUNT(*)
           FROM transactions t
           WHERE t.lease_id = l.id
-            AND t.tenant_id = l.tenant_id
+            AND t.operator_id = l.operator_id
             AND t.transaction_type IN ('deposit_inflow', 'deposit_return', 'deposit_deduction')
             AND t.deleted_at IS NULL
         ) AS has_deposit_txs
       FROM leases l
-      LEFT JOIN units u ON l.unit_id = u.id AND u.tenant_id = l.tenant_id
-      LEFT JOIN properties p ON u.property_id = p.id AND p.tenant_id = l.tenant_id
-      WHERE l.tenant_id = ?
+      LEFT JOIN units u ON l.unit_id = u.id AND u.operator_id = l.operator_id
+      LEFT JOIN properties p ON u.property_id = p.id AND p.operator_id = l.operator_id
+      WHERE l.operator_id = ?
         AND l.deleted_at IS NULL
         AND l.status IN ('active', 'pending')
         AND l.start_date <= ?
       ORDER BY p.name ASC, u.unit_number ASC
-    `).all(asOf, tenantId, asOf) as Array<{
+    `).all(asOf, operatorId, asOf) as Array<{
       lease_id: string;
       current_deposit_held_cents: number;
       property_name: string | null;
@@ -725,7 +725,7 @@ export class AccountingRepository {
     taxYear: number,
     tx?: any
   ): Vendor1099ReportResult {
-    const tenantId = RequestContext.getTenantId();
+    const operatorId = RequestContext.getOperatorId();
     const db = tx || getDatabase();
     const yearStart = Date.UTC(taxYear, 0, 1, 0, 0, 0, 0);
     const yearEnd = Date.UTC(taxYear, 11, 31, 23, 59, 59, 999);
@@ -740,14 +740,14 @@ export class AccountingRepository {
       FROM journal_lines jl
       JOIN journal_entries je ON jl.journal_entry_id = je.id
       JOIN chart_of_accounts coa ON jl.account_id = coa.id
-      WHERE jl.tenant_id = ?
+      WHERE jl.operator_id = ?
         AND jl.contact_id IS NOT NULL
         AND coa.account_type IN ('Expense', 'CostOfGoodsSold')
         AND je.date_ms >= ? AND je.date_ms <= ?
         AND je.reversed_by_entry_id IS NULL
         AND je.deleted_at IS NULL
       GROUP BY jl.contact_id
-    `).all(tenantId, yearStart, yearEnd) as Array<{ contact_id: string; total_cents: number }>;
+    `).all(operatorId, yearStart, yearEnd) as Array<{ contact_id: string; total_cents: number }>;
 
     for (const r of journalVendorRows) {
       if (r.contact_id) {
@@ -761,14 +761,14 @@ export class AccountingRepository {
     const txVendorRows = db.prepare(`
       SELECT payee_contact_id AS contact_id, SUM(amount_cents) AS total_cents
       FROM transactions
-      WHERE tenant_id = ?
+      WHERE operator_id = ?
         AND payee_contact_id IS NOT NULL
         AND transaction_type = 'expense'
         AND journal_entry_id IS NULL
         AND transaction_date >= ? AND transaction_date <= ?
         AND deleted_at IS NULL
       GROUP BY payee_contact_id
-    `).all(tenantId, yearStart, yearEnd) as Array<{ contact_id: string; total_cents: number }>;
+    `).all(operatorId, yearStart, yearEnd) as Array<{ contact_id: string; total_cents: number }>;
 
     for (const r of txVendorRows) {
       if (r.contact_id) {
@@ -781,8 +781,8 @@ export class AccountingRepository {
     const allVendors = db.prepare(`
       SELECT id, first_name, last_name, company_name, tax_id_last4, email, phone
       FROM contacts
-      WHERE tenant_id = ? AND contact_type = 'vendor' AND deleted_at IS NULL
-    `).all(tenantId) as Array<{
+      WHERE operator_id = ? AND contact_type = 'vendor' AND deleted_at IS NULL
+    `).all(operatorId) as Array<{
       id: string;
       first_name: string;
       last_name: string;
@@ -817,8 +817,8 @@ export class AccountingRepository {
         const contact = db.prepare(`
           SELECT id, first_name, last_name, company_name, tax_id_last4, email, phone
           FROM contacts
-          WHERE id = ? AND tenant_id = ? AND deleted_at IS NULL
-        `).get(contactId, tenantId) as any;
+          WHERE id = ? AND operator_id = ? AND deleted_at IS NULL
+        `).get(contactId, operatorId) as any;
         if (contact) {
           const vendorName = contact.company_name || `${contact.first_name} ${contact.last_name}`.trim();
           vendorRecords.push({

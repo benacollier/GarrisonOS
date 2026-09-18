@@ -7,6 +7,7 @@ import {
   securityHeadersMiddleware,
   correlationMiddleware,
   rateLimitMiddleware,
+  operatorContextMiddleware,
   tenantContextMiddleware
 } from './middleware.js';
 import { successResponse, errorResponse } from './response.js';
@@ -69,7 +70,7 @@ export function createRouter(serverPort: number = PORT): Router {
   router.use(securityHeadersMiddleware);
   router.use(correlationMiddleware);
   router.use(rateLimitMiddleware);
-  router.use(tenantContextMiddleware);
+  router.use(operatorContextMiddleware);
 
   // Health and readiness checks
   router.getBatchSafe('/health', (_req, res) => {
@@ -202,18 +203,19 @@ export function createRouter(serverPort: number = PORT): Router {
 
   // Authentication: Operator Login
   router.post('/api/v1/auth/login', async (req, res) => {
-    const { email, password, tenant_id } = req.body || {};
+    const { email, password, operator_id, tenant_id } = req.body || {};
     if (!email || !password) {
       return errorResponse(res, 'VALIDATION_ERROR', 'Email and password are required', 400);
     }
 
+    const operatorId = operator_id || tenant_id;
     const db = getDatabase();
     let query = 'SELECT * FROM users WHERE email = ? AND deleted_at IS NULL';
     const params: any[] = [email];
 
-    if (tenant_id) {
-      query += ' AND tenant_id = ?';
-      params.push(tenant_id);
+    if (operatorId) {
+      query += ' AND operator_id = ?';
+      params.push(operatorId);
     }
 
     const user = db.prepare(query).get(...params) as any;
@@ -230,7 +232,8 @@ export function createRouter(serverPort: number = PORT): Router {
     const token = createToken(
       {
         sub: user.id,
-        tid: user.tenant_id,
+        opid: user.operator_id,
+        tid: user.operator_id, // Backward-compatible claim
         role: user.role,
         exp: Math.floor(Date.now() / 1000) + 86400,
         tv: user.token_version || 1
@@ -241,11 +244,11 @@ export function createRouter(serverPort: number = PORT): Router {
     // Record audit log
     try {
       db.prepare(`
-        INSERT INTO audit_logs (id, tenant_id, user_id, entity_type, entity_id, action, changes_json, ip_address, created_at)
+        INSERT INTO audit_logs (id, operator_id, user_id, entity_type, entity_id, action, changes_json, ip_address, created_at)
         VALUES (?, ?, ?, 'user', ?, 'login', ?, ?, ?)
       `).run(
         generateUUIDv7(),
-        user.tenant_id,
+        user.operator_id,
         user.id,
         user.id,
         JSON.stringify({ email: user.email }),
@@ -260,7 +263,8 @@ export function createRouter(serverPort: number = PORT): Router {
       token,
       user: {
         id: user.id,
-        tenant_id: user.tenant_id,
+        operator_id: user.operator_id,
+        tenant_id: user.operator_id, // Backward-compatible field
         email: user.email,
         first_name: user.first_name,
         last_name: user.last_name,
@@ -348,39 +352,39 @@ export function createRouter(serverPort: number = PORT): Router {
     }
 
     const now = Date.now();
-    const tenantId = generateUUIDv7();
+    const operatorId = generateUUIDv7();
     const userId = generateUUIDv7();
     const passwordHash = await hashPassword(cleanPassword);
 
     try {
       withTransaction((tx) => {
-        // 1. Create primary tenant
+        // 1. Create primary operator
         tx.prepare(`
-          INSERT INTO tenants (id, name, subdomain, currency, created_at, updated_at)
+          INSERT INTO operators (id, name, subdomain, currency, created_at, updated_at)
           VALUES (?, ?, ?, 'USD', ?, ?)
-        `).run(tenantId, cleanOrg, 'primary', now, now);
+        `).run(operatorId, cleanOrg, 'primary', now, now);
 
         // 2. Create owner user
         tx.prepare(`
-          INSERT INTO users (id, tenant_id, email, password_hash, first_name, last_name, role, token_version, created_at, updated_at)
+          INSERT INTO users (id, operator_id, email, password_hash, first_name, last_name, role, token_version, created_at, updated_at)
           VALUES (?, ?, ?, ?, ?, ?, 'owner', 1, ?, ?)
-        `).run(userId, tenantId, cleanEmail, passwordHash, cleanFirst, cleanLast, now, now);
+        `).run(userId, operatorId, cleanEmail, passwordHash, cleanFirst, cleanLast, now, now);
 
         // 3. Audit log
         tx.prepare(`
-          INSERT INTO audit_logs (id, tenant_id, user_id, entity_type, entity_id, action, changes_json, ip_address, created_at)
+          INSERT INTO audit_logs (id, operator_id, user_id, entity_type, entity_id, action, changes_json, ip_address, created_at)
           VALUES (?, ?, ?, 'system', ?, 'create', ?, ?, ?)
         `).run(
           generateUUIDv7(),
-          tenantId,
+          operatorId,
           userId,
-          tenantId,
+          operatorId,
           JSON.stringify({ organization_name: cleanOrg, email: cleanEmail }),
           (req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress || '127.0.0.1',
           now
         );
 
-        // 4. If demo data requested, seed sample records under this new tenant
+        // 4. If demo data requested, seed sample records under this new operator
         if (seed_demo_data === true) {
           // Initialize Chart of Accounts if table exists
           const tableCheck = tx.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='chart_of_accounts'").get();
@@ -395,45 +399,46 @@ export function createRouter(serverPort: number = PORT): Router {
             ];
             for (const [num, name, type, qbType] of accounts) {
               tx.prepare(`
-                INSERT INTO chart_of_accounts (id, tenant_id, account_number, account_name, account_type, qb_account_type, is_active, created_at, updated_at)
+                INSERT INTO chart_of_accounts (id, operator_id, account_number, account_name, account_type, qb_account_type, is_active, created_at, updated_at)
                 VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)
-              `).run(generateUUIDv7(), tenantId, num, name, type, qbType, now, now);
+              `).run(generateUUIDv7(), operatorId, num, name, type, qbType, now, now);
             }
           }
 
           // Sample portfolio
           const portId = generateUUIDv7();
           tx.prepare(`
-            INSERT INTO portfolios (id, tenant_id, name, notes, created_at, updated_at)
+            INSERT INTO portfolios (id, operator_id, name, notes, created_at, updated_at)
             VALUES (?, ?, 'Primary Portfolio', 'Initial sample portfolio created during onboarding', ?, ?)
-          `).run(portId, tenantId, now, now);
+          `).run(portId, operatorId, now, now);
 
           // Sample vendor contact
           const vendorId = generateUUIDv7();
           tx.prepare(`
-            INSERT INTO contacts (id, tenant_id, contact_type, first_name, last_name, company_name, email, phone, vendor_specialty, created_at, updated_at)
+            INSERT INTO contacts (id, operator_id, contact_type, first_name, last_name, company_name, email, phone, vendor_specialty, created_at, updated_at)
             VALUES (?, ?, 'vendor', 'Marcus', 'Vance', 'Apex Plumbing Services', 'marcus@apexplumb.local', '(555) 301-4401', 'Plumbing', ?, ?)
-          `).run(vendorId, tenantId, now, now);
+          `).run(vendorId, operatorId, now, now);
 
           // Sample property & unit
           const propId = generateUUIDv7();
           tx.prepare(`
-            INSERT INTO properties (id, tenant_id, portfolio_id, name, property_type, address_line1, city, state, postal_code, created_at, updated_at)
+            INSERT INTO properties (id, operator_id, portfolio_id, name, property_type, address_line1, city, state, postal_code, created_at, updated_at)
             VALUES (?, ?, ?, '104 Oakwood Drive', 'single_family', '104 Oakwood Dr', 'Asheville', 'NC', '28801', ?, ?)
-          `).run(propId, tenantId, portId, now, now);
+          `).run(propId, operatorId, portId, now, now);
 
           const unitId = generateUUIDv7();
           tx.prepare(`
-            INSERT INTO units (id, tenant_id, property_id, unit_number, status, bedrooms, bathrooms, square_feet, market_rent_cents, target_deposit_cents, created_at, updated_at)
+            INSERT INTO units (id, operator_id, property_id, unit_number, status, bedrooms, bathrooms, square_feet, market_rent_cents, target_deposit_cents, created_at, updated_at)
             VALUES (?, ?, ?, 'Main', 'vacant', 3, 2, 1450, 185000, 185000, ?, ?)
-          `).run(unitId, tenantId, propId, now, now);
+          `).run(unitId, operatorId, propId, now, now);
         }
       }, db);
 
       const token = createToken(
         {
           sub: userId,
-          tid: tenantId,
+          opid: operatorId,
+          tid: operatorId, // Backward-compatible claim
           role: 'owner',
           exp: Math.floor(Date.now() / 1000) + 86400,
           tv: 1
@@ -445,7 +450,8 @@ export function createRouter(serverPort: number = PORT): Router {
         token,
         user: {
           id: userId,
-          tenant_id: tenantId,
+          operator_id: operatorId,
+          tenant_id: operatorId, // Backward-compatible field
           email: cleanEmail,
           first_name: cleanFirst,
           last_name: cleanLast,

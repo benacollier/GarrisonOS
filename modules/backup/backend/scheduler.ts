@@ -5,26 +5,98 @@ import { getDatabase } from '../../../database/client.js';
 import { BackupRecord } from './repository.js';
 import { BackupService } from './service.js';
 
+/**
+ * Configuration options governing the background backup scheduler.
+ */
 export interface SchedulerConfig {
+  /**
+   * Whether the background scheduler is active.
+   */
   enabled: boolean;
+
+  /**
+   * Interval in hours between automated full system backups.
+   */
   intervalHours: number;
+
+  /**
+   * Number of days to retain backups before pruning.
+   */
   retentionDays: number;
+
+  /**
+   * Interval in hours between automated database vacuum and maintenance routines.
+   */
   vacuumIntervalHours: number;
 }
 
+/**
+ * Operational metrics and status details for the background backup scheduler.
+ */
 export interface SchedulerStatus {
+  /**
+   * Whether the scheduler is configured as enabled.
+   */
   enabled: boolean;
+
+  /**
+   * Whether background timers are currently running.
+   */
   running: boolean;
+
+  /**
+   * Configured backup interval in hours.
+   */
   intervalHours: number;
+
+  /**
+   * Configured retention period in days.
+   */
   retentionDays: number;
+
+  /**
+   * Configured vacuum interval in hours.
+   */
   vacuumIntervalHours: number;
+
+  /**
+   * Epoch millisecond timestamp of the last executed backup, or null.
+   */
   lastBackupAt: number | null;
+
+  /**
+   * Status of the last executed backup.
+   */
   lastBackupStatus: 'completed' | 'failed' | null;
+
+  /**
+   * Epoch millisecond timestamp of the last executed vacuum routine, or null.
+   */
   lastVacuumAt: number | null;
+
+  /**
+   * Epoch millisecond timestamp of the next scheduled backup run, or null.
+   */
   nextScheduledBackupAt: number | null;
+
+  /**
+   * Epoch millisecond timestamp of the next scheduled vacuum routine, or null.
+   */
   nextScheduledVacuumAt: number | null;
+
+  /**
+   * Cumulative count of automated backups executed since boot.
+   */
   totalBackupsRun: number;
+
+  /**
+   * Cumulative count of vacuum routines executed since boot.
+   */
   totalVacuumsRun: number;
+
+  /**
+   * Type of maintenance currently in progress, or null if idle.
+   */
   maintenanceInProgress: 'backup' | 'vacuum' | null;
 }
 
@@ -103,6 +175,12 @@ export class BackupScheduler {
     this.config = config;
   }
 
+  /**
+   * Retrieves the singleton BackupScheduler instance, initializing it if necessary.
+   *
+   * @param config - Optional configuration overrides.
+   * @returns The singleton BackupScheduler instance.
+   */
   public static getInstance(config?: Partial<SchedulerConfig>): BackupScheduler {
     if (!BackupScheduler.instance) {
       BackupScheduler.instance = new BackupScheduler(config);
@@ -111,13 +189,13 @@ export class BackupScheduler {
   }
 
   /**
-   * Resolve an existing tenant ID for system background jobs,
-   * falling back to querying the first available tenant in the database.
+   * Resolve an existing operator ID for system background jobs,
+   * falling back to querying the first available operator in the database.
    */
-  private resolveSystemTenantId(): string {
+  private resolveSystemOperatorId(): string {
     try {
       const db = getDatabase();
-      const row = db.prepare('SELECT id FROM tenants WHERE deleted_at IS NULL ORDER BY created_at ASC LIMIT 1').get() as { id: string } | undefined;
+      const row = db.prepare('SELECT id FROM operators WHERE deleted_at IS NULL ORDER BY created_at ASC LIMIT 1').get() as { id: string } | undefined;
       if (row?.id) {
         return row.id;
       }
@@ -125,6 +203,10 @@ export class BackupScheduler {
       // Database might be uninitialized during setup/test
     }
     return 'system';
+  }
+
+  private resolveSystemTenantId(): string {
+    return this.resolveSystemOperatorId();
   }
 
   /**
@@ -221,12 +303,13 @@ export class BackupScheduler {
    * @returns The completed backup record.
    */
   private async runScheduledBackup(): Promise<BackupRecord | null> {
-    const tenantId = this.resolveSystemTenantId();
+    const operatorId = this.resolveSystemOperatorId();
     const correlationId = generateUUIDv7();
 
     return RequestContext.run(
       {
-        tenantId,
+        operatorId,
+        tenantId: operatorId,
         correlationId
       },
       async () => {
@@ -264,7 +347,8 @@ export class BackupScheduler {
 
         eventBus.publish('backup.scheduled.completed', {
           backupId: record.id,
-          tenantId: record.tenant_id,
+          operatorId: record.operator_id,
+          tenantId: record.operator_id,
           filename: record.filename,
           fileSizeBytes: record.file_size_bytes,
           checksumSha256: record.checksum_sha256,
@@ -307,12 +391,13 @@ export class BackupScheduler {
    * @returns Performance and duration metrics from the maintenance worker.
    */
   private async runScheduledVacuum(): Promise<{ durationMs: number; checkpointResult: string }> {
-    const tenantId = this.resolveSystemTenantId();
+    const operatorId = this.resolveSystemOperatorId();
     const correlationId = generateUUIDv7();
 
     return RequestContext.run(
       {
-        tenantId,
+        operatorId,
+        tenantId: operatorId,
         correlationId
       },
       async () => {

@@ -145,8 +145,8 @@ describe('System First-Launch Setup Subsystem', () => {
     assert.ok(tenantRow);
     assert.equal(tenantRow.name, 'Blue Ridge Properties');
 
-    // Verify demo data was seeded under this tenant
-    const propertyCount = db.prepare('SELECT COUNT(*) as count FROM properties WHERE tenant_id = ?').get(tenantRow.id) as any;
+    // Verify demo data was seeded under this operator
+    const propertyCount = db.prepare('SELECT COUNT(*) as count FROM properties WHERE operator_id = ?').get(tenantRow.id) as any;
     assert.equal(propertyCount.count, 1);
 
     // Verify GET /api/v1/system/status now reports is_configured: true

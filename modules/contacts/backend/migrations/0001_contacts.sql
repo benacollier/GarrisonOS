@@ -1,7 +1,7 @@
 -- Individual humans & organizations directory
 CREATE TABLE IF NOT EXISTS contacts (
     id TEXT PRIMARY KEY,
-    tenant_id TEXT NOT NULL,
+    operator_id TEXT NOT NULL,
     contact_type TEXT NOT NULL CHECK (contact_type IN ('tenant', 'owner', 'vendor', 'guarantor', 'prospect', 'emergency')),
     first_name TEXT NOT NULL,
     last_name TEXT NOT NULL,
@@ -15,8 +15,8 @@ CREATE TABLE IF NOT EXISTS contacts (
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL,
     deleted_at INTEGER,
-    FOREIGN KEY (tenant_id) REFERENCES tenants(id)
+    FOREIGN KEY (operator_id) REFERENCES operators(id)
 );
-CREATE INDEX IF NOT EXISTS idx_contacts_tenant_type ON contacts(tenant_id, contact_type);
-CREATE INDEX IF NOT EXISTS idx_contacts_tenant_name ON contacts(tenant_id, last_name, first_name);
+CREATE INDEX IF NOT EXISTS idx_contacts_operator_type ON contacts(operator_id, contact_type);
+CREATE INDEX IF NOT EXISTS idx_contacts_operator_name ON contacts(operator_id, last_name, first_name);
 

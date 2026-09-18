@@ -4,15 +4,23 @@ The GarrisonOS REST API is exposed by the headless Node.js backend (`api/server.
 
 ---
 
-## 1. Request Headers
+## 1. Request Headers & Operator Identity Resolution
 
 | Header | Required | Description |
 | :--- | :--- | :--- |
-| `X-Tenant-ID` | **Yes\*** | UUIDv7 of the active tenant context (\*except public endpoints; ignored for authenticated batch identity) |
+| `X-Operator-ID` | Conditional | UUIDv7 of the active operator context (preferred header for operational routes) |
+| `X-Tenant-ID` | Optional | Legacy alias for `X-Operator-ID` supported for backward compatibility |
 | `Authorization` | Optional | `Bearer <signed_hmac_token>` for authenticated endpoints |
 | `X-Request-ID` | Optional | Client correlation ID (generated automatically if omitted) |
 | `Content-Type` | Optional | `application/json` for state-modifying requests |
 | `Origin` | Optional | Must match an origin in `CORS_ALLOWED_ORIGINS` for browser cross-origin access |
+
+### Operator Resolution Rules
+1. **Header Precedence**: When inspecting request headers, `X-Operator-ID` takes precedence over `X-Tenant-ID`.
+2. **Token Fallback**: If neither header is provided, non-batch operational endpoints resolve operator identity from the verified Bearer token's `opid` (or `tid`) claim.
+3. **Mismatch Enforcement**: If an operator header is provided alongside a Bearer token, the header identity and token claim must agree. Mismatches return `401 UNAUTHORIZED`.
+4. **Missing Operator**: If no operator identity can be resolved on non-public endpoints, the server returns `400 OPERATOR_REQUIRED`.
+5. **Batch Processing**: `/api/v1/batch` strictly ignores both `X-Operator-ID` and `X-Tenant-ID` headers; operator and user identities are derived exclusively from the verified Bearer token.
 
 ---
 
@@ -54,6 +62,7 @@ All JSON responses conform to standardized envelopes:
 
 ### Error Codes
 
+* `OPERATOR_REQUIRED` (`400`)
 * `VALIDATION_ERROR` (`400`)
 * `UNAUTHORIZED` (`401`)
 * `FORBIDDEN` (`403`)

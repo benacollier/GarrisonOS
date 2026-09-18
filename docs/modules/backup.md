@@ -9,9 +9,9 @@ The **Backup & Disaster Recovery Module** (`modules/backup/`) provides zero-depe
 | Capability | Scope | Mechanism |
 | :--- | :--- | :--- |
 | **Full System Database Backup** | Instance Level (Admin) | SQLite WAL checkpoint + `VACUUM INTO` + Gzip stream (`.sqlite.gz`) |
-| **Tenant Data Export** | Tenant Level | Dynamic tenant table extraction + JSON formatting + Gzip (`.json.gz`) |
+| **Operator Data Export** | Operator Level | Dynamic operator table extraction + JSON formatting + Gzip (`.json.gz`) (accepts `operator_data` or legacy `tenant_data`) |
 | **Integrity Verification** | Both | SHA-256 hash computed on completion, validated on-demand |
-| **Tenant Data Restore** | Tenant Level | Atomic import (`withTransaction`) with **Clean-Slate** or **Merge** options |
+| **Operator Data Restore** | Operator Level | Atomic import (`withTransaction`) with **Clean-Slate** or **Merge** options |
 | **Disaster Recovery Restore** | Instance Level | Offline CLI script (`scripts/restore.js`) with binary header check and WAL cache wipe |
 
 ---
@@ -21,8 +21,8 @@ The **Backup & Disaster Recovery Module** (`modules/backup/`) provides zero-depe
 ```sql
 CREATE TABLE IF NOT EXISTS backups (
     id TEXT PRIMARY KEY,
-    tenant_id TEXT NOT NULL,
-    backup_type TEXT NOT NULL, -- 'full_system' | 'tenant_data'
+    operator_id TEXT NOT NULL,
+    backup_type TEXT NOT NULL, -- 'full_system' | 'operator_data'
     filename TEXT NOT NULL,
     relative_path TEXT NOT NULL,
     file_size_bytes INTEGER NOT NULL DEFAULT 0,
@@ -32,30 +32,30 @@ CREATE TABLE IF NOT EXISTS backups (
     metadata_json TEXT,
     created_at INTEGER NOT NULL,
     deleted_at INTEGER,
-    FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE
+    FOREIGN KEY (operator_id) REFERENCES operators(id) ON DELETE CASCADE
 );
 
-CREATE INDEX IF NOT EXISTS idx_backups_tenant_created 
-ON backups (tenant_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_backups_operator_created 
+ON backups (operator_id, created_at DESC);
 
-CREATE INDEX IF NOT EXISTS idx_backups_tenant_status 
-ON backups (tenant_id, status);
+CREATE INDEX IF NOT EXISTS idx_backups_operator_status 
+ON backups (operator_id, status);
 ```
 
 ---
 
 ## 3. REST API Endpoints
 
-All endpoints require standard `X-Tenant-ID` header and authentication tokens.
+All endpoints require standard `X-Operator-ID` (or `X-Tenant-ID`) header and authentication tokens.
 
 | Method | Endpoint | Description |
 | :--- | :--- | :--- |
-| `GET` | `/api/v1/backups` | List backups for the active tenant context (paginated) |
-| `POST` | `/api/v1/backups` | Trigger new backup (`{ "type": "tenant_data" \| "full_system" }`) |
+| `GET` | `/api/v1/backups` | List backups for the active operator context (paginated) |
+| `POST` | `/api/v1/backups` | Trigger new backup (`{ "type": "operator_data" \| "full_system" }`) |
 | `GET` | `/api/v1/backups/:id` | Get backup metadata, size, checksum, and status |
 | `GET` | `/api/v1/backups/:id/download` | Stream download backup archive with path-traversal guard |
 | `POST` | `/api/v1/backups/:id/verify` | Run SHA-256 integrity verification against the physical file |
-| `POST` | `/api/v1/backups/:id/restore` | Restore tenant data (`{ "mode": "clean_slate" \| "merge" }`) |
+| `POST` | `/api/v1/backups/:id/restore` | Restore operator data (`{ "mode": "clean_slate" \| "merge" }`) |
 | `DELETE` | `/api/v1/backups/:id` | Soft-delete record and unlink physical archive from storage |
 | `GET` | `/api/v1/backups/scheduler/status` | Get background scheduler running state, intervals, next runs, and metrics |
 | `POST` | `/api/v1/backups/scheduler/trigger` | Owner-only trigger for an immediate scheduled backup or vacuum (`{ "action": "vacuum" }`) |
@@ -91,16 +91,16 @@ The module includes an in-process, zero-dependency background daemon (`BackupSch
 
 ## 5. Restoration Modes
 
-### Tenant-Level Restoration (`tenant_data`)
+### Operator-Level Restoration (`operator_data` / `tenant_data`)
 
 1. **Clean-Slate (Replace)**:
-   - Deletes existing tenant records in the backed-up tables before inserting snapshot records.
+   - Deletes existing operator records in the backed-up tables before inserting snapshot records.
    - Ideal for rolling back unintentional data alterations or deletions.
 2. **Merge / Upsert**:
    - Updates or inserts matching records from the snapshot by primary key.
    - Preserves newly created records added since the backup was taken.
-3. **Multi-Tenancy Guard**:
-   - The backup metadata is strictly validated against `RequestContext.getTenantId()`. A tenant is strictly barred from restoring another tenant's archive.
+3. **Multi-Operator Guard**:
+   - The backup metadata is strictly validated against `RequestContext.getOperatorId()` (or `RequestContext.getTenantId()`). An operator is strictly barred from restoring another operator's archive.
 
 ### Full System Disaster Recovery (`full_system`)
 

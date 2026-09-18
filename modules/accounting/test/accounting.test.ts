@@ -72,20 +72,20 @@ describe('Accounting Module - Repository & Financial Workflows', () => {
       // Insert property & unit for FK constraints
       db.prepare(`
         INSERT INTO properties (
-          id, tenant_id, name, property_type, address_line1, city, state, postal_code, created_at, updated_at
+          id, operator_id, name, property_type, address_line1, city, state, postal_code, created_at, updated_at
         ) VALUES (?, 'tenant-acct-test', 'Test Building', 'single_family', '123 Main', 'City', 'ST', '12345', ?, ?)
       `).run(propId, now, now);
 
       db.prepare(`
         INSERT INTO units (
-          id, tenant_id, property_id, unit_number, status, market_rent_cents, created_at, updated_at
+          id, operator_id, property_id, unit_number, status, market_rent_cents, created_at, updated_at
         ) VALUES (?, 'tenant-acct-test', ?, '101', 'occupied', 200000, ?, ?)
       `).run(unitId, propId, now, now);
 
       // Insert dummy lease with deposit held
       db.prepare(`
         INSERT INTO leases (
-          id, tenant_id, unit_id, start_date, end_date, rent_amount_cents,
+          id, operator_id, unit_id, start_date, end_date, rent_amount_cents,
           deposit_held_cents, status, created_at, updated_at
         ) VALUES (?, 'tenant-acct-test', ?, ?, ?, 200000, 200000, 'active', ?, ?)
       `).run(leaseId, unitId, now - 1000000, now + 1000000, now, now);

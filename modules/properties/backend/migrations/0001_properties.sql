@@ -1,21 +1,21 @@
 -- Portfolios (Legal ownership entities / LLCs)
 CREATE TABLE IF NOT EXISTS portfolios (
     id TEXT PRIMARY KEY,
-    tenant_id TEXT NOT NULL,
+    operator_id TEXT NOT NULL,
     name TEXT NOT NULL,
     tax_id TEXT,
     notes TEXT,
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL,
     deleted_at INTEGER,
-    FOREIGN KEY (tenant_id) REFERENCES tenants(id)
+    FOREIGN KEY (operator_id) REFERENCES operators(id)
 );
-CREATE INDEX IF NOT EXISTS idx_portfolios_tenant ON portfolios(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_portfolios_operator ON portfolios(operator_id);
 
 -- Physical Properties / Buildings
 CREATE TABLE IF NOT EXISTS properties (
     id TEXT PRIMARY KEY,
-    tenant_id TEXT NOT NULL,
+    operator_id TEXT NOT NULL,
     portfolio_id TEXT,
     name TEXT NOT NULL,
     property_type TEXT NOT NULL CHECK (property_type IN ('single_family', 'multi_family', 'condo', 'townhouse', 'commercial')),
@@ -28,15 +28,15 @@ CREATE TABLE IF NOT EXISTS properties (
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL,
     deleted_at INTEGER,
-    FOREIGN KEY (tenant_id) REFERENCES tenants(id),
+    FOREIGN KEY (operator_id) REFERENCES operators(id),
     FOREIGN KEY (portfolio_id) REFERENCES portfolios(id)
 );
-CREATE INDEX IF NOT EXISTS idx_properties_tenant_portfolio ON properties(tenant_id, portfolio_id);
+CREATE INDEX IF NOT EXISTS idx_properties_operator_portfolio ON properties(operator_id, portfolio_id);
 
 -- Rentable Units
 CREATE TABLE IF NOT EXISTS units (
     id TEXT PRIMARY KEY,
-    tenant_id TEXT NOT NULL,
+    operator_id TEXT NOT NULL,
     property_id TEXT NOT NULL,
     unit_number TEXT NOT NULL,
     status TEXT NOT NULL CHECK (status IN ('vacant', 'occupied', 'notice_given', 'turnover', 'maintenance_hold')),
@@ -48,9 +48,9 @@ CREATE TABLE IF NOT EXISTS units (
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL,
     deleted_at INTEGER,
-    FOREIGN KEY (tenant_id) REFERENCES tenants(id),
+    FOREIGN KEY (operator_id) REFERENCES operators(id),
     FOREIGN KEY (property_id) REFERENCES properties(id)
 );
-CREATE INDEX IF NOT EXISTS idx_units_tenant_property ON units(tenant_id, property_id);
-CREATE INDEX IF NOT EXISTS idx_units_tenant_status ON units(tenant_id, status);
+CREATE INDEX IF NOT EXISTS idx_units_operator_property ON units(operator_id, property_id);
+CREATE INDEX IF NOT EXISTS idx_units_operator_status ON units(operator_id, status);
 

@@ -1,8 +1,8 @@
 -- Backup records tracking schema
 CREATE TABLE IF NOT EXISTS backups (
     id TEXT PRIMARY KEY,
-    tenant_id TEXT NOT NULL,
-    backup_type TEXT NOT NULL, -- 'full_system' | 'tenant_data'
+    operator_id TEXT NOT NULL,
+    backup_type TEXT NOT NULL, -- 'full_system' | 'operator_data' | 'tenant_data'
     filename TEXT NOT NULL,
     relative_path TEXT NOT NULL,
     file_size_bytes INTEGER NOT NULL DEFAULT 0,
@@ -12,12 +12,12 @@ CREATE TABLE IF NOT EXISTS backups (
     metadata_json TEXT,
     created_at INTEGER NOT NULL,
     deleted_at INTEGER,
-    FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE
+    FOREIGN KEY (operator_id) REFERENCES operators(id) ON DELETE CASCADE
 );
 
-CREATE INDEX IF NOT EXISTS idx_backups_tenant_created 
-ON backups (tenant_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_backups_operator_created 
+ON backups (operator_id, created_at DESC);
 
-CREATE INDEX IF NOT EXISTS idx_backups_tenant_status 
-ON backups (tenant_id, status);
+CREATE INDEX IF NOT EXISTS idx_backups_operator_status 
+ON backups (operator_id, status);
 

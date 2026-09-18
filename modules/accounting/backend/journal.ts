@@ -23,7 +23,8 @@ export interface CreateJournalEntryInput {
 
 export interface JournalLineRecord {
   id: string;
-  tenant_id: string;
+  operator_id: string;
+  tenant_id?: string;
   journal_entry_id: string;
   account_id: string;
   debit_cents: number;
@@ -40,7 +41,8 @@ export interface JournalLineRecord {
 
 export interface JournalEntryRecord {
   id: string;
-  tenant_id: string;
+  operator_id: string;
+  tenant_id?: string;
   entry_number: number;
   date_ms: number;
   memo: string;
@@ -84,7 +86,7 @@ export class JournalService {
     dbInstance?: any,
     options?: { historicalReferenceMode?: boolean }
   ): JournalEntryRecord {
-    const tenantId = RequestContext.getTenantId();
+    const operatorId = RequestContext.getOperatorId();
     const isDatabaseInstance = !!dbInstance && typeof dbInstance === 'object' && typeof dbInstance.prepare === 'function';
     const db = isDatabaseInstance ? dbInstance : getDatabase();
     const historicalReferenceMode =
@@ -132,44 +134,44 @@ export class JournalService {
     const entryDate = input.date_ms || now;
 
     const executeInsert = (conn: any) => {
-      // Validate tenant ownership of account_id, property_id, unit_id, and contact_id.
+      // Validate operator ownership of account_id, property_id, unit_id, and contact_id.
       // Historical-reference mode is reserved for internal reversal/backfill flows that
-      // must preserve tenant validation while allowing soft-deleted references to remain readable.
+      // must preserve operator validation while allowing soft-deleted references to remain readable.
       const deletedFilter = historicalReferenceMode ? '' : ' AND deleted_at IS NULL';
       const checkAccount = conn.prepare(`
         SELECT id, account_number, account_name, account_type, category_mapping
         FROM chart_of_accounts
-        WHERE id = ? AND tenant_id = ?${deletedFilter}
+        WHERE id = ? AND operator_id = ?${deletedFilter}
       `);
       const checkProperty = conn.prepare(`
         SELECT 1 FROM properties
-        WHERE id = ? AND tenant_id = ?${deletedFilter}
+        WHERE id = ? AND operator_id = ?${deletedFilter}
       `);
       const checkUnit = conn.prepare(`
         SELECT 1 FROM units
-        WHERE id = ? AND tenant_id = ?${deletedFilter}
+        WHERE id = ? AND operator_id = ?${deletedFilter}
       `);
       const checkContact = conn.prepare(`
         SELECT 1 FROM contacts
-        WHERE id = ? AND tenant_id = ?${deletedFilter}
+        WHERE id = ? AND operator_id = ?${deletedFilter}
       `);
 
       const lineAccounts: Array<{ line: CreateJournalLineInput; account: any }> = [];
       for (const line of input.lines) {
-        const acc = checkAccount.get(line.account_id, tenantId) as any;
+        const acc = checkAccount.get(line.account_id, operatorId) as any;
         if (!acc) {
-          throw new Error(`Account '${line.account_id}' does not exist or does not belong to the current tenant.`);
+          throw new Error(`Account '${line.account_id}' does not exist or does not belong to the current operator.`);
         }
         lineAccounts.push({ line, account: acc });
 
-        if (line.property_id && !checkProperty.get(line.property_id, tenantId)) {
-          throw new Error(`Property '${line.property_id}' does not exist or does not belong to the current tenant.`);
+        if (line.property_id && !checkProperty.get(line.property_id, operatorId)) {
+          throw new Error(`Property '${line.property_id}' does not exist or does not belong to the current operator.`);
         }
-        if (line.unit_id && !checkUnit.get(line.unit_id, tenantId)) {
-          throw new Error(`Unit '${line.unit_id}' does not exist or does not belong to the current tenant.`);
+        if (line.unit_id && !checkUnit.get(line.unit_id, operatorId)) {
+          throw new Error(`Unit '${line.unit_id}' does not exist or does not belong to the current operator.`);
         }
-        if (line.contact_id && !checkContact.get(line.contact_id, tenantId)) {
-          throw new Error(`Contact '${line.contact_id}' does not exist or does not belong to the current tenant.`);
+        if (line.contact_id && !checkContact.get(line.contact_id, operatorId)) {
+          throw new Error(`Contact '${line.contact_id}' does not exist or does not belong to the current operator.`);
         }
       }
 
@@ -212,23 +214,23 @@ export class JournalService {
         }
       }
 
-      // Obtain next sequential entry_number for this tenant
+      // Obtain next sequential entry_number for this operator
       const maxRow = conn.prepare(`
         SELECT COALESCE(MAX(entry_number), 0) as max_num
         FROM journal_entries
-        WHERE tenant_id = ?
-      `).get(tenantId) as { max_num: number };
+        WHERE operator_id = ?
+      `).get(operatorId) as { max_num: number };
 
       const entryNumber = (maxRow?.max_num || 0) + 1;
 
       conn.prepare(`
         INSERT INTO journal_entries (
-          id, tenant_id, entry_number, date_ms, memo, source_type, source_id,
+          id, operator_id, entry_number, date_ms, memo, source_type, source_id,
           posted_at, reversed_by_entry_id, created_at, updated_at
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?)
       `).run(
         entryId,
-        tenantId,
+        operatorId,
         entryNumber,
         entryDate,
         input.memo,
@@ -241,7 +243,7 @@ export class JournalService {
 
       const lineStmt = conn.prepare(`
         INSERT INTO journal_lines (
-          id, tenant_id, journal_entry_id, account_id, debit_cents, credit_cents,
+          id, operator_id, journal_entry_id, account_id, debit_cents, credit_cents,
           property_id, unit_id, contact_id, description, created_at
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
@@ -249,7 +251,7 @@ export class JournalService {
       for (const line of input.lines) {
         lineStmt.run(
           generateUUIDv7(),
-          tenantId,
+          operatorId,
           entryId,
           line.account_id,
           Math.round(line.debit_cents || 0),
@@ -283,7 +285,7 @@ export class JournalService {
    * and linking reversed_by_entry_id.
    */
   public static reverseEntry(entryId: string, reason: string, dbInstance?: any): JournalEntryRecord {
-    const tenantId = RequestContext.getTenantId();
+    const operatorId = RequestContext.getOperatorId();
     const db = dbInstance || getDatabase();
 
     let reversalEntry: JournalEntryRecord;
@@ -327,8 +329,8 @@ export class JournalService {
       conn.prepare(`
         UPDATE journal_entries
         SET reversed_by_entry_id = ?, updated_at = ?
-        WHERE id = ? AND tenant_id = ?
-      `).run(reversalEntry.id, Date.now(), original.id, tenantId);
+        WHERE id = ? AND operator_id = ?
+      `).run(reversalEntry.id, Date.now(), original.id, operatorId);
     };
 
     if (dbInstance) {
@@ -346,13 +348,13 @@ export class JournalService {
    * Retrieve a single journal entry with all lines.
    */
   public static getEntryById(id: string, dbInstance?: any): JournalEntryRecord | null {
-    const tenantId = RequestContext.getTenantId();
+    const operatorId = RequestContext.getOperatorId();
     const db = dbInstance || getDatabase();
 
     const entry = db.prepare(`
       SELECT * FROM journal_entries
-      WHERE id = ? AND tenant_id = ? AND deleted_at IS NULL
-    `).get(id, tenantId) as JournalEntryRecord | undefined;
+      WHERE id = ? AND operator_id = ? AND deleted_at IS NULL
+    `).get(id, operatorId) as JournalEntryRecord | undefined;
 
     if (!entry) return null;
 
@@ -364,9 +366,9 @@ export class JournalService {
         coa.account_type
       FROM journal_lines jl
       JOIN chart_of_accounts coa ON jl.account_id = coa.id
-      WHERE jl.journal_entry_id = ? AND jl.tenant_id = ?
+      WHERE jl.journal_entry_id = ? AND jl.operator_id = ?
       ORDER BY jl.debit_cents DESC, jl.credit_cents DESC, jl.created_at ASC
-    `).all(id, tenantId) as unknown as JournalLineRecord[];
+    `).all(id, operatorId) as unknown as JournalLineRecord[];
 
     const totalDebit = lines.reduce((sum, l) => sum + l.debit_cents, 0);
     const totalCredit = lines.reduce((sum, l) => sum + l.credit_cents, 0);
@@ -390,11 +392,11 @@ export class JournalService {
     limit?: number;
     offset?: number;
   }): { entries: JournalEntryRecord[]; total: number } {
-    const tenantId = RequestContext.getTenantId();
+    const operatorId = RequestContext.getOperatorId();
     const db = getDatabase();
 
-    let sql = `SELECT * FROM journal_entries WHERE tenant_id = ? AND deleted_at IS NULL`;
-    const params: any[] = [tenantId];
+    let sql = `SELECT * FROM journal_entries WHERE operator_id = ? AND deleted_at IS NULL`;
+    const params: any[] = [operatorId];
 
     if (filter?.source_type) {
       sql += ` AND source_type = ?`;
@@ -428,9 +430,10 @@ export class JournalService {
       }
     }
 
-    const rows = db.prepare(sql).all(...params) as unknown as JournalEntryRecord[];
+    const entries = db.prepare(sql).all(...params) as unknown as JournalEntryRecord[];
 
-    const entries: JournalEntryRecord[] = rows.map((entry) => {
+    // Hydrate each entry with lines
+    for (const entry of entries) {
       const lines = db.prepare(`
         SELECT
           jl.*,
@@ -439,20 +442,14 @@ export class JournalService {
           coa.account_type
         FROM journal_lines jl
         JOIN chart_of_accounts coa ON jl.account_id = coa.id
-        WHERE jl.journal_entry_id = ? AND jl.tenant_id = ?
-        ORDER BY jl.debit_cents DESC, jl.credit_cents DESC
-      `).all(entry.id, tenantId) as unknown as JournalLineRecord[];
+        WHERE jl.journal_entry_id = ? AND jl.operator_id = ?
+        ORDER BY jl.debit_cents DESC, jl.credit_cents DESC, jl.created_at ASC
+      `).all(entry.id, operatorId) as unknown as JournalLineRecord[];
 
-      const totalDebit = lines.reduce((sum, l) => sum + l.debit_cents, 0);
-      const totalCredit = lines.reduce((sum, l) => sum + l.credit_cents, 0);
-
-      return {
-        ...entry,
-        lines,
-        total_debit_cents: totalDebit,
-        total_credit_cents: totalCredit
-      };
-    });
+      entry.lines = lines;
+      entry.total_debit_cents = lines.reduce((sum, l) => sum + l.debit_cents, 0);
+      entry.total_credit_cents = lines.reduce((sum, l) => sum + l.credit_cents, 0);
+    }
 
     return { entries, total };
   }
@@ -462,7 +459,7 @@ export class JournalService {
    */
   public static getTrialBalance(asOfDateMs?: number, propertyId?: string): TrialBalanceReport {
     ChartOfAccountsRepository.ensureDefaultAccounts();
-    const tenantId = RequestContext.getTenantId();
+    const operatorId = RequestContext.getOperatorId();
     const db = getDatabase();
     const cutoffDate = asOfDateMs || Date.now();
 
@@ -480,13 +477,13 @@ export class JournalService {
         FROM journal_lines jl
         JOIN journal_entries je
           ON jl.journal_entry_id = je.id
-         AND jl.tenant_id = je.tenant_id
+         AND jl.operator_id = je.operator_id
         WHERE je.deleted_at IS NULL
           AND je.date_ms <= ?
-      ) jl ON coa.id = jl.account_id AND coa.tenant_id = jl.tenant_id
-      WHERE coa.tenant_id = ? AND coa.deleted_at IS NULL
+      ) jl ON coa.id = jl.account_id AND coa.operator_id = jl.operator_id
+      WHERE coa.operator_id = ? AND coa.deleted_at IS NULL
     `;
-    const params: any[] = [cutoffDate, tenantId];
+    const params: any[] = [cutoffDate, operatorId];
 
     if (propertyId) {
       sql += ` AND (jl.property_id = ? OR jl.property_id IS NULL)`;
@@ -561,16 +558,16 @@ export class JournalService {
    */
   public static backfillLegacyTransactions(): { migrated: number; skipped: number } {
     ChartOfAccountsRepository.ensureDefaultAccounts();
-    const tenantId = RequestContext.getTenantId();
+    const operatorId = RequestContext.getOperatorId();
     const db = getDatabase();
 
     // Find active transactions that do not yet have a journal_entry_id
     const unmigrated = db.prepare(`
       SELECT * FROM transactions
-      WHERE tenant_id = ? AND deleted_at IS NULL
+      WHERE operator_id = ? AND deleted_at IS NULL
         AND (journal_entry_id IS NULL OR journal_entry_id = '')
       ORDER BY transaction_date ASC, created_at ASC
-    `).all(tenantId) as any[];
+    `).all(operatorId) as any[];
 
     if (unmigrated.length === 0) {
       return { migrated: 0, skipped: 0 };
@@ -589,8 +586,8 @@ export class JournalService {
         // Re-read candidate transaction inside transaction to guarantee idempotency
         const current = tx.prepare(`
           SELECT id, journal_entry_id, deleted_at FROM transactions
-          WHERE id = ? AND tenant_id = ?
-        `).get(t.id, tenantId) as { id: string; journal_entry_id: string | null; deleted_at: number | null } | undefined;
+          WHERE id = ? AND operator_id = ?
+        `).get(t.id, operatorId) as { id: string; journal_entry_id: string | null; deleted_at: number | null } | undefined;
 
         if (!current || current.deleted_at !== null || (current.journal_entry_id && current.journal_entry_id !== '')) {
           skipped++;
@@ -792,8 +789,8 @@ export class JournalService {
         tx.prepare(`
           UPDATE transactions
           SET journal_entry_id = ?
-          WHERE id = ? AND tenant_id = ?
-        `).run(entry.id, t.id, tenantId);
+          WHERE id = ? AND operator_id = ?
+        `).run(entry.id, t.id, operatorId);
 
         migrated++;
       }

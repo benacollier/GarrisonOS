@@ -1,11 +1,18 @@
 import { html, SafeHtml } from '../lib/html.js';
 import { SessionUser } from '../lib/session.js';
 
-export function renderHeader(user: SessionUser | null, tenantId: string): SafeHtml {
+/**
+ * Renders the top navigation header containing operator badge and user authentication controls.
+ *
+ * @param user - Active authenticated user, or null if anonymous.
+ * @param operatorId - Active operator context identifier string.
+ * @returns SafeHtml template component.
+ */
+export function renderHeader(user: SessionUser | null, operatorId: string): SafeHtml {
   return html`
     <header class="topbar">
-      <div class="tenant-selector">
-        <span>🏢 <strong>${tenantId}</strong></span>
+      <div class="operator-selector tenant-selector">
+        <span>🏢 <strong>${operatorId}</strong></span>
       </div>
       <div class="user-profile">
         ${user

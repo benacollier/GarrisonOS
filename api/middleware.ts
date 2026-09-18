@@ -32,7 +32,11 @@ const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000; // 15 minutes
 const RATE_LIMIT_MAX_ATTEMPTS = 10;
 
 /**
- * Resolve the response origin without ever reflecting an unconfigured origin.
+ * Resolves the response origin without ever reflecting an unconfigured origin.
+ *
+ * @param origin - The Incoming Origin header value from the client request.
+ * @param allowedOrigins - Set of configured allowed origin URLs.
+ * @returns The matching allowed origin or the first configured fallback origin.
  */
 export function resolveCorsOrigin(origin: string | undefined, allowedOrigins: ReadonlySet<string>): string | undefined {
   if (origin && allowedOrigins.has(origin)) return origin;
@@ -40,7 +44,12 @@ export function resolveCorsOrigin(origin: string | undefined, allowedOrigins: Re
 }
 
 /**
- * Security headers and CORS middleware.
+ * Security headers and CORS middleware. Applies defensive headers (CSP, nosniff, DENY)
+ * and verifies origin against the configured whitelist.
+ *
+ * @param req - The API request object.
+ * @param res - The HTTP server response object.
+ * @param next - Function to invoke the next middleware in the pipeline.
  */
 export const securityHeadersMiddleware: Middleware = async (req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
@@ -53,13 +62,18 @@ export const securityHeadersMiddleware: Middleware = async (req, res, next) => {
     res.setHeader('Vary', 'Origin');
   }
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Tenant-ID, X-Request-ID, X-User-ID');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Operator-ID, X-Tenant-ID, X-Request-ID, X-User-ID');
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   await next();
 };
 
 /**
- * Correlation ID tracking middleware.
+ * Correlation ID tracking middleware. Extracts incoming X-Request-ID or generates
+ * a new RFC 9562 UUIDv7 for distributed tracing.
+ *
+ * @param req - The API request object.
+ * @param res - The HTTP server response object.
+ * @param next - Function to invoke the next middleware in the pipeline.
  */
 export const correlationMiddleware: Middleware = async (req, res, next) => {
   const headerId = req.headers['x-request-id'];
@@ -70,7 +84,12 @@ export const correlationMiddleware: Middleware = async (req, res, next) => {
 };
 
 /**
- * In-memory sliding-window rate limiter for sensitive authentication routes.
+ * In-memory sliding-window rate limiter for sensitive authentication and setup routes.
+ * Throttles brute-force attempts per IP and endpoint.
+ *
+ * @param req - The API request object.
+ * @param res - The HTTP server response object.
+ * @param next - Function to invoke the next middleware in the pipeline.
  */
 export const rateLimitMiddleware: Middleware = async (req, res, next) => {
   if (req.path.startsWith('/api/v1/auth/') || req.path === '/api/v1/system/setup' || req.path === '/api/v1/system/restore') {
@@ -101,9 +120,15 @@ export const rateLimitMiddleware: Middleware = async (req, res, next) => {
 };
 
 /**
- * Multi-tenant resolution and AsyncLocalStorage context execution wrapper.
+ * Multi-operator resolution and AsyncLocalStorage context execution wrapper.
+ * Resolves operator context from headers and bearer tokens, verifies identity consistency,
+ * and wraps execution within RequestContext.
+ *
+ * @param req - The API request object.
+ * @param res - The HTTP server response object.
+ * @param next - Function to invoke the next middleware in the pipeline.
  */
-export const tenantContextMiddleware: Middleware = async (req, res, next) => {
+export const operatorContextMiddleware: Middleware = async (req, res, next) => {
   const isBatchRoute = req.path === '/api/v1/batch' || req.path === '/api/v1/batch/';
   const isAdministratorRoute = (
     req.path === '/api/v1/system/backup' ||
@@ -118,7 +143,7 @@ export const tenantContextMiddleware: Middleware = async (req, res, next) => {
     req.path === '/api/v1/system/restore'
   );
 
-  let tenantId = isBatchRoute ? '' : ((req.headers['x-tenant-id'] as string) || '');
+  let operatorId = isBatchRoute ? '' : ((req.headers['x-operator-id'] as string) || (req.headers['x-tenant-id'] as string) || '');
   const headerUserId = isBatchRoute ? undefined : ((req.headers['x-user-id'] as string) || undefined);
   let userId: string | undefined = undefined;
   let batchAuthenticated = false;
@@ -139,16 +164,17 @@ export const tenantContextMiddleware: Middleware = async (req, res, next) => {
     }
 
     if (payload) {
+      const tokenOpId = typeof payload.opid === 'string' ? payload.opid : (typeof payload.tid === 'string' ? payload.tid : '');
       if (isBatchRoute) {
-        tenantId = typeof payload.tid === 'string' ? payload.tid : '';
+        operatorId = tokenOpId;
         userId = typeof payload.sub === 'string' ? payload.sub : undefined;
-        batchAuthenticated = tenantId.length > 0 && typeof userId === 'string' && userId.length > 0;
+        batchAuthenticated = operatorId.length > 0 && typeof userId === 'string' && userId.length > 0;
       } else {
-        if (!isPublicRoute && tenantId && payload.tid !== tenantId) {
+        if (!isPublicRoute && operatorId && tokenOpId && tokenOpId !== operatorId) {
           return errorResponse(
             res,
             'UNAUTHORIZED',
-            'Tenant identity does not match the authentication token',
+            'Operator identity does not match the authentication token',
             401
           );
         }
@@ -160,7 +186,7 @@ export const tenantContextMiddleware: Middleware = async (req, res, next) => {
             401
           );
         }
-        if (!tenantId) tenantId = payload.tid;
+        if (!operatorId) operatorId = tokenOpId;
         userId = typeof payload.sub === 'string' ? payload.sub : undefined;
       }
     } else if (authHeader && !isPublicRoute) {
@@ -182,14 +208,15 @@ export const tenantContextMiddleware: Middleware = async (req, res, next) => {
     );
   }
 
-  req.tenantId = tenantId;
+  req.operatorId = operatorId;
+  req.tenantId = operatorId; // Alias
   req.userId = userId;
 
-  if (!isPublicRoute && !tenantId) {
+  if (!isPublicRoute && !operatorId) {
     return errorResponse(
       res,
-      'TENANT_REQUIRED',
-      'The X-Tenant-ID header is required for this operational endpoint',
+      'OPERATOR_REQUIRED',
+      'The X-Operator-ID header is required for this operational endpoint',
       400
     );
   }
@@ -198,8 +225,8 @@ export const tenantContextMiddleware: Middleware = async (req, res, next) => {
     const db = getDatabase();
     const administrator = userId
       ? db.prepare(
-        'SELECT 1 FROM users WHERE id = ? AND tenant_id = ? AND role = ? AND deleted_at IS NULL'
-      ).get(userId, tenantId, 'owner')
+        'SELECT 1 FROM users WHERE id = ? AND operator_id = ? AND role = ? AND deleted_at IS NULL'
+      ).get(userId, operatorId, 'owner')
       : undefined;
     if (!administrator) {
       return errorResponse(
@@ -214,7 +241,8 @@ export const tenantContextMiddleware: Middleware = async (req, res, next) => {
   // Wrap downstream execution inside RequestContext
   await RequestContext.run(
     {
-      tenantId: tenantId || 'system',
+      operatorId: operatorId || 'system',
+      tenantId: operatorId || 'system',
       userId,
       correlationId: req.correlationId || generateUUIDv7()
     },
@@ -223,3 +251,8 @@ export const tenantContextMiddleware: Middleware = async (req, res, next) => {
     }
   );
 };
+
+/**
+ * Backward-compatible alias for operatorContextMiddleware.
+ */
+export const tenantContextMiddleware = operatorContextMiddleware;

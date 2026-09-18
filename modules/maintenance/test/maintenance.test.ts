@@ -123,4 +123,35 @@ describe('Maintenance Module - Work Orders & Event Dispatch', () => {
       assert.equal(repairTx.category, 'repairs');
     });
   });
+
+  it('rejects work order creation with cross-operator property or contact ID (IDOR protection)', () => {
+    // 1. Create property in operator A
+    let propAId = '';
+    runInTenantContext('operator-a', () => {
+      const propA = PropertiesRepository.createProperty({
+        name: 'Operator A Manor',
+        property_type: 'single_family',
+        address_line1: '100 Alpha St',
+        city: 'Atlanta',
+        state: 'GA',
+        postal_code: '30301'
+      });
+      propAId = propA.id;
+    });
+
+    // 2. Attempt to create work order in operator B referencing operator A's property
+    runInTenantContext('operator-b', () => {
+      assert.throws(
+        () => {
+          MaintenanceRepository.createWorkOrder({
+            property_id: propAId,
+            title: 'Unauthorized Cross-Operator Request',
+            description: 'Attempting to link to property of operator A'
+          });
+        },
+        /does not belong to the active operator/
+      );
+    });
+  });
 });
+

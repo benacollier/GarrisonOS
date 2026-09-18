@@ -40,7 +40,8 @@ describe('Web Presentation - Cookie Session Management', () => {
       first_name: 'Admin',
       last_name: 'User',
       role: 'administrator',
-      tenant_id: 'tenant-demo'
+      operator_id: 'operator-demo',
+      tenant_id: 'operator-demo'
     };
     originalSession.authToken = 'test-jwt-or-hmac-token';
 

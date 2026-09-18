@@ -3,14 +3,47 @@ import { csrfField, validateCsrf } from '../lib/csrf.js';
 import { FlashMessage } from '../lib/session.js';
 import { PageContext, PageResult } from '../lib/page-context.js';
 
+/**
+ * Template rendering options for the user login page.
+ */
 export interface LoginPageOptions {
+  /**
+   * Cryptographic CSRF token string.
+   */
   csrfToken: string;
+
+  /**
+   * Pending flash messages to display.
+   */
   flashMessages?: FlashMessage[];
+
+  /**
+   * Error message to display, if authentication failed.
+   */
   error?: string | null;
+
+  /**
+   * Pre-filled email address.
+   */
   email?: string;
+
+  /**
+   * Pre-filled operator isolation ID.
+   */
+  operatorId?: string;
+
+  /**
+   * Legacy alias for operatorId.
+   */
   tenantId?: string;
 }
 
+/**
+ * Renders the standalone sign-in page document.
+ *
+ * @param options - Template parameters and form defaults.
+ * @returns Complete HTML document string.
+ */
 export function renderLoginPage(options: LoginPageOptions): string {
   const flashes = (options.flashMessages || []).map(
     (f) =>
@@ -55,8 +88,8 @@ export function renderLoginPage(options: LoginPageOptions): string {
             </div>
 
             <div class="form-group">
-                <label class="form-label" for="tenant_id">Tenant ID / Account (Optional)</label>
-                <input class="form-input" type="text" id="tenant_id" name="tenant_id" placeholder="e.g. tenant-demo" value="${options.tenantId || ''}">
+                <label class="form-label" for="operator_id">Operator ID (Optional)</label>
+                <input class="form-input" type="text" id="operator_id" name="operator_id" placeholder="e.g. operator-demo" value="${options.operatorId || options.tenantId || ''}">
             </div>
 
             <button type="submit" class="btn btn-primary" style="width: 100%; padding: 0.75rem; font-size: 1rem; margin-top: 1rem;">
@@ -70,6 +103,12 @@ export function renderLoginPage(options: LoginPageOptions): string {
   return doc.toString();
 }
 
+/**
+ * Dispatches GET rendering or POST credentials verification for user authentication.
+ *
+ * @param ctx - Page execution context containing session, API client, and request body.
+ * @returns PageResult with redirect or rendered login page.
+ */
 export async function handle(ctx: PageContext): Promise<PageResult> {
   if (ctx.session.user) {
     return { redirect: '/dashboard', content: '' };
@@ -78,7 +117,7 @@ export async function handle(ctx: PageContext): Promise<PageResult> {
   const csrfToken = ctx.session.getCsrfToken();
   let error: string | null = null;
   let email = '';
-  let tenantId = '';
+  let operatorId = '';
 
   if (ctx.method === 'POST') {
     if (!validateCsrf(csrfToken, ctx.body['csrf_token'])) {
@@ -91,13 +130,14 @@ export async function handle(ctx: PageContext): Promise<PageResult> {
 
     email = typeof ctx.body['email'] === 'string' ? ctx.body['email'].trim() : '';
     const password = typeof ctx.body['password'] === 'string' ? ctx.body['password'] : '';
-    tenantId = typeof ctx.body['tenant_id'] === 'string' ? ctx.body['tenant_id'].trim() : '';
+    operatorId = typeof ctx.body['operator_id'] === 'string' ? ctx.body['operator_id'].trim() : (typeof ctx.body['tenant_id'] === 'string' ? ctx.body['tenant_id'].trim() : '');
 
     try {
       const res = await ctx.api.post('/api/v1/auth/login', {
         email,
         password,
-        tenant_id: tenantId ? tenantId : undefined,
+        operator_id: operatorId ? operatorId : undefined,
+        tenant_id: operatorId ? operatorId : undefined,
       });
 
       const token = res.data?.token;
@@ -106,8 +146,10 @@ export async function handle(ctx: PageContext): Promise<PageResult> {
       if (user && token) {
         ctx.session.user = user;
         ctx.session.authToken = token;
-        if (res.data.tenant_id) {
-          ctx.session.tenantId = res.data.tenant_id;
+        if (res.data.operator_id) {
+          ctx.session.operatorId = res.data.operator_id;
+        } else if (res.data.tenant_id) {
+          ctx.session.operatorId = res.data.tenant_id;
         }
         ctx.session.addFlash('success', `Welcome back, ${user.first_name || 'User'}!`);
         return { redirect: '/dashboard', content: '' };
@@ -124,7 +166,8 @@ export async function handle(ctx: PageContext): Promise<PageResult> {
     flashMessages: ctx.session.getFlash(),
     error,
     email,
-    tenantId,
+    operatorId,
+    tenantId: operatorId,
   });
 
   return {

@@ -4,7 +4,8 @@ import { generateUUIDv7 } from '../../../core/crypto.js';
 
 export interface ChartOfAccountRecord {
   id: string;
-  tenant_id: string;
+  operator_id: string;
+  tenant_id?: string;
   account_number: string | null;
   account_name: string;
   account_type:
@@ -257,22 +258,22 @@ export const DEFAULT_PROPERTY_MANAGEMENT_COA: DefaultAccountDefinition[] = [
 
 export class ChartOfAccountsRepository {
   /**
-   * Seed standard Chart of Accounts defaults for the current tenant if none exist.
+   * Seed standard Chart of Accounts defaults for the current operator if none exist.
    */
   public static ensureDefaultAccounts(dbInstance?: any): void {
-    const tenantId = RequestContext.getTenantId();
+    const operatorId = RequestContext.getOperatorId();
     const db = dbInstance || getDatabase();
 
     const countRow = db.prepare(`
       SELECT COUNT(*) as count FROM chart_of_accounts
-      WHERE tenant_id = ? AND deleted_at IS NULL
-    `).get(tenantId) as { count: number };
+      WHERE operator_id = ? AND deleted_at IS NULL
+    `).get(operatorId) as { count: number };
 
     if (countRow.count === 0) {
       const seedAccounts = (tx: any) => {
         const stmt = tx.prepare(`
           INSERT INTO chart_of_accounts (
-            id, tenant_id, account_number, account_name, account_type,
+            id, operator_id, account_number, account_name, account_type,
             qb_account_type, category_mapping, description, is_system_default,
             is_active, created_at, updated_at
           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, 1, ?, ?)
@@ -282,7 +283,7 @@ export class ChartOfAccountsRepository {
         for (const def of DEFAULT_PROPERTY_MANAGEMENT_COA) {
           stmt.run(
             generateUUIDv7(),
-            tenantId,
+            operatorId,
             def.account_number,
             def.account_name,
             def.account_type,
@@ -305,43 +306,43 @@ export class ChartOfAccountsRepository {
 
   public static listAccounts(includeInactive = false): ChartOfAccountRecord[] {
     this.ensureDefaultAccounts();
-    const tenantId = RequestContext.getTenantId();
+    const operatorId = RequestContext.getOperatorId();
     const db = getDatabase();
 
     let sql = `
       SELECT * FROM chart_of_accounts
-      WHERE tenant_id = ? AND deleted_at IS NULL
+      WHERE operator_id = ? AND deleted_at IS NULL
     `;
     if (!includeInactive) {
       sql += ' AND is_active = 1';
     }
     sql += ' ORDER BY account_number ASC, account_name ASC';
 
-    return db.prepare(sql).all(tenantId) as unknown as ChartOfAccountRecord[];
+    return db.prepare(sql).all(operatorId) as unknown as ChartOfAccountRecord[];
   }
 
   public static getAccountById(id: string): ChartOfAccountRecord | null {
-    const tenantId = RequestContext.getTenantId();
+    const operatorId = RequestContext.getOperatorId();
     const db = getDatabase();
 
     const row = db.prepare(`
       SELECT * FROM chart_of_accounts
-      WHERE id = ? AND tenant_id = ? AND deleted_at IS NULL
-    `).get(id, tenantId) as ChartOfAccountRecord | undefined;
+      WHERE id = ? AND operator_id = ? AND deleted_at IS NULL
+    `).get(id, operatorId) as ChartOfAccountRecord | undefined;
 
     return row || null;
   }
 
   public static getAccountByMapping(categoryMapping: string, dbInstance?: any): ChartOfAccountRecord | null {
     this.ensureDefaultAccounts(dbInstance);
-    const tenantId = RequestContext.getTenantId();
+    const operatorId = RequestContext.getOperatorId();
     const db = dbInstance || getDatabase();
 
     const row = db.prepare(`
       SELECT * FROM chart_of_accounts
-      WHERE tenant_id = ? AND category_mapping = ? AND is_active = 1 AND deleted_at IS NULL
+      WHERE operator_id = ? AND category_mapping = ? AND is_active = 1 AND deleted_at IS NULL
       LIMIT 1
-    `).get(tenantId, categoryMapping) as ChartOfAccountRecord | undefined;
+    `).get(operatorId, categoryMapping) as ChartOfAccountRecord | undefined;
 
     return row || null;
   }
@@ -354,20 +355,20 @@ export class ChartOfAccountsRepository {
     category_mapping?: string | null;
     description?: string | null;
   }): ChartOfAccountRecord {
-    const tenantId = RequestContext.getTenantId();
+    const operatorId = RequestContext.getOperatorId();
     const db = getDatabase();
     const now = Date.now();
     const id = generateUUIDv7();
 
     db.prepare(`
       INSERT INTO chart_of_accounts (
-        id, tenant_id, account_number, account_name, account_type,
+        id, operator_id, account_number, account_name, account_type,
         qb_account_type, category_mapping, description, is_system_default,
         is_active, created_at, updated_at
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 1, ?, ?)
     `).run(
       id,
-      tenantId,
+      operatorId,
       data.account_number || null,
       data.account_name,
       data.account_type,
@@ -393,7 +394,7 @@ export class ChartOfAccountsRepository {
       is_active?: number;
     }
   ): ChartOfAccountRecord | null {
-    const tenantId = RequestContext.getTenantId();
+    const operatorId = RequestContext.getOperatorId();
     const db = getDatabase();
     const existing = this.getAccountById(id);
     if (!existing) return null;
@@ -435,12 +436,12 @@ export class ChartOfAccountsRepository {
     updates.push('updated_at = ?');
     params.push(Date.now());
 
-    params.push(id, tenantId);
+    params.push(id, operatorId);
 
     db.prepare(`
       UPDATE chart_of_accounts
       SET ${updates.join(', ')}
-      WHERE id = ? AND tenant_id = ? AND deleted_at IS NULL
+      WHERE id = ? AND operator_id = ? AND deleted_at IS NULL
     `).run(...params);
 
     return this.getAccountById(id);

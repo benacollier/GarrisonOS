@@ -82,28 +82,28 @@ describe('Accounting Module - Statutory Trust Accounting & Regulatory Compliance
       const now = Date.now();
 
       db.prepare(`
-        INSERT INTO properties (id, tenant_id, name, address_line1, city, state, postal_code, property_type, created_at, updated_at)
+        INSERT INTO properties (id, operator_id, name, address_line1, city, state, postal_code, property_type, created_at, updated_at)
         VALUES (?, 'tenant-reconciliation-test', 'Sunset Villas', '123 Ocean Way', 'San Diego', 'CA', '92109', 'multi_family', ?, ?)
       `).run(propId, now, now);
 
       db.prepare(`
-        INSERT INTO units (id, tenant_id, property_id, unit_number, status, market_rent_cents, created_at, updated_at)
+        INSERT INTO units (id, operator_id, property_id, unit_number, status, market_rent_cents, created_at, updated_at)
         VALUES (?, 'tenant-reconciliation-test', ?, '101', 'occupied', 180000, ?, ?)
       `).run(unitId, propId, now, now);
 
       db.prepare(`
-        INSERT INTO contacts (id, tenant_id, contact_type, first_name, last_name, email, phone, created_at, updated_at)
+        INSERT INTO contacts (id, operator_id, contact_type, first_name, last_name, email, phone, created_at, updated_at)
         VALUES (?, 'tenant-reconciliation-test', 'tenant', 'Alice', 'Walker', 'alice@test.local', '555-0100', ?, ?)
       `).run(contactId, now, now);
 
       db.prepare(`
-        INSERT INTO leases (id, tenant_id, unit_id, start_date, end_date, rent_amount_cents, deposit_held_cents, status, created_at, updated_at)
+        INSERT INTO leases (id, operator_id, unit_id, start_date, end_date, rent_amount_cents, deposit_held_cents, status, created_at, updated_at)
         VALUES (?, 'tenant-reconciliation-test', ?, ?, ?, 180000, 150000, 'active', ?, ?)
       `).run(leaseId, unitId, now - 30 * 86400000, now + 335 * 86400000, now, now);
 
       const leaseContactId = generateUUIDv7();
       db.prepare(`
-        INSERT INTO lease_contacts (id, tenant_id, lease_id, contact_id, role, is_financially_responsible, created_at)
+        INSERT INTO lease_contacts (id, operator_id, lease_id, contact_id, role, is_financially_responsible, created_at)
         VALUES (?, 'tenant-reconciliation-test', ?, ?, 'primary_tenant', 1, ?)
       `).run(leaseContactId, leaseId, contactId, now);
 
@@ -141,7 +141,7 @@ describe('Accounting Module - Statutory Trust Accounting & Regulatory Compliance
       // Verify terminated leases are excluded from active lease subledgers
       const terminatedLeaseId = generateUUIDv7();
       db.prepare(`
-        INSERT INTO leases (id, tenant_id, unit_id, start_date, end_date, rent_amount_cents, deposit_held_cents, status, created_at, updated_at)
+        INSERT INTO leases (id, operator_id, unit_id, start_date, end_date, rent_amount_cents, deposit_held_cents, status, created_at, updated_at)
         VALUES (?, 'tenant-reconciliation-test', ?, ?, ?, 180000, 100000, 'terminated', ?, ?)
       `).run(terminatedLeaseId, unitId, now - 60 * 86400000, now - 5 * 86400000, now, now);
 
@@ -163,12 +163,12 @@ describe('Accounting Module - Statutory Trust Accounting & Regulatory Compliance
       const vendor2Id = generateUUIDv7();
 
       db.prepare(`
-        INSERT INTO contacts (id, tenant_id, contact_type, first_name, last_name, company_name, tax_id_last4, email, phone, created_at, updated_at)
+        INSERT INTO contacts (id, operator_id, contact_type, first_name, last_name, company_name, tax_id_last4, email, phone, created_at, updated_at)
         VALUES (?, 'tenant-1099-test', 'vendor', 'Bob', 'Builder', 'Apex Plumbing Services LLC', '9876', 'bob@apex.local', '555-0200', ?, ?)
       `).run(vendor1Id, now, now);
 
       db.prepare(`
-        INSERT INTO contacts (id, tenant_id, contact_type, first_name, last_name, company_name, tax_id_last4, email, phone, created_at, updated_at)
+        INSERT INTO contacts (id, operator_id, contact_type, first_name, last_name, company_name, tax_id_last4, email, phone, created_at, updated_at)
         VALUES (?, 'tenant-1099-test', 'vendor', 'Carol', 'Cleaner', 'Sparkle Cleaning Co', '1234', 'carol@sparkle.local', '555-0300', ?, ?)
       `).run(vendor2Id, now, now);
 

@@ -172,11 +172,18 @@ function checkFile(relPath) {
     });
   }
 
-  // 6. Tenant Isolation & Zero Parameter Leakage
-  if (isSource && !relPath.includes('/test/')) {
+  // 6. Operator Isolation & Zero Parameter Leakage
+  if (isSource && !relPath.includes('/test/') && relPath !== 'scripts/check-hygiene.js') {
     lines.forEach((line, index) => {
-      if (/router\.(?:get|post|put|delete|patch)\s*\(\s*['"][^'"]*:\s*tenant_id/i.test(line)) {
-        reportViolation('TENANT LEAKAGE', relPath, index + 1, `Route parameter ":tenant_id" is forbidden. Tenant must be resolved implicitly via RequestContext.`);
+      const trimmed = line.trim();
+      if (trimmed.startsWith('//') || trimmed.startsWith('*') || trimmed.startsWith('/*')) return;
+
+      if (/router\.(?:get|post|put|delete|patch|getBatchSafe|getUnsafe)\s*\(\s*['"][^'"]*:\s*(?:operator_id|tenant_id)/i.test(line)) {
+        reportViolation('OPERATOR LEAKAGE', relPath, index + 1, `Route parameter ":operator_id" or ":tenant_id" is forbidden. Operator must be resolved implicitly via RequestContext.`);
+      }
+
+      if (/req\.(?:body|query)(?:\.|\[['"])(?:operator_id|tenant_id)['"]?/.test(line)) {
+        reportViolation('OPERATOR LEAKAGE', relPath, index + 1, `Direct consumption of "operator_id" or "tenant_id" from request body/query is forbidden. Operator must be resolved implicitly via RequestContext.`);
       }
     });
   }

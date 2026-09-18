@@ -14,7 +14,7 @@ docs/
 ├── ROADMAP.md             # Phased MVP development roadmap and milestone deliverables
 ├── architecture/          # Core engine design, multi-tenancy, data schemas, and blueprints
 │   ├── overview.md        # Polyglot architecture, zero-dependency engine, and request lifecycle
-│   ├── multi-tenancy.md   # Strict row-level isolation, AsyncLocalStorage, and X-Tenant-ID
+│   ├── multi-tenancy.md   # Strict operator isolation, AsyncLocalStorage, and X-Operator-ID
 │   ├── data-model.md      # SQLite WAL, RFC 9562 UUIDv7, Integer Cents, Millisecond timestamps
 │   ├── bootstrap-spec.md  # Canonical architectural bootstrap blueprint and MVP specification
 │   └── technical-debt.md  # Architecture critique, failure-mode analysis, and technical debt log
@@ -26,7 +26,7 @@ docs/
 │   ├── leases.md          # Lease agreements, terms, signatories, and lifecycle transitions
 │   ├── accounting.md      # Double-entry GL, statutory trust accounting, 3-way reconciliation, Schedule E, and QuickBooks
 │   ├── maintenance.md     # Work order triage, vendor dispatch, and expense conversion
-│   └── backup.md          # Point-in-time snapshots, tenant portability, and disaster recovery
+│   └── backup.md          # Point-in-time snapshots, operator data portability, and disaster recovery
 │
 ├── api/                   # REST API and EventBus contracts
 │   ├── rest-api.md        # Zero-dependency HTTP REST endpoints, headers, and error envelopes

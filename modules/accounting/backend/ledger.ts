@@ -1,6 +1,7 @@
 export interface TransactionRecord {
   id: string;
-  tenant_id: string;
+  operator_id?: string;
+  tenant_id?: string;
   transaction_type: 'charge' | 'payment' | 'expense' | 'refund' | 'deposit_inflow' | 'deposit_return' | 'deposit_deduction';
   category: string;
   amount_cents: number;

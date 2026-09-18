@@ -34,7 +34,7 @@ export function calculateProratedRent(
  * Automatically posts balanced double-entry journal entries via AccountingRepository.createTransaction.
  */
 export function generateMonthlyRentCharges(targetYearMonth?: string): RecurringRentGenerationResult {
-  const tenantId = RequestContext.getTenantId();
+  const operatorId = RequestContext.getOperatorId();
   const db = getDatabase();
 
   let year: number;
@@ -70,12 +70,12 @@ export function generateMonthlyRentCharges(targetYearMonth?: string): RecurringR
       (SELECT lc.contact_id FROM lease_contacts lc WHERE lc.lease_id = l.id AND lc.role = 'primary_tenant' AND lc.deleted_at IS NULL LIMIT 1) as contact_id
     FROM leases l
     JOIN units u ON l.unit_id = u.id AND u.deleted_at IS NULL
-    WHERE l.tenant_id = ?
+    WHERE l.operator_id = ?
       AND l.status IN ('active', 'renewed', 'month_to_month', 'expiring')
       AND l.start_date <= ?
       AND l.end_date >= ?
       AND l.deleted_at IS NULL
-  `).all(tenantId, monthEndMs, monthStartMs) as unknown as Array<{
+  `).all(operatorId, monthEndMs, monthStartMs) as unknown as Array<{
     id: string;
     unit_id: string;
     property_id: string;
@@ -101,8 +101,8 @@ export function generateMonthlyRentCharges(targetYearMonth?: string): RecurringR
     // Check if charge already exists
     const existing = db.prepare(`
       SELECT id FROM transactions
-      WHERE tenant_id = ? AND lease_id = ? AND reference_number = ? AND deleted_at IS NULL
-    `).get(tenantId, lease.id, idempotencyRef);
+      WHERE operator_id = ? AND lease_id = ? AND reference_number = ? AND deleted_at IS NULL
+    `).get(operatorId, lease.id, idempotencyRef);
 
     if (existing) {
       result.skippedExisting += 1;
