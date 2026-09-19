@@ -251,7 +251,7 @@ Standard Error Codes:
 ### 5.1 Vendor Check Register CRUD
 * **List Vendor Checks**: `GET /api/v1/accounting/vendor_checks` (filters: `vendor_id`, `portfolio_id`, `post_date_start`, `post_date_end`, `limit`, `page`; kebab alias `/vendor-checks` supported)
 * **Create Manual Check**: `POST /api/v1/accounting/vendor_checks`
-  - Payload: `{ "vendor_id": "...", "bank_account_id": "...", "check_number": 1045, "amount_cents": 32000, "payee_name": "...", "memo": "..." }`
+  - Payload: `{ "vendor_id": "...", "bank_account_id": "...", "check_number": "001045", "amount_cents": 32000, "payee_name": "...", "memo": "..." }`
 * **Update Check Details**: `PUT /api/v1/accounting/vendor_checks/:id`
 
 ### 5.2 Generate Print Check PDF
@@ -337,7 +337,7 @@ Standard Error Codes:
   "memo": "HVAC replacement reserve capital"
 }
 ```
-* **Ledger Invariant**: Debit `1010 Operating Checking`, Credit `3010 Client Capital`.
+* **Ledger Invariant**: Debit the supplied `destination_account_id`, Credit `3010 Client Capital`.
 
 ### 7.2 Query Client Capital Contributions
 * **Endpoint**: `GET /api/v1/accounting/client_contributions`
@@ -357,7 +357,7 @@ Standard Error Codes:
   "memo": "Monthly net operating cash distribution"
 }
 ```
-* **Ledger Invariant**: Debit `3020 Client Distributions`, Credit `1010 Operating Checking`.
+* **Ledger Invariant**: Debit `3020 Client Distributions`, Credit the supplied `source_account_id`.
 
 ### 7.4 Query Client Draws / Distributions
 * **Endpoint**: `GET /api/v1/accounting/client_distributions`
@@ -508,20 +508,21 @@ Supported on `POST/PUT /api/v1/properties/:id`, `POST/PUT /api/v1/buildings/:id`
 ### 14.1 Work Order Subtasks & Task Comments (Sprint 6)
 * **List Tasks**: `GET /api/v1/maintenance/:id/tasks`
 * **Create Task**: `POST /api/v1/maintenance/:id/tasks`
-  - Payload: `{ "task_name": "Replace air intake filter", "due_date": 1789510000000, "assigned_user_id": "...", "is_private": false }`
+  - Payload: `{ "task_name": "Replace air intake filter", "due_date": 1789510000000, "assigned_user_id": "..." }`
 * **Update Task**: `PUT /api/v1/maintenance/:id/tasks/:task_id`
 * **Add Task Comment**: `POST /api/v1/maintenance/:id/tasks/:task_id/comments`
 * **Close Work Order Contract**: `PUT /api/v1/maintenance/:id/close`
   - Payload: `{ "completion_notes": "All tasks verified. Tenant signed off.", "actual_cost_cents": 45000, "completed_at": 1789512000000 }`
+  - Field Mapping: `completion_notes`, `actual_cost_cents`, and `completed_at` persist to the same-named `work_orders` fields.
 
 ### 14.2 Property Condition Inspections (Post-MVP Horizon)
 * **List Inspections**: `GET /api/v1/inspections` (filters: `building_id`, `unit_id`, `status`, `inspector_id`, `date_start`, `date_end`)
 * **Create Inspection**: `POST /api/v1/inspections`
-  - Payload: `{ "unit_id": "...", "inspector_id": "...", "scheduled_date": 1789500000000, "template_id": "...", "notes": "Move-out walk-through" }`
+  - Payload: `{ "property_id": "...", "unit_id": "...", "inspector_id": "...", "scheduled_date": 1789500000000, "general_notes": "Move-out walk-through" }`
 * **Get Inspection with Areas & Checklist Items**: `GET /api/v1/inspections/:id`
 
 ### 14.3 Prospect CRM & Lead Inquiries (Post-MVP Horizon)
-* **List Prospects**: `GET /api/v1/prospects` (filters: `status`, `portfolio_id`, `desired_move_in_start`, `desired_move_in_end`)
+* **List Prospects**: `GET /api/v1/prospects` (filters: `status`, `desired_move_in_start`, `desired_move_in_end`)
 * **Create Prospect Lead**: `POST /api/v1/prospects`
 * **Get Prospect Statuses**: `GET /api/v1/prospects/statuses`
 * **Campaign & Tracking Number Attribution**: `GET /api/v1/prospects/:id/campaign`
@@ -543,4 +544,3 @@ All modules communicate asynchronously via `EventBus` (`core/events.ts`). Every 
 | `lease.late_fee_applied` | `operatorId`, `leaseId`, `feeCents`, `delinquentCents` | Delinquency policy triggers | Accounting (posts late fee receivable), Notifications (alerts tenant) |
 | `attachment.uploaded` | `operatorId`, `attachmentId`, `entityType`, `entityId` | Document upload sanitized | Audit (records file checksum and metadata) |
 | `work_order.closed` | `operatorId`, `workOrderId`, `actualCostCents` | Work order formally closed | Accounting (verifies expense allocation), Turnover state machine |
-

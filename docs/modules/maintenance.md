@@ -78,9 +78,11 @@ The **Accounting** module listens for this event and can automatically record a 
 ## 6. Work Order Task Checklists, Closure & Technician Timecards
 
 ### 6.1. Subtask Checklists
+
 Work orders support multi-step task checklists (`work_order_tasks`). Maintenance supervisors assign subtasks to specific staff members or contractors with individual due dates. A work order cannot be closed if mandatory subtasks remain incomplete.
 
 ### 6.2. Formal Closure Workflow
+
 Closing a work order (`PUT /api/v1/maintenance/:id/close`) requires capturing:
 - `completed_at`: Verification timestamp (epoch ms).
 - `completion_notes`: Documented repair outcome and tenant sign-off.
@@ -88,4 +90,5 @@ Closing a work order (`PUT /api/v1/maintenance/:id/close`) requires capturing:
 - Optional link to an Accounts Payable bill (`bills.id`) for vendor invoicing.
 
 ### 6.3. Technician Timecard Integration (Sprint 6: Field Operations)
+
 Technicians log billable hours against work orders (`technician_timecards`). Logged hours aggregate with hourly labor rates (`hourly_rate_cents`) to compute total labor expenses, which can be automatically converted into AP bills for contractor disbursement.

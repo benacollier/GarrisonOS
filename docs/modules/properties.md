@@ -72,7 +72,7 @@ GarrisonOS provides integrated unit turnover management:
 * `GET /api/v1/properties/units/:unit_id`: Get unit details
 * `PUT /api/v1/properties/units/:unit_id`: Update unit details, syndication terms, and status
 * `GET /api/v1/amenities`: List standardized amenities catalog
-* `POST /api/v1/amenities`: Create global amenity definition
+* `POST /api/v1/amenities`: Create an operator-scoped amenity definition
 * `PUT /api/v1/amenities/:id`: Update amenity name, category, or description
 * `DELETE /api/v1/amenities/:id`: Soft delete amenity
 * `GET /api/v1/properties/:id/amenities`: Get assigned amenities for a property
@@ -83,4 +83,5 @@ GarrisonOS provides integrated unit turnover management:
 ---
 
 ## 4. Standardized Amenities Catalog & Junctions
+
 Amenities are categorized into standardized groups (`community`, `unit`, `accessibility`, `pet`, `eco`) in the `amenities` dictionary table. Operators associate amenities at both the property level (e.g., swimming pool, fitness center, clubhouse) and the individual unit level (e.g., stainless appliances, balcony, washer/dryer in-unit, hardwood floors). Assigned amenities are synchronized via atomic junction endpoints and presented on public listings and marketing syndication feeds.

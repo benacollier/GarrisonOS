@@ -12,6 +12,7 @@ Every contact entity (`contacts`) is classified by role:
 | :--- | :--- | :--- |
 | `tenant` | Resident leasing a property unit | Signatory on residential leases, tenant ledger balance |
 | `client` | Beneficial owner or property investor | Portfolio reporting, owner capital contributions, distributions |
+| `owner` | Compatibility role for a property owner | Existing owner records and legacy owner-facing workflows |
 | `vendor` | Contractor or service provider | Maintenance work orders, plumbing, HVAC, electrical dispatch, AP bills, check register |
 | `guarantor` | Financial co-signer | Lease backing |
 | `prospect` | Potential applicant | Inquiries, touring |
@@ -59,7 +60,7 @@ The contacts module tracks vendor compliance and independent contractor taxation
 
 ## 4. API Endpoints
 
-* `GET /api/v1/contacts`: List contacts (supports `?contact_type=tenant|vendor|client|owner` and `?query=search`)
+* `GET /api/v1/contacts`: List contacts (supports `?contact_type=tenant|owner|client|vendor|guarantor|prospect|emergency` and `?query=search`)
 * `POST /api/v1/contacts`: Create a new contact
 * `GET /api/v1/contacts/:id`: Fetch contact details, active leases, insurance status, and billing defaults
 * `PUT /api/v1/contacts/:id`: Update contact details (including W-9 status, insurance, and tax classification)

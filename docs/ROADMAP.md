@@ -10,7 +10,7 @@ Continuous evaluations track implementation maturity against the non-negotiable 
 
 ### Overall Project Health Progression
 
-| Metric Category | Baseline (2026-09-15) | Post-Sprint 1 (2026-09-17) | Post-Sprint 2 (2026-09-17) | Post-Sprint 3 (2026-09-18) | Target (v0.1.0 GA - Sprint 5) |
+| Metric Category | Baseline (2026-09-15) | Post-Sprint 1 (2026-09-17) | Post-Sprint 2 (2026-09-17) | Post-Sprint 3 (2026-09-18) | Target (v0.1.5-alpha - Sprint 5) |
 | :--- | :---: | :---: | :---: | :---: | :---: |
 | **Architecture & Design** | 92% | 96% | 98% | **100%** | 100% |
 | **Core Implementation** | 85% | 92% | 96% | **98%** | 100% |
@@ -242,6 +242,7 @@ GarrisonOS organizes engineering work into structured two-week execution sprints
 ---
 
 ### Sprint 5 (Weeks 9–10): Foundational Operations & Accounts Payable
+
 > **Status**: Planned | **Release Target**: v0.1.5-alpha | **Effort**: ~60 hours
 
 | Priority | Task | Effort | Impact | Status |
@@ -260,6 +261,7 @@ GarrisonOS organizes engineering work into structured two-week execution sprints
 ---
 
 ### Sprint 6 (Weeks 11–12): Dual-Engine Architecture & Field Operations
+
 > **Status**: Planned | **Release Target**: v0.2.0-beta | **Effort**: ~52 hours
 
 | Priority | Task | Effort | Impact | Status |
@@ -292,7 +294,7 @@ The following operational domains are cataloged in Post-MVP Architectural Horizo
 1. **Property Condition Inspections Subsystem**:
    - Clean-room inspection hierarchy: `inspections` $\to$ `inspection_areas` $\to$ `inspection_items` with standard condition grading (`clean`, `good`, `fair`, `poor`, `damaged`), room-by-room checklists, inspector scheduling, and photo attachment logs.
    - *UI Presentation*: Mobile-first walk-through inspection interface optimized for tablet/mobile viewports with quick-toggle condition buttons and direct camera photo uploads.
-   - *Forward compatibility*: Core `attachments` table provides photo storage; turnover state machine (`turnover` $\to$ `make_ready`) is wired with EventBus hooks for future `inspection.completed` events.
+   - *Forward compatibility*: Core `attachments` table provides photo storage. EventBus hooks for future `inspection.completed` events preserve the established unit states (`vacant`, `turnover`, `maintenance_hold`); entering `turnover` can trigger creation of a `make_ready` work order rather than a `make_ready` unit-state transition.
 2. **Prospects & Lead-to-Lease Pipeline (CRM)**:
    - Inquiring applicant intake, tour scheduling, desired unit/budget/pet specs, marketing campaign source tracking, call tracking routing metadata (`campaign_tracking`), and one-click conversion to active lease.
    - *UI Presentation*: Interactive lead Kanban pipeline (`inquiry` $\to$ `showing_scheduled` $\to$ `application_submitted` $\to$ `approved` $\to$ `lease_drafted`), campaign attribution analytics, and prospect inquiry modal.
@@ -309,4 +311,3 @@ The following operational domains are cataloged in Post-MVP Architectural Horizo
    - *Forward compatibility*: RBAC engine and session manager admit `client` role credentials natively.
 6. **SMS Dispatch & Mobile Messaging Rails**:
    - Outbound messaging rails for tenant magic links, emergency maintenance alerts, and rent balance reminders via zero-dependency webhook dispatcher.
-

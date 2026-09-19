@@ -129,7 +129,7 @@ All JSON responses conform to standardized envelopes:
 * `GET /api/v1/properties/units/:unit_id`: Get unit details including `building_id`
 * `PUT /api/v1/properties/units/:unit_id`: Update unit details including `building_id`
 * `GET /api/v1/amenities`: List standardized amenities catalog (`category` filter)
-* `POST /api/v1/amenities`: Create global amenity definition
+* `POST /api/v1/amenities`: Create an operator-scoped amenity definition (names are unique per operator)
 * `PUT /api/v1/amenities/:id`: Update amenity name/category/description
 * `DELETE /api/v1/amenities/:id`: Soft delete amenity
 * `GET /api/v1/properties/:id/amenities`: Get assigned amenities for a property parcel

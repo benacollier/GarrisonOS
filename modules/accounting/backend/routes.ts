@@ -407,7 +407,7 @@ export function registerRoutes(router: Router): void {
     }
     res.writeHead(200, {
       'Content-Type': 'text/csv',
-      'Content-Disposition': `attachment; filename="ledger-${req.params.leaseId}-${Date.now()}.csv"`
+      'Content-Disposition': `attachment; filename="ledger-${leaseId}-${Date.now()}.csv"`
     });
     res.end(csv);
   });
