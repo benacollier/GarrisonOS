@@ -64,8 +64,8 @@ All collection `GET` endpoints support standardized temporal filtering and dynam
   - `last_modified_start` / `last_modified_end`: Filters records modified within interval.
   - `post_date_start` / `post_date_end`: Filters accounting journals and transactions by accounting date.
   - `start_date_start` / `start_date_end`: Filters leases and contracts by commencement window.
-* **Sorting (`orderby`)**:
-  - Format: `orderby=field1:asc,field2:desc` (defaults to ascending if direction is omitted).
+* **Sorting (`order_by`)**:
+  - Format: `order_by=field1:asc,field2:desc` (defaults to ascending if direction is omitted).
 * **Custom Fields Flag**:
   - `include_custom_fields=true`: Embeds validated dynamic custom fields in entity data envelopes.
 
@@ -227,17 +227,20 @@ Standard Error Codes:
 * **Response (201 Created)**: Creates disbursement, marks bill as `paid`, posts double-entry transaction (Debit `2010 Accounts Payable`, Credit `1010 Operating Checking`), and publishes `bill.disbursed` event.
 
 ### 4.5 Vendor Credit Memos & Bill Offsets
-* **Create Vendor Credit**: `POST /api/v1/accounting/bills/credits`
-  - Payload: `{ "vendor_id": "...", "amount_cents": 15000, "credit_date": 1789501000000, "gl_account_id": "...", "notes": "Vendor volume discount" }`
+* **List Vendor Credits**: `GET /api/v1/accounting/vendor_credits` (filters: `vendor_id`, `status`, `post_date_start`, `post_date_end`, `limit`, `page`)
+* **Create Vendor Credit**: `POST /api/v1/accounting/vendor_credits`
+  - Payload: `{ "vendor_id": "...", "credit_number": "VC-1001", "total_amount_cents": 15000, "credit_date": 1789501000000, "gl_account_id": "...", "reason": "Vendor volume discount", "reference_number": "REF-9921" }`
   - Ledger Invariant: Debit `2010 Accounts Payable`, Credit `5010 Operating Expense`.
-* **Update Vendor Credit**: `PUT /api/v1/accounting/bills/credits/:id`
+* **Apply Vendor Credit to Bill**: `POST /api/v1/accounting/vendor_credits/:id/apply`
+  - Payload: `{ "bill_id": "...", "applied_amount_cents": 15000, "applied_date": 1789502000000 }`
+* **Update Vendor Credit**: `PUT /api/v1/accounting/vendor_credits/:id`
 
 ### 4.6 Recurring Scheduled Bills
 * **Endpoint**: `POST /api/v1/accounting/bills/recurring`
   - Payload: `{ "vendor_id": "...", "frequency": "monthly", "day_of_month": 1, "allocations": [ ... ], "notes": "Monthly pest control" }`
 
 ### 4.7 Bill Payment Register & Lookup
-* **List Bill Payments**: `GET /api/v1/accounting/bills/payments` (supports `vendor_id`, `date_start`, `date_end`, `limit`, `offset`)
+* **List Bill Payments**: `GET /api/v1/accounting/bills/payments` (supports `vendor_id`, `date_start`, `date_end`, `limit`, `page`)
 * **Get Bill Payment**: `GET /api/v1/accounting/bills/payments/:id`
 * **Update Reference**: `PATCH /api/v1/accounting/bills/payments/:id` (payload: `{ "reference_number": "WIRE-9921" }`)
 
@@ -246,10 +249,10 @@ Standard Error Codes:
 ## 5. Vendor Check Register & Pure TypeScript PDF Check Printing
 
 ### 5.1 Vendor Check Register CRUD
-* **List Vendor Checks**: `GET /api/v1/accounting/vendor-checks` (filters: `vendor_id`, `portfolio_id`, `post_date_start`, `post_date_end`)
-* **Create Manual Check**: `POST /api/v1/accounting/vendor-checks`
+* **List Vendor Checks**: `GET /api/v1/accounting/vendor_checks` (filters: `vendor_id`, `portfolio_id`, `post_date_start`, `post_date_end`, `limit`, `page`; kebab alias `/vendor-checks` supported)
+* **Create Manual Check**: `POST /api/v1/accounting/vendor_checks`
   - Payload: `{ "vendor_id": "...", "bank_account_id": "...", "check_number": 1045, "amount_cents": 32000, "payee_name": "...", "memo": "..." }`
-* **Update Check Details**: `PUT /api/v1/accounting/vendor-checks/:id`
+* **Update Check Details**: `PUT /api/v1/accounting/vendor_checks/:id`
 
 ### 5.2 Generate Print Check PDF
 * **Endpoint**: `POST /api/v1/accounting/checks/print`
@@ -286,15 +289,15 @@ Standard Error Codes:
 ## 6. Bank Deposits & Clearing Subsystem
 
 ### 6.1 List Undeposited Receipts
-* **Endpoint**: `GET /api/v1/accounting/undeposited-funds`
+* **Endpoint**: `GET /api/v1/accounting/undeposited_funds` (kebab alias `/undeposited-funds` supported)
 * **Response (200 OK)**: Lists all payments posted to `1030 Undeposited Funds` awaiting batching.
 
 ### 6.2 List & Query Bank Deposits
-* **Endpoint**: `GET /api/v1/accounting/bank-deposits`
-* **Query Parameters**: `bank_account_id`, `post_date_start`, `post_date_end`, `limit`, `offset`.
+* **Endpoint**: `GET /api/v1/accounting/bank_deposits` (kebab alias `/bank-deposits` supported)
+* **Query Parameters**: `bank_account_id`, `post_date_start`, `post_date_end`, `limit`, `page`.
 
 ### 6.3 Create Bank Deposit
-* **Endpoint**: `POST /api/v1/accounting/bank-deposits`
+* **Endpoint**: `POST /api/v1/accounting/bank_deposits` (kebab alias `/bank-deposits` supported)
 * **Permission**: `accounting:deposits:create`
 * **Request Body**:
 ```json
@@ -312,7 +315,7 @@ Standard Error Codes:
 * **Response (201 Created)**: Generates clearing journal entry (Debit `1010/1020 Bank Checking`, Credit `1030 Undeposited Funds`) and groups receipts into a single statement-matched deposit slip.
 
 ### 6.4 Delete / Void Bank Deposit
-* **Endpoint**: `DELETE /api/v1/accounting/bank-deposits/:id`
+* **Endpoint**: `DELETE /api/v1/accounting/bank_deposits/:id`
 * **Behavior**: Unlinks receipt transactions returning them to `1030 Undeposited Funds` and posts reversing journal entry.
 
 ---
@@ -320,7 +323,7 @@ Standard Error Codes:
 ## 7. Client Portfolio Accounting & Management Fees
 
 ### 7.1 Record Client Capital Contribution
-* **Endpoint**: `POST /api/v1/accounting/client-contributions`
+* **Endpoint**: `POST /api/v1/accounting/client_contributions` (kebab alias `/client-contributions` supported)
 * **Request Body**:
 ```json
 {
@@ -337,11 +340,11 @@ Standard Error Codes:
 * **Ledger Invariant**: Debit `1010 Operating Checking`, Credit `3010 Client Capital`.
 
 ### 7.2 Query Client Capital Contributions
-* **Endpoint**: `GET /api/v1/accounting/client-contributions`
-* **Query Parameters**: `client_contact_id`, `portfolio_id`, `post_date_start`, `post_date_end`, `limit`, `offset`.
+* **Endpoint**: `GET /api/v1/accounting/client_contributions`
+* **Query Parameters**: `client_contact_id`, `portfolio_id`, `post_date_start`, `post_date_end`, `limit`, `page`.
 
 ### 7.3 Disburse Client Draw / Distribution
-* **Endpoint**: `POST /api/v1/accounting/client-distributions`
+* **Endpoint**: `POST /api/v1/accounting/client_distributions` (kebab alias `/client-distributions` supported)
 * **Request Body**:
 ```json
 {
@@ -357,17 +360,21 @@ Standard Error Codes:
 * **Ledger Invariant**: Debit `3020 Client Distributions`, Credit `1010 Operating Checking`.
 
 ### 7.4 Query Client Draws / Distributions
-* **Endpoint**: `GET /api/v1/accounting/client-distributions`
-* **Query Parameters**: `client_contact_id`, `portfolio_id`, `post_date_start`, `post_date_end`, `limit`, `offset`.
+* **Endpoint**: `GET /api/v1/accounting/client_distributions`
+* **Query Parameters**: `client_contact_id`, `portfolio_id`, `post_date_start`, `post_date_end`, `limit`, `page`.
+
+### 7.5 Management Fee Automation
+* **Preview Management Fees**: `POST /api/v1/accounting/management_fees/calculate`
+* **Post Management Fees**: `POST /api/v1/accounting/management_fees/post`
 
 ---
 
 ## 8. Leasing AR & Fee Policy Engine
 
 ### 8.1 Recurring Lease Charges
-* **Create Schedule**: `POST /api/v1/leases/:id/recurring-charges`
+* **Create Schedule**: `POST /api/v1/leases/:id/recurring_charges` (kebab alias `/recurring-charges` supported)
   - Payload: `{ "charge_category": "pet_rent", "amount_cents": 3500, "gl_account_id": "...", "billing_frequency": "monthly", "billing_day": 1 }`
-* **List Schedules**: `GET /api/v1/leases/:id/recurring-charges`
+* **List Schedules**: `GET /api/v1/leases/:id/recurring_charges`
 
 ### 8.2 Granular Lease AR Transactions
 * **Post Charge**: `POST /api/v1/leases/:id/charges` (and bulk creation: `POST /api/v1/leases/charges/bulk`)
@@ -378,9 +385,9 @@ Standard Error Codes:
 * **Disburse Move-Out Deposit Refund**: `POST /api/v1/leases/:id/refunds`
 
 ### 8.3 Lease Policies & Metadata Lookups
-* **Get Active Late Fee Policy**: `GET /api/v1/leases/:id/late-fee-policy`
+* **Get Active Late Fee Policy**: `GET /api/v1/leases/:id/late_fee_policy` (alias: `/late-fee-policy`)
 * **Get Valid Lease Statuses**: `GET /api/v1/leases/statuses`
-* **Get Linked Lease Work Orders**: `GET /api/v1/leases/:id/work-orders`
+* **Get Linked Lease Work Orders**: `GET /api/v1/leases/:id/work_orders` (alias: `/work-orders`)
 
 ---
 
@@ -436,33 +443,43 @@ All portal routes execute under dedicated subdomain host routing with independen
 
 ## 11. Universal Conversations & Notes Subsystem
 
-Polymorphic threaded notes and audit comments across all primary operational entities (`properties`, `buildings`, `units`, `leases`, `contacts`, `work_orders`).
+Polymorphic threaded notes and audit comments across all primary operational entities (`properties`, `buildings`, `units`, `leases`, `contacts`, `work_orders`, `bills`).
 
-### 11.1 List Entity Conversations
-* **Endpoint**: `GET /api/v1/:entity/:id/conversations`
-* **Query Parameters**: `last_modified_start`, `last_modified_end`, `limit`, `offset`.
+### 11.1 List Conversations
+* **Canonical Endpoint**: `GET /api/v1/conversations`
+* **Query Parameters**: `entity_type` (required), `entity_id` (required), `last_modified_start`, `last_modified_end`, `limit`, `page`.
+* **Entity-Nested Alias**: `GET /api/v1/:entity_type/:id/conversations`
 
 ### 11.2 Create Conversation Thread
-* **Endpoint**: `POST /api/v1/:entity/:id/conversations`
-* **Request Body**: `{ "subject": "HVAC unit maintenance history", "is_private": false }`
+* **Canonical Endpoint**: `POST /api/v1/conversations`
+* **Request Body**: `{ "entity_type": "property", "entity_id": "...", "subject": "HVAC unit maintenance history", "is_private": false }`
+* **Entity-Nested Alias**: `POST /api/v1/:entity_type/:id/conversations` (payload: `{ "subject": "...", "is_private": false }`)
 
 ### 11.3 Add Message / Comment to Thread
-* **Endpoint**: `POST /api/v1/:entity/:id/conversations/:cid/messages`
+* **Endpoint**: `POST /api/v1/conversations/:conversation_id/messages` (alias: `POST /api/v1/:entity_type/:id/conversations/:conversation_id/messages`)
 * **Request Body**: `{ "body": "Technician replaced run capacitor. Testing compressor draw." }`
 
 ### 11.4 Delete Conversation Thread
-* **Endpoint**: `DELETE /api/v1/:entity/:id/conversations/:cid`
+* **Endpoint**: `DELETE /api/v1/conversations/:conversation_id` (alias: `DELETE /api/v1/:entity_type/:id/conversations/:conversation_id`)
 
 ---
 
 ## 12. Real Estate Amenities & Marketing Syndication Profiles
 
-### 12.1 Amenities Catalog Lookups
-* **Building Amenities Dictionary**: `GET /api/v1/buildings/amenities`
-* **Unit Amenities Dictionary**: `GET /api/v1/units/amenities`
+### 12.1 Standardized Amenities Catalog CRUD
+* **List Amenities**: `GET /api/v1/amenities` (optional `category` filter: `community`, `unit`, `accessibility`, `pet`, `eco`)
+* **Create Amenity**: `POST /api/v1/amenities` (payload: `{ "name": "Rooftop Deck", "category": "community", "description": "..." }`)
+* **Update Amenity**: `PUT /api/v1/amenities/:id`
+* **Delete Amenity**: `DELETE /api/v1/amenities/:id`
 
-### 12.2 Marketing & Syndication Attributes
-Supported on `POST/PUT /api/v1/buildings/:id` and `POST/PUT /api/v1/properties/units/:id`:
+### 12.2 Property & Unit Amenity Junctions
+* **Get Property Amenities**: `GET /api/v1/properties/:id/amenities`
+* **Sync Property Amenities**: `PUT /api/v1/properties/:id/amenities` (payload: `{ "amenity_ids": [ ... ] }`)
+* **Get Unit Amenities**: `GET /api/v1/properties/units/:unit_id/amenities`
+* **Sync Unit Amenities**: `PUT /api/v1/properties/units/:unit_id/amenities` (payload: `{ "amenity_ids": [ ... ] }`)
+
+### 12.3 Marketing & Syndication Attributes
+Supported on `POST/PUT /api/v1/properties/:id`, `POST/PUT /api/v1/buildings/:id`, and `POST/PUT /api/v1/properties/units/:unit_id`:
 * Syndication flags: `published_for_rent`, `published_for_sale`, `featured_for_rent`, `syndicate`.
 * Advertising copy: `posting_title`, `specials`, `short_description`, `long_description`, `available_date`.
 * Pricing targets: `target_rent_cents`, `target_deposit_cents`, `other_monthly_charges_cents`.
@@ -473,12 +490,14 @@ Supported on `POST/PUT /api/v1/buildings/:id` and `POST/PUT /api/v1/properties/u
 ## 13. Dynamic Custom Fields Engine
 
 ### 13.1 Retrieve Schema Definitions
-* **Endpoint**: `GET /api/v1/custom-fields/:entityType/definitions`
-* **Parameters**: `entityType` (`property`, `building`, `unit`, `lease`, `contact`, `work_order`, `bill`).
-* **Response (200 OK)**: Returns field definitions (`name`, `field_type`, `options`, `required`, `display_order`).
+* **Endpoint**: `GET /api/v1/custom_fields/definitions` (kebab alias `/custom-fields/definitions` supported)
+* **Query Parameter**: `entity_type` (`portfolio`, `property`, `building`, `unit`, `lease`, `contact`, `work_order`, `bill`).
+* **Register Definition**: `POST /api/v1/custom_fields/definitions` (payload: `{ "entity_type": "...", "field_name": "gate_code", "field_label": "Gate Code", "data_type": "string", "is_required": false }`)
+* **Update Definition**: `PUT /api/v1/custom_fields/definitions/:id`
+* **Delete Definition**: `DELETE /api/v1/custom_fields/definitions/:id`
 
 ### 13.2 Update Entity Custom Field Values
-* **Endpoint**: `PUT /api/v1/:entity/:id/custom-fields`
+* **Endpoint**: `PUT /api/v1/:entity_type/:id/custom_fields`
 * **Request Body**: `{ "custom_fields": { "hoa_gate_code": "8492", "inspection_lockbox": "1122" } }`
 * **Date Standard**: All custom field date values adhere strictly to ISO `YYYY-MM-DD`.
 
@@ -489,9 +508,9 @@ Supported on `POST/PUT /api/v1/buildings/:id` and `POST/PUT /api/v1/properties/u
 ### 14.1 Work Order Subtasks & Task Comments (Sprint 6)
 * **List Tasks**: `GET /api/v1/maintenance/:id/tasks`
 * **Create Task**: `POST /api/v1/maintenance/:id/tasks`
-  - Payload: `{ "description": "Replace air intake filter", "due_date": 1789510000000, "assigned_user_id": "...", "is_private": false }`
-* **Update Task**: `PUT /api/v1/maintenance/:id/tasks/:taskId`
-* **Add Task Comment**: `POST /api/v1/maintenance/:id/tasks/:taskId/comments`
+  - Payload: `{ "task_name": "Replace air intake filter", "due_date": 1789510000000, "assigned_user_id": "...", "is_private": false }`
+* **Update Task**: `PUT /api/v1/maintenance/:id/tasks/:task_id`
+* **Add Task Comment**: `POST /api/v1/maintenance/:id/tasks/:task_id/comments`
 * **Close Work Order Contract**: `PUT /api/v1/maintenance/:id/close`
   - Payload: `{ "completion_notes": "All tasks verified. Tenant signed off.", "actual_cost_cents": 45000, "completed_at": 1789512000000 }`
 

@@ -70,16 +70,16 @@ Residential tenancies frequently involve multiple roommates, co-signers, and non
 * `POST /api/v1/leases/:id/renew`: Execute lease extension/renewal
 * `POST /api/v1/leases/:id/terminate`: Terminate lease contract (accepts optional `notice_date` and `move_out_date` epoch ms)
 * `POST /api/v1/leases/:id/signatories`: Add signatory to lease
-* `DELETE /api/v1/leases/:id/signatories/:contactId`: Remove signatory from lease
-* `GET /api/v1/leases/:id/recurring-charges`: List active recurring charge line items
-* `POST /api/v1/leases/:id/recurring-charges`: Add recurring fee schedule (pet rent, parking, utility)
-* `DELETE /api/v1/leases/:id/recurring-charges/:chargeId`: Soft delete recurring fee schedule
+* `DELETE /api/v1/leases/:id/signatories/:contact_id`: Remove signatory from lease
+* `GET /api/v1/leases/:id/recurring_charges`: List active recurring charge line items
+* `POST /api/v1/leases/:id/recurring_charges`: Add recurring fee schedule (pet rent, parking, utility)
+* `DELETE /api/v1/leases/:id/recurring_charges/:charge_id`: Soft delete recurring fee schedule
 * `GET /api/v1/leases/:id/credits`: List tenant credits, concessions, and discounts
 * `POST /api/v1/leases/:id/credits`: Post promotional concession or ledger adjustment
 * `GET /api/v1/leases/:id/clauses`: List custom lease clauses and legal covenants
 * `POST /api/v1/leases/:id/clauses`: Attach custom lease clause
-* `PUT /api/v1/leases/:id/clauses/:clauseId`: Update clause title, text, or display order
-* `DELETE /api/v1/leases/:id/clauses/:clauseId`: Delete custom lease clause
+* `PUT /api/v1/leases/:id/clauses/:clause_id`: Update clause title, text, or display order
+* `DELETE /api/v1/leases/:id/clauses/:clause_id`: Delete custom lease clause
 
 ---
 

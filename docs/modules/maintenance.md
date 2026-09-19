@@ -70,7 +70,7 @@ The **Accounting** module listens for this event and can automatically record a 
 * `PUT /api/v1/maintenance/:id/close`: Complete work order workflow with resolution summary and vendor invoice link
 * `GET /api/v1/maintenance/:id/tasks`: List subtask checklist items
 * `POST /api/v1/maintenance/:id/tasks`: Create subtask checklist item
-* `PUT /api/v1/maintenance/:id/tasks/:taskId`: Mark subtask complete or update assignment
+* `PUT /api/v1/maintenance/:id/tasks/:task_id`: Mark subtask complete or update assignment
 * `DELETE /api/v1/maintenance/:id`: Soft delete work order
 
 ---
@@ -82,10 +82,10 @@ Work orders support multi-step task checklists (`work_order_tasks`). Maintenance
 
 ### 6.2. Formal Closure Workflow
 Closing a work order (`PUT /api/v1/maintenance/:id/close`) requires capturing:
-- `completed_at`: Verification timestamp.
-- `resolution_notes`: Documented repair outcome and tenant sign-off.
-- `final_cost_cents`: Total labor and material expense.
+- `completed_at`: Verification timestamp (epoch ms).
+- `completion_notes`: Documented repair outcome and tenant sign-off.
+- `actual_cost_cents`: Total labor and material expense.
 - Optional link to an Accounts Payable bill (`bills.id`) for vendor invoicing.
 
-### 6.3. Technician Timecard Integration (Post-MVP Horizon)
+### 6.3. Technician Timecard Integration (Sprint 6: Field Operations)
 Technicians log billable hours against work orders (`technician_timecards`). Logged hours aggregate with hourly labor rates (`hourly_rate_cents`) to compute total labor expenses, which can be automatically converted into AP bills for contractor disbursement.

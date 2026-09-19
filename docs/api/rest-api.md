@@ -126,16 +126,16 @@ All JSON responses conform to standardized envelopes:
 * `PUT /api/v1/buildings/:id`: Update building
 * `DELETE /api/v1/buildings/:id`: Soft delete building
 * `POST /api/v1/properties/:id/units`: Create unit under property (supports optional `building_id`)
-* `GET /api/v1/properties/units/:unitId`: Get unit details including `building_id`
-* `PUT /api/v1/properties/units/:unitId`: Update unit details including `building_id`
+* `GET /api/v1/properties/units/:unit_id`: Get unit details including `building_id`
+* `PUT /api/v1/properties/units/:unit_id`: Update unit details including `building_id`
 * `GET /api/v1/amenities`: List standardized amenities catalog (`category` filter)
 * `POST /api/v1/amenities`: Create global amenity definition
 * `PUT /api/v1/amenities/:id`: Update amenity name/category/description
 * `DELETE /api/v1/amenities/:id`: Soft delete amenity
 * `GET /api/v1/properties/:id/amenities`: Get assigned amenities for a property parcel
 * `PUT /api/v1/properties/:id/amenities`: Replace/sync assigned amenities for a property parcel
-* `GET /api/v1/properties/units/:unitId/amenities`: Get assigned amenities for an individual unit
-* `PUT /api/v1/properties/units/:unitId/amenities`: Replace/sync assigned amenities for an individual unit
+* `GET /api/v1/properties/units/:unit_id/amenities`: Get assigned amenities for an individual unit
+* `PUT /api/v1/properties/units/:unit_id/amenities`: Replace/sync assigned amenities for an individual unit
 
 ### Contacts & Vendors
 
@@ -154,26 +154,26 @@ All JSON responses conform to standardized envelopes:
 * `POST /api/v1/leases/:id/signatories`: Add signatory
 * `POST /api/v1/leases/:id/renew`: Execute lease extension/renewal
 * `POST /api/v1/leases/:id/terminate`: Issue notice to vacate and set move-out date
-* `GET /api/v1/leases/:id/recurring-charges`: List active recurring charge line items
-* `POST /api/v1/leases/:id/recurring-charges`: Create recurring charge (pet rent, parking, utilities)
-* `DELETE /api/v1/leases/:id/recurring-charges/:chargeId`: Soft delete recurring charge
+* `GET /api/v1/leases/:id/recurring_charges`: List active recurring charge line items
+* `POST /api/v1/leases/:id/recurring_charges`: Create recurring charge (pet rent, parking, utilities)
+* `DELETE /api/v1/leases/:id/recurring_charges/:charge_id`: Soft delete recurring charge
 * `GET /api/v1/leases/:id/credits`: List discounts, rent concessions, and adjustments
 * `POST /api/v1/leases/:id/credits`: Post promotional concession or tenant credit adjustment
 * `GET /api/v1/leases/:id/clauses`: List custom lease clauses and legal addenda
 * `POST /api/v1/leases/:id/clauses`: Attach custom lease clause
-* `PUT /api/v1/leases/:id/clauses/:clauseId`: Update clause title, text, or sort order
-* `DELETE /api/v1/leases/:id/clauses/:clauseId`: Remove custom lease clause
+* `PUT /api/v1/leases/:id/clauses/:clause_id`: Update clause title, text, or sort order
+* `DELETE /api/v1/leases/:id/clauses/:clause_id`: Remove custom lease clause
 
 ### Accounting, Accounts Payable (AP) & Banking
 
 * `GET /api/v1/accounting/transactions`: List financial transactions
 * `POST /api/v1/accounting/transactions`: Record charge, payment, or expense
-* `GET /api/v1/accounting/ledger/:leaseId`: Calculate running balance
+* `GET /api/v1/accounting/ledger/:lease_id`: Calculate running balance
 * `POST /api/v1/accounting/generate-rent-charges`: Trigger monthly recurring rent billing run
 * `POST /api/v1/accounting/deposit-disposition`: Settle move-out security deposit
 * `GET /api/v1/accounting/export/rent-roll.csv`: Stream Rent Roll CSV
 * `GET /api/v1/accounting/export/schedule-e.csv`: Stream Schedule E CSV
-* `GET /api/v1/accounting/export/ledger/:leaseId.csv`: Stream Ledger Statement CSV
+* `GET /api/v1/accounting/export/ledger/:lease_id.csv`: Stream Ledger Statement CSV
 * `GET /api/v1/accounting/chart-of-accounts`: List Chart of Accounts
 * `POST /api/v1/accounting/chart-of-accounts`: Create general ledger account
 * `PUT /api/v1/accounting/chart-of-accounts/:id`: Update general ledger account
@@ -192,21 +192,21 @@ All JSON responses conform to standardized envelopes:
 * `POST /api/v1/accounting/bills/:id/void`: Void bill and reverse journal allocations
 * `GET /api/v1/accounting/bills/recurring`: List scheduled recurring bill templates
 * `POST /api/v1/accounting/bills/recurring`: Create recurring bill template
-* `GET /api/v1/accounting/vendor-checks`: List printed and draft vendor checks from register
-* `POST /api/v1/accounting/vendor-checks`: Record paper check payment settling one or more bills
-* `GET /api/v1/accounting/vendor-checks/:id`: Get check details and bill settlements
-* `POST /api/v1/accounting/vendor-checks/:id/void`: Void check and restore unpaid bill balances
-* `GET /api/v1/accounting/vendor-credits`: List vendor credit memos
-* `POST /api/v1/accounting/vendor-credits`: Record vendor credit memo / refund
-* `POST /api/v1/accounting/vendor-credits/:id/apply`: Apply credit memo balance against open vendor bills
-* `GET /api/v1/accounting/deposits`: List bank deposit batches
-* `POST /api/v1/accounting/deposits`: Create bank deposit grouping payments into bank clearing account
-* `GET /api/v1/accounting/client-contributions`: List client owner capital contributions
-* `POST /api/v1/accounting/client-contributions`: Record investor/owner capital infusion
-* `GET /api/v1/accounting/client-distributions`: List client owner draw disbursements
-* `POST /api/v1/accounting/client-distributions`: Execute client draw disbursement
-* `POST /api/v1/accounting/management-fees/calculate`: Preview management fees across portfolios
-* `POST /api/v1/accounting/management-fees/post`: Post management fee journal entries
+* `GET /api/v1/accounting/vendor_checks`: List printed and draft vendor checks from register
+* `POST /api/v1/accounting/vendor_checks`: Record paper check payment settling one or more bills
+* `GET /api/v1/accounting/vendor_checks/:id`: Get check details and bill settlements
+* `POST /api/v1/accounting/vendor_checks/:id/void`: Void check and restore unpaid bill balances
+* `GET /api/v1/accounting/vendor_credits`: List vendor credit memos
+* `POST /api/v1/accounting/vendor_credits`: Record vendor credit memo / refund
+* `POST /api/v1/accounting/vendor_credits/:id/apply`: Apply credit memo balance against open vendor bills
+* `GET /api/v1/accounting/bank_deposits`: List bank deposit batches
+* `POST /api/v1/accounting/bank_deposits`: Create bank deposit grouping payments into bank clearing account
+* `GET /api/v1/accounting/client_contributions`: List client owner capital contributions
+* `POST /api/v1/accounting/client_contributions`: Record investor/owner capital infusion
+* `GET /api/v1/accounting/client_distributions`: List client owner draw disbursements
+* `POST /api/v1/accounting/client_distributions`: Execute client draw disbursement
+* `POST /api/v1/accounting/management_fees/calculate`: Preview management fees across portfolios
+* `POST /api/v1/accounting/management_fees/post`: Post management fee journal entries
 
 ### Maintenance & Work Orders
 
@@ -214,25 +214,27 @@ All JSON responses conform to standardized envelopes:
 * `POST /api/v1/maintenance`: Create work order
 * `GET /api/v1/maintenance/:id`: Work order details, assigned vendor, and costs
 * `PUT /api/v1/maintenance/:id`: Update work order status and costs
-* `PUT /api/v1/maintenance/:id/close`: Complete work order workflow with resolution notes and final bill link
+* `PUT /api/v1/maintenance/:id/close`: Complete work order workflow (`completion_notes`, `actual_cost_cents`, `completed_at`)
 * `GET /api/v1/maintenance/:id/tasks`: List work order checklist tasks
 * `POST /api/v1/maintenance/:id/tasks`: Create subtask checklist item
-* `PUT /api/v1/maintenance/:id/tasks/:taskId`: Mark subtask complete or reassign
+* `PUT /api/v1/maintenance/:id/tasks/:task_id`: Mark subtask complete or reassign
 * `DELETE /api/v1/maintenance/:id`: Soft delete work order
 
 ### Universal Conversations & Notes
 
 * `GET /api/v1/conversations`: List threaded conversations by polymorphic parent (`entity_type`, `entity_id`)
 * `POST /api/v1/conversations`: Create conversation thread attached to an entity
-* `GET /api/v1/conversations/:id`: Get thread messages and participants
-* `POST /api/v1/conversations/:id/messages`: Post message or note to thread
+* `GET /api/v1/conversations/:conversation_id`: Get thread messages and participants
+* `POST /api/v1/conversations/:conversation_id/messages`: Post message or note to thread
+* `DELETE /api/v1/conversations/:conversation_id`: Soft delete conversation thread
 
 ### Custom Fields Engine
 
-* `GET /api/v1/custom-fields/definitions`: List custom field schemas filtered by `entity_type`
-* `POST /api/v1/custom-fields/definitions`: Register custom field definition
-* `PUT /api/v1/custom-fields/definitions/:id`: Update field label, required status, or options
-* `DELETE /api/v1/custom-fields/definitions/:id`: Soft delete custom field definition
+* `GET /api/v1/custom_fields/definitions`: List custom field schemas filtered by `entity_type`
+* `POST /api/v1/custom_fields/definitions`: Register custom field definition
+* `PUT /api/v1/custom_fields/definitions/:id`: Update field label, required status, or options
+* `DELETE /api/v1/custom_fields/definitions/:id`: Soft delete custom field definition
+* `PUT /api/v1/:entity_type/:id/custom_fields`: Update entity custom field values
 
 ### Backup & Disaster Recovery
 

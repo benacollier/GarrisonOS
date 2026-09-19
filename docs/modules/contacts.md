@@ -23,14 +23,14 @@ Every contact entity (`contacts`) is classified by role:
 
 * `id` (UUIDv7): Primary key
 * `operator_id` (UUIDv7): Owning operator instance
-* `contact_type` (TEXT): Role category (`tenant`, `client`, `vendor`, `guarantor`, `prospect`, `emergency`)
+* `contact_type` (TEXT): Role category (`tenant`, `owner`, `client`, `vendor`, `guarantor`, `prospect`, `emergency`)
 * `first_name` (TEXT), `last_name` (TEXT)
 * `company_name` (TEXT): For vendors or commercial entities
 * `email` (TEXT), `phone` (TEXT), `secondary_phone` (TEXT)
-* `tax_id_encrypted` (TEXT): Encrypted EIN or SSN
+* `tax_id_last4` (TEXT), `tax_id_encrypted` (TEXT): Encrypted EIN or SSN
 * `tax_payer_name` (TEXT): Legal tax identity name
 * `tax_classification` (TEXT): Legal tax status (`individual`, `llc`, `corporation`, `partnership`, `other`)
-* `trade_specialization` (TEXT): Trade category (e.g. `Plumbing`, `Electrical`, `HVAC`, `General Contracting`)
+* `trade_specialization` (TEXT) / `vendor_specialty` (TEXT): Trade category (e.g. `Plumbing`, `Electrical`, `HVAC`, `General Contracting`)
 * `w9_received` (INTEGER): W-9 on file status (`0` = Pending, `1` = Verified)
 * `vendor_insured` (INTEGER): General liability insurance status (`0` = Unverified, `1` = Insured)
 * `insurance_expiration_date` (INTEGER ms): Policy expiration date for compliance alerts
@@ -59,7 +59,7 @@ The contacts module tracks vendor compliance and independent contractor taxation
 
 ## 4. API Endpoints
 
-* `GET /api/v1/contacts`: List contacts (supports `?type=tenant|vendor|client` and `?search=query`)
+* `GET /api/v1/contacts`: List contacts (supports `?contact_type=tenant|vendor|client|owner` and `?query=search`)
 * `POST /api/v1/contacts`: Create a new contact
 * `GET /api/v1/contacts/:id`: Fetch contact details, active leases, insurance status, and billing defaults
 * `PUT /api/v1/contacts/:id`: Update contact details (including W-9 status, insurance, and tax classification)

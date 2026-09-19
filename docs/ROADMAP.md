@@ -81,7 +81,7 @@ Progress across the seven canonical architectural phases leading to Foundational
   - [x] Granular Subuser Permissions & Dual Scoping (`user_portfolio_access`, `user_module_access`, and User Management API `/api/v1/users`).
   - [x] Setup Wizard Architecture Selector (Single-Operator Mode vs. Multi-Operator Mode) with automatic environment binding.
   - [x] Pre-release security review & zero-dependency architectural compliance verification.
-- [ ] **Sprint 4 (Weeks 7–8): Financial Modernization, Client Accounting & Policy Engine** (Planned, Target: v0.1.0-alpha)
+- [ ] **Sprint 4 (Weeks 7–8): Financial Modernization, Client Accounting & Policy Engine** (Planned, Target: v0.1.1-alpha)
   - [ ] Deprecation and removal of legacy single-entry accounting (`transactions` table) and abandoned aliases (`tenants` view).
   - [ ] Client Accounting & Management Fees: Fiduciary portfolio accounting, Client Capital Contributions (`client_capital_contributions`), automated management fee calculation (% of rent / flat unit fee), and Client Distribution / Draw engine based on net operating cash.
   - [ ] Leasing AR & Fee Policy Engine: Granular sub-resources for recurring lease charges (`recurring_lease_charges`), configurable late fee policies (`late_fee_policies`), one-off adjustments, discounts, promotional concessions, and move-out deposit disposition refunds.
@@ -93,9 +93,9 @@ Progress across the seven canonical architectural phases leading to Foundational
   - [ ] **Vendor Credit Memos & Bill Offsets**: Vendor credit issuance and allocation offsets against accounts payable liabilities.
   - [ ] **Vendor Check Register CRUD & PDF Printing**: Native vector stream check generator (`web/lib/pdf.ts`) supporting ANSI X9.100-140 check stock specifications, check number auditing, and void check operations.
   - [ ] **Bank Deposits & Batched Clearing**: Grouping undeposited receipts into statement-reconciled bank deposit slips with voiding capability.
-  - [ ] **Amenities & Marketing Syndication Profiles**: Standardized building/unit amenities dictionaries (`/buildings/amenities`, `/units/amenities`), pet policies, and rental listing advertising metadata (`published_for_rent`, `posting_title`, `specials`).
-  - [ ] **Dynamic Custom Fields Engine**: Metadata schema definitions API (`/custom-fields/:type/definitions`), entity mutation endpoints, and standardized `YYYY-MM-DD` date formatting.
-  - [ ] **Standardized Bulk & Temporal API Conventions**: Transactional bulk creation (`POST /api/v1/:resource/bulk`), date interval filtering (`*_start`, `*_end`), and multi-key `orderby` sorting.
+  - [ ] **Amenities & Marketing Syndication Profiles**: Standardized amenities catalog (`/api/v1/amenities`), property/unit junctions, pet policies, and rental listing advertising metadata (`published_for_rent`, `posting_title`, `specials`).
+  - [ ] **Dynamic Custom Fields Engine**: Metadata schema definitions API (`/api/v1/custom_fields/definitions`), entity mutation endpoints, and standardized `YYYY-MM-DD` date formatting.
+  - [ ] **Standardized Bulk & Temporal API Conventions**: Transactional bulk creation (`POST /api/v1/:resource/bulk`), date interval filtering (`*_start`, `*_end`), and multi-key `order_by` sorting.
   - [ ] **Packaged GUI Installers**: Super-simple click-through graphical setup wizards for Windows (`.exe`/`.msi`), macOS (`.pkg`/`.dmg`), and Linux (`.deb`).
   - [ ] **Public-Facing Tenant Self-Service Portal**: Hosted on isolated subdomain (`portal.<domain>`) with magic-link passwordless email login, mobile-first presentation, and safe mobile maintenance photo uploads.
   - [ ] **TypeScript SSR Presentation Layer (UI)**: AP bill entry & multi-property allocation queue, Check register & printing batch preview screen, Bank deposit batching dashboard, Dynamic custom fields form renderer component, and Amenities/Marketing editor.
@@ -228,7 +228,7 @@ GarrisonOS organizes engineering work into structured two-week execution sprints
 ---
 
 ### Sprint 4 (Weeks 7–8): Financial Modernization, Client Accounting & Policy Engine
-> **Status**: Planned | **Release Target**: v0.1.0-alpha | **Effort**: ~48 hours
+> **Status**: Planned | **Release Target**: v0.1.1-alpha | **Effort**: ~48 hours
 
 | Priority | Task | Effort | Impact | Status |
 | :---: | :--- | :---: | :---: | :---: |
@@ -251,10 +251,10 @@ GarrisonOS organizes engineering work into structured two-week execution sprints
 | 28 | **Accounts Payable (AP) Core Subsystem**: integrated into `modules/accounting/`, managing bill lifecycle (Draft, Unapproved, Approved, Paid, Voided), multi-property allocations (`bill_allocations`), and recurring bills (`recurring_bills`) | 8h | High | Planned |
 | 29 | **Vendor Credit Memos & Bill Offsets**: vendor credit issuance (`vendor_credits`) and allocation offsets against accounts payable liabilities | 4h | High | Planned |
 | 30 | **Zero-Dependency PDF Vendor Check Printing & Check Register**: native server-rendered PDF check generator (`web/lib/pdf.ts`) supporting ANSI X9.100-140 check stock specifications with check register CRUD and void operations | 6h | High | Planned |
-| 31 | **Bank Deposits & Batched Clearing**: grouping multiple cash/check/electronic receipts into deposit slip batches (`bank_deposits`) for 3-way reconciliation with voiding support | 4h | High | Planned |
-| 32 | **Property & Unit Amenities Catalog & Marketing Syndication Profiles**: amenities dictionaries (`/buildings/amenities`, `/units/amenities`), pet policies, and rental listing advertising copy (`published_for_rent`, `posting_title`, `specials`) | 6h | High | Planned |
+| 31 | **Bank Deposits & Batched Clearing**: grouping multiple cash/check/electronic receipts into deposit slip batches (`bank_deposits`) for bank statement clearing reconciliation with voiding support | 4h | High | Planned |
+| 32 | **Property & Unit Amenities Catalog & Marketing Syndication Profiles**: amenities catalog (`/api/v1/amenities`), property and unit junctions, pet policies, and rental listing advertising copy (`published_for_rent`, `posting_title`, `specials`) | 6h | High | Planned |
 | 33 | **Dynamic Custom Fields Engine**: validated JSON column (`custom_fields`) on primary entities governed by `custom_field_definitions` schema table with standardized `YYYY-MM-DD` date formatting | 4h | Medium | Planned |
-| 34 | **Standardized Bulk Ingestion & Temporal Query Conventions**: transactional bulk creation (`POST /api/v1/:resource/bulk`), timestamp interval filtering (`*_start`/`*_end`), and multi-key `orderby` sorting across all collections | 4h | High | Planned |
+| 34 | **Standardized Bulk Ingestion & Temporal Query Conventions**: transactional bulk creation (`POST /api/v1/:resource/bulk`), timestamp interval filtering (`*_start`/`*_end`), and multi-key `order_by` sorting across all collections | 4h | High | Planned |
 | 35 | **AP, Banking, Custom Fields & Marketing SSR UI Views**: AP bill entry with multi-property allocations, check register preview and print dashboard, bank deposit batching screen, dynamic custom field form generator, and amenities/marketing editor | 6h | High | Planned |
 
 ---

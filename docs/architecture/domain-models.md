@@ -187,8 +187,8 @@ CREATE TABLE IF NOT EXISTS properties (
     pet_deposit_cents INTEGER DEFAULT 0,
     pet_fee_cents INTEGER DEFAULT 0,
     pet_rent_cents INTEGER DEFAULT 0,
-    pet_dog_allowed INTEGER DEFAULT 0 CHECK (pet_dog_allowed IN (0, 1)),
-    pet_cat_allowed INTEGER DEFAULT 0 CHECK (pet_cat_allowed IN (0, 1)),
+    pet_dog_allowed INTEGER NOT NULL DEFAULT 0 CHECK (pet_dog_allowed IN (0, 1)),
+    pet_cat_allowed INTEGER NOT NULL DEFAULT 0 CHECK (pet_cat_allowed IN (0, 1)),
     pet_weight_limit_lbs INTEGER,
     featured_image_url TEXT,
     custom_fields TEXT NOT NULL DEFAULT '{}',
@@ -296,7 +296,7 @@ Directory of tenants, clients (owners), vendors, and contractors.
 CREATE TABLE IF NOT EXISTS contacts (
     id TEXT PRIMARY KEY,
     operator_id TEXT NOT NULL REFERENCES operators(id),
-    contact_type TEXT NOT NULL CHECK (contact_type IN ('tenant', 'client', 'vendor', 'emergency', 'prospect')),
+    contact_type TEXT NOT NULL CHECK (contact_type IN ('tenant', 'owner', 'client', 'vendor', 'guarantor', 'emergency', 'prospect')),
     first_name TEXT NOT NULL,
     last_name TEXT NOT NULL,
     company_name TEXT,
@@ -307,10 +307,12 @@ CREATE TABLE IF NOT EXISTS contacts (
     city TEXT,
     state TEXT,
     postal_code TEXT,
+    tax_id_last4 TEXT,
     tax_id_encrypted TEXT,
     tax_payer_name TEXT,
-    tax_classification TEXT CHECK (tax_classification IN ('individual', 'corporation', 'partnership', 'llc_single', 'llc_partnership', 'llc_corporation', 'other')),
+    tax_classification TEXT CHECK (tax_classification IN ('individual', 'llc', 'corporation', 'partnership', 'llc_single', 'llc_partnership', 'llc_corporation', 'other')),
     trade_specialization TEXT CHECK (trade_specialization IN ('Plumbing', 'Electrical', 'HVAC', 'General Contracting', 'Appliance Repair', 'Roofing', 'Landscaping', 'Painting', 'Pest Control', 'Cleaning', 'Locksmith', 'Legal / Professional', 'Other')),
+    vendor_specialty TEXT, -- backward-compatible alias for trade_specialization
     w9_received INTEGER NOT NULL DEFAULT 0 CHECK (w9_received IN (0, 1)),
     vendor_insured INTEGER NOT NULL DEFAULT 0 CHECK (vendor_insured IN (0, 1)),
     insurance_expiration_date INTEGER,
@@ -476,6 +478,7 @@ CREATE TABLE IF NOT EXISTS expense_recovery_charges (
     estimated_monthly_cents INTEGER NOT NULL DEFAULT 0,
     reconciliation_frequency TEXT NOT NULL DEFAULT 'annually' CHECK (reconciliation_frequency IN ('monthly', 'quarterly', 'annually')),
     created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
     deleted_at INTEGER
 );
 CREATE INDEX IF NOT EXISTS idx_expense_recovery_lease ON expense_recovery_charges(operator_id, lease_id) WHERE deleted_at IS NULL;
@@ -744,6 +747,7 @@ CREATE TABLE IF NOT EXISTS client_capital_contributions (
     reference_number TEXT,
     memo TEXT,
     created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
     deleted_at INTEGER
 );
 CREATE INDEX IF NOT EXISTS idx_client_contrib_portfolio ON client_capital_contributions(operator_id, portfolio_id) WHERE deleted_at IS NULL;
@@ -765,6 +769,7 @@ CREATE TABLE IF NOT EXISTS client_distributions (
     reference_number TEXT,
     memo TEXT,
     created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
     deleted_at INTEGER
 );
 CREATE INDEX IF NOT EXISTS idx_client_dist_portfolio ON client_distributions(operator_id, portfolio_id) WHERE deleted_at IS NULL;
@@ -815,7 +820,7 @@ CREATE INDEX IF NOT EXISTS idx_work_orders_operator_unit ON work_orders(operator
 CREATE INDEX IF NOT EXISTS idx_work_orders_assigned_vendor ON work_orders(operator_id, assigned_vendor_id) WHERE deleted_at IS NULL;
 ```
 
-### 7.2 Work Order Subtasks (`work_order_tasks`) *(Post-MVP Horizon)*
+### 7.2 Work Order Subtasks (`work_order_tasks`) *(Sprint 6: Field Operations)*
 ```sql
 CREATE TABLE IF NOT EXISTS work_order_tasks (
     id TEXT PRIMARY KEY,
@@ -827,12 +832,13 @@ CREATE TABLE IF NOT EXISTS work_order_tasks (
     is_completed INTEGER NOT NULL DEFAULT 0 CHECK (is_completed IN (0, 1)),
     completed_at INTEGER,
     created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
     deleted_at INTEGER
 );
 CREATE INDEX IF NOT EXISTS idx_wo_tasks_parent ON work_order_tasks(operator_id, work_order_id) WHERE deleted_at IS NULL;
 ```
 
-### 7.3 Technician Timecards (`technician_timecards`) *(Post-MVP Horizon)*
+### 7.3 Technician Timecards (`technician_timecards`) *(Sprint 6: Field Operations)*
 ```sql
 CREATE TABLE IF NOT EXISTS technician_timecards (
     id TEXT PRIMARY KEY,
@@ -844,6 +850,7 @@ CREATE TABLE IF NOT EXISTS technician_timecards (
     hourly_rate_cents INTEGER NOT NULL,
     bill_id TEXT REFERENCES bills(id),
     created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
     deleted_at INTEGER
 );
 CREATE INDEX IF NOT EXISTS idx_timecards_wo ON technician_timecards(operator_id, work_order_id) WHERE deleted_at IS NULL;
@@ -859,11 +866,13 @@ Polymorphic collaboration stream attached to operational entities.
 CREATE TABLE IF NOT EXISTS conversations (
     id TEXT PRIMARY KEY,
     operator_id TEXT NOT NULL REFERENCES operators(id),
-    entity_type TEXT NOT NULL CHECK (entity_type IN ('lease', 'property', 'unit', 'contact', 'work_order', 'bill', 'portfolio')),
+    entity_type TEXT NOT NULL CHECK (entity_type IN ('lease', 'property', 'building', 'unit', 'contact', 'work_order', 'bill', 'portfolio')),
     entity_id TEXT NOT NULL,
-    title TEXT,
+    subject TEXT NOT NULL,
+    is_private INTEGER NOT NULL DEFAULT 0 CHECK (is_private IN (0, 1)),
     created_by TEXT REFERENCES users(id),
     created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
     deleted_at INTEGER
 );
 CREATE INDEX IF NOT EXISTS idx_conversations_entity ON conversations(operator_id, entity_type, entity_id) WHERE deleted_at IS NULL;
@@ -887,7 +896,7 @@ Schema-agnostic field definitions validating parent `custom_fields` JSON objects
 CREATE TABLE IF NOT EXISTS custom_field_definitions (
     id TEXT PRIMARY KEY,
     operator_id TEXT NOT NULL REFERENCES operators(id),
-    entity_type TEXT NOT NULL CHECK (entity_type IN ('portfolio', 'property', 'unit', 'lease', 'contact', 'work_order', 'bill')),
+    entity_type TEXT NOT NULL CHECK (entity_type IN ('portfolio', 'property', 'building', 'unit', 'lease', 'contact', 'work_order', 'bill')),
     field_name TEXT NOT NULL,
     field_label TEXT NOT NULL,
     data_type TEXT NOT NULL CHECK (data_type IN ('string', 'number', 'boolean', 'date', 'currency', 'select')),
@@ -975,6 +984,7 @@ CREATE TABLE IF NOT EXISTS prospects (
     status TEXT NOT NULL DEFAULT 'inquiry' CHECK (status IN ('inquiry', 'showing_scheduled', 'showing_completed', 'application_submitted', 'approved', 'converted_to_lease', 'archived')),
     converted_lease_id TEXT REFERENCES leases(id),
     created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
     deleted_at INTEGER
 );
 CREATE INDEX IF NOT EXISTS idx_prospects_operator_status ON prospects(operator_id, status) WHERE deleted_at IS NULL;

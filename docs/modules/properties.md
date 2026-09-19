@@ -69,16 +69,16 @@ GarrisonOS provides integrated unit turnover management:
 * `PUT /api/v1/properties/:id`: Update property, marketing syndication flags, and pet policies
 * `DELETE /api/v1/properties/:id`: Soft delete property
 * `POST /api/v1/properties/:id/units`: Create unit under property
-* `GET /api/v1/properties/units/:unitId`: Get unit details
-* `PUT /api/v1/properties/units/:unitId`: Update unit details, syndication terms, and status
+* `GET /api/v1/properties/units/:unit_id`: Get unit details
+* `PUT /api/v1/properties/units/:unit_id`: Update unit details, syndication terms, and status
 * `GET /api/v1/amenities`: List standardized amenities catalog
 * `POST /api/v1/amenities`: Create global amenity definition
 * `PUT /api/v1/amenities/:id`: Update amenity name, category, or description
 * `DELETE /api/v1/amenities/:id`: Soft delete amenity
 * `GET /api/v1/properties/:id/amenities`: Get assigned amenities for a property
 * `PUT /api/v1/properties/:id/amenities`: Update assigned amenities for a property
-* `GET /api/v1/properties/units/:unitId/amenities`: Get assigned amenities for a unit
-* `PUT /api/v1/properties/units/:unitId/amenities`: Update assigned amenities for a unit
+* `GET /api/v1/properties/units/:unit_id/amenities`: Get assigned amenities for a unit
+* `PUT /api/v1/properties/units/:unit_id/amenities`: Update assigned amenities for a unit
 
 ---
 
